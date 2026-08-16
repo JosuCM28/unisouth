@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UNISOUTH — SISTEMA VISUAL FLAT
+   La app se usa en una bodega con luz mala, en celular, a veces con
+   guantes. Por eso: cero sombras, cero degradados, cero blur. La
+   jerarquía se construye con bordes de 1px y fondo sólido, nunca con
+   elevación. Un solo acento (ámbar industrial) para la acción primaria.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Radio del sistema: 4px, punto. */
+  --radius: 0.25rem;
+
+  /* ── Neutros fríos (slate) ── */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.208 0.042 265.755);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 265.755);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.208 0.042 265.755);
+
+  /* ── Acento único: ámbar industrial ──
+     Sólo acción primaria y estado activo del nav. Nada más. */
+  --primary: oklch(0.769 0.158 70.08);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.769 0.158 70.08);
+
+  /* ── Estados de inventario: fondo sólido + texto legible ──
+     verde disponible · ámbar reservado · violeta retazo · rojo defectuoso */
+  --state-available: oklch(0.596 0.145 163.225);
+  --state-available-foreground: oklch(0.984 0.003 247.858);
+  --state-available-muted: oklch(0.95 0.045 163.225);
+
+  --state-reserved: oklch(0.769 0.158 70.08);
+  --state-reserved-foreground: oklch(0.208 0.042 265.755);
+  --state-reserved-muted: oklch(0.96 0.05 70.08);
+
+  --state-remnant: oklch(0.606 0.176 293.744);
+  --state-remnant-foreground: oklch(0.984 0.003 247.858);
+  --state-remnant-muted: oklch(0.95 0.04 293.744);
+
+  --state-defective: oklch(0.577 0.245 27.325);
+  --state-defective-foreground: oklch(0.984 0.003 247.858);
+  --state-defective-muted: oklch(0.95 0.05 27.325);
+
+  /* ── Sidebar ── */
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.769 0.158 70.08);
+  --sidebar-primary-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.769 0.158 70.08);
+
+  /* Gráficas: derivadas de los estados, para no meter una paleta nueva. */
+  --chart-1: oklch(0.769 0.158 70.08);
+  --chart-2: oklch(0.596 0.145 163.225);
+  --chart-3: oklch(0.606 0.176 293.744);
+  --chart-4: oklch(0.554 0.046 257.417);
+  --chart-5: oklch(0.577 0.245 27.325);
+}
+
+.dark {
+  --background: oklch(0.208 0.042 265.755);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.279 0.041 260.031);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.279 0.041 260.031);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+
+  --primary: oklch(0.769 0.158 70.08);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+
+  --destructive: oklch(0.637 0.237 25.331);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+
+  --border: oklch(0.372 0.044 257.287);
+  --input: oklch(0.372 0.044 257.287);
+  --ring: oklch(0.769 0.158 70.08);
+
+  --state-available: oklch(0.696 0.149 162.48);
+  --state-available-foreground: oklch(0.208 0.042 265.755);
+  --state-available-muted: oklch(0.32 0.06 162.48);
+
+  --state-reserved: oklch(0.769 0.158 70.08);
+  --state-reserved-foreground: oklch(0.208 0.042 265.755);
+  --state-reserved-muted: oklch(0.34 0.07 70.08);
+
+  --state-remnant: oklch(0.702 0.183 293.541);
+  --state-remnant-foreground: oklch(0.208 0.042 265.755);
+  --state-remnant-muted: oklch(0.32 0.07 293.541);
+
+  --state-defective: oklch(0.637 0.237 25.331);
+  --state-defective-foreground: oklch(0.984 0.003 247.858);
+  --state-defective-muted: oklch(0.32 0.08 25.331);
+
+  --sidebar: oklch(0.279 0.041 260.031);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.769 0.158 70.08);
+  --sidebar-primary-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-accent: oklch(0.372 0.044 257.287);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(0.372 0.044 257.287);
+  --sidebar-ring: oklch(0.769 0.158 70.08);
+
+  --chart-1: oklch(0.769 0.158 70.08);
+  --chart-2: oklch(0.696 0.149 162.48);
+  --chart-3: oklch(0.702 0.183 293.541);
+  --chart-4: oklch(0.704 0.04 256.788);
+  --chart-5: oklch(0.637 0.237 25.331);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-state-available: var(--state-available);
+  --color-state-available-foreground: var(--state-available-foreground);
+  --color-state-available-muted: var(--state-available-muted);
+  --color-state-reserved: var(--state-reserved);
+  --color-state-reserved-foreground: var(--state-reserved-foreground);
+  --color-state-reserved-muted: var(--state-reserved-muted);
+  --color-state-remnant: var(--state-remnant);
+  --color-state-remnant-foreground: var(--state-remnant-foreground);
+  --color-state-remnant-muted: var(--state-remnant-muted);
+  --color-state-defective: var(--state-defective);
+  --color-state-defective-foreground: var(--state-defective-foreground);
+  --color-state-defective-muted: var(--state-defective-muted);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Todos los radios apuntan al mismo valor: el sistema es plano y parejo. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* El diseño flat no usa elevación: ninguna sombra debe colarse por
+     defecto de una librería de componentes. Se anulan de raíz. */
+  .shadow-2xs,
+  .shadow-xs,
+  .shadow-sm,
+  .shadow,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: none !important;
+  }
+}
+
+@layer components {
+  /* Toda tarjeta del sistema. Jerarquía por borde, no por sombra. */
+  .flat-surface {
+    @apply border border-border bg-card;
+  }
+
+  /* Obligatoria en TODO folio y TODA cantidad: alinea las columnas de
+     números para que el auxiliar compare metrajes de un vistazo. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Área táctil mínima (44px) para usar la app de pie y con guantes. */
+  .touch-target {
+    @apply min-h-11 min-w-11;
+  }
+
+  /* Respeto del notch en celular. */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Listas horizontales sin barra visible (chips de filtro en celular). */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

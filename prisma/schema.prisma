@@ -1,0 +1,1434 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  UNISOUTH — WAREHOUSE INVENTORY SYSTEM
+//  PostgreSQL 18 (Neon) · Prisma 6 · BetterAuth
+//
+//  Conventions:
+//   · Quantities & money: Decimal(14,4) — never Float
+//   · History (Movement, AuditLog) is IMMUTABLE: append-only
+//   · Catalogs use soft delete (deletedAt), never physical DELETE
+//   · `extras Json?` + CustomField = add fields without a migration
+// ═══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  1. AUTHENTICATION — BetterAuth core schema
+//     Field names MUST match BetterAuth's expectations. Custom fields
+//     (role, phone, pinHash, active) are declared in lib/auth.ts under
+//     `user.additionalFields`.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // ── Custom fields (BetterAuth admin plugin + app-specific) ──
+  /// Stored as String because the BetterAuth admin plugin requires it.
+  /// The allowed values live in lib/constants/roles.ts (single source of truth).
+  role       String    @default("READ_ONLY")
+  banned     Boolean   @default(false)
+  banReason  String?
+  banExpires DateTime?
+  phone      String?
+  /// Short PIN hash for fast shop-floor actions (scan + cut without full login).
+  pinHash    String?
+  active     Boolean   @default(true)
+  deletedAt  DateTime?
+
+  sessions Session[]
+  accounts Account[]
+
+  // ── Traceability: who did what ──
+  auditLogs                 AuditLog[]
+  movements                 Movement[]          @relation("MovementUser")
+  lotsCreated               Lot[]               @relation("LotCreatedBy")
+  receiptsRecorded          Receipt[]           @relation("ReceiptRecordedBy")
+  documentsCreated          InventoryDocument[] @relation("DocumentCreatedBy")
+  documentsApplied          InventoryDocument[] @relation("DocumentAppliedBy")
+  documentsCancelled        InventoryDocument[] @relation("DocumentCancelledBy")
+  reservationsCreated       Reservation[]       @relation("ReservationCreatedBy")
+  countsResponsible         Count[]             @relation("CountResponsible")
+  countLinesCounted         CountLine[]         @relation("CountLineCountedBy")
+  billsOfMaterialsCreated   BillOfMaterials[]   @relation("BomCreatedBy")
+  billsOfMaterialsApproved  BillOfMaterials[]   @relation("BomApprovedBy")
+  calculationsCreated       Calculation[]       @relation("CalculationCreatedBy")
+  productionOrdersCreated   ProductionOrder[]   @relation("ProductionOrderCreatedBy")
+  purchaseRequestsRequested PurchaseRequest[]   @relation("PurchaseRequestRequestedBy")
+  purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
+
+  @@index([active, role])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Set by the BetterAuth admin plugin when an admin impersonates a user.
+  impersonatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+/// Immutable audit trail: WHO touched WHAT, WHEN, FROM WHERE, and exactly
+/// which fields changed. Written by AuditService, never inline.
+model AuditLog {
+  id        String      @id @default(cuid())
+  entity    String
+  entityId  String?
+  action    AuditAction
+  reference String?
+
+  oldValue      Json?
+  newValue      Json?
+  changedFields String[]
+
+  sensitivity Sensitivity @default(LOW)
+  reason      String?
+
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName String?
+
+  ip        String?
+  userAgent String?
+  source    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId, createdAt])
+  @@index([userId, createdAt])
+  @@index([sensitivity, createdAt])
+  @@index([createdAt])
+  @@index([reference])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPLY
+  CANCEL
+  RECALCULATE
+  APPROVE
+  PRINT
+  EXPORT
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+}
+
+enum Sensitivity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  2. CATALOGS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Location {
+  id       String       @id @default(cuid())
+  code     String       @unique
+  name     String
+  type     LocationType @default(ROW)
+  order    Int          @default(0)
+  parentId String?
+  parent   Location?    @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children Location[]   @relation("LocationHierarchy")
+
+  lotCapacity Int?
+  notes       String?
+  active      Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lots            Lot[]
+  movementsFrom   Movement[]  @relation("MovementLocationFrom")
+  movementsTo     Movement[]  @relation("MovementLocationTo")
+  counts          Count[]
+  countLinesFound CountLine[] @relation("CountLineLocationFound")
+
+  @@index([type, active])
+  @@index([order])
+  @@map("locations")
+}
+
+enum LocationType {
+  ROW
+  RACK
+  PALLET
+  FLOOR
+  SHELF
+  REMNANTS
+  QUARANTINE
+  TRANSIT
+}
+
+/// The OWNER of the material. Fabric usually belongs to whoever commissioned
+/// the job, so all stock is segregated by owner.
+model Client {
+  id        String    @id @default(cuid())
+  code      String?   @unique
+  name      String    @unique
+  legalName String?
+  taxId     String?
+  contact   String?
+  phone     String?
+  email     String?
+  notes     String?
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  productionRuns   ProductionRun[]
+  lots             Lot[]
+  receipts         Receipt[]
+  finishedProducts FinishedProduct[]
+  calculations     Calculation[]
+  productionOrders ProductionOrder[]
+
+  @@index([active])
+  @@map("clients")
+}
+
+model ProductionRun {
+  id        String              @id @default(cuid())
+  code      String              @unique
+  name      String
+  clientId  String
+  client    Client              @relation(fields: [clientId], references: [id])
+  season    String?
+  startDate DateTime?
+  endDate   DateTime?
+  status    ProductionRunStatus @default(ACTIVE)
+  notes     String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  lots             Lot[]
+  movements        Movement[]
+  reservations     Reservation[]
+  calculations     Calculation[]
+  productionOrders ProductionOrder[]
+  documents        InventoryDocument[]
+
+  @@index([clientId, status])
+  @@map("production_runs")
+}
+
+enum ProductionRunStatus {
+  PLANNED
+  ACTIVE
+  PAUSED
+  CLOSED
+  CANCELLED
+}
+
+model Supplier {
+  id           String    @id @default(cuid())
+  code         String?   @unique
+  name         String    @unique
+  taxId        String?
+  contact      String?
+  phone        String?
+  email        String?
+  address      String?
+  leadTimeDays Int?
+  notes        String?
+  active       Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  receipts         Receipt[]
+  materials        SupplierMaterial[]
+  purchaseRequests PurchaseRequest[]
+
+  @@map("suppliers")
+}
+
+model Carrier {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  phone       String?
+  trackingUrl String?
+  active      Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  receipts Receipt[]
+
+  @@map("carriers")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  3. MATERIAL CATALOG
+//     Unified: fabric, zippers, buttons, thread. Fabric-only fields nullable.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Material {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  type        MaterialType
+  subtype     String?
+  description String?
+
+  baseUnit       Unit
+  purchaseUnit   Unit?
+  purchaseFactor Decimal? @db.Decimal(14, 6)
+
+  // ── Fabric attributes ──
+  composition String?
+  colorName   String?
+  colorHex    String?
+  widthMm     Int?
+  /// Fabric thickness in millimetres — how flat/technical fabrics are specced.
+  thicknessMm Decimal? @db.Decimal(8, 3)
+  /// Weight in ounces (oz/yd²) — how DENIM is specced. Coexists with thicknessMm.
+  weightOz     Decimal? @db.Decimal(6, 2)
+  gsm          Decimal? @db.Decimal(8, 2)
+  shrinkagePct Decimal? @db.Decimal(5, 2)
+  finish       String?
+
+  minStock         Decimal  @default(0) @db.Decimal(14, 4)
+  reorderPoint     Decimal  @default(0) @db.Decimal(14, 4)
+  remnantThreshold Decimal? @db.Decimal(14, 4)
+  requiresShade    Boolean  @default(false)
+  lotControlled    Boolean  @default(true)
+
+  lastCost     Decimal? @db.Decimal(14, 4)
+  costCurrency String   @default("MXN")
+
+  active    Boolean   @default(true)
+  imageUrl  String?
+  extras    Json?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  lots                 Lot[]
+  movements            Movement[]
+  suppliers            SupplierMaterial[]
+  bomLines             BomLine[]
+  requirements         CalculationRequirement[]
+  purchaseRequestLines PurchaseRequestLine[]
+  substituteOf         MaterialSubstitute[]     @relation("MainMaterial")
+  substitutes          MaterialSubstitute[]     @relation("SubstituteMaterial")
+  tags                 MaterialTag[]
+
+  @@index([type, active])
+  @@index([name])
+  @@index([colorName])
+  @@map("materials")
+}
+
+enum MaterialType {
+  FABRIC
+  ZIPPER
+  BUTTON
+  THREAD
+  ELASTIC
+  LABEL
+  SNAP
+  TAPE
+  DRAWSTRING
+  INTERLINING
+  PACKAGING
+  OTHER
+}
+
+enum Unit {
+  METER
+  SQUARE_METER
+  YARD
+  KILOGRAM
+  GRAM
+  PIECE
+  PAIR
+  CONE
+  ROLL
+  BOX
+  PACK
+  GROSS
+  THOUSAND
+  LITER
+}
+
+model MaterialSubstitute {
+  id           String   @id @default(cuid())
+  materialId   String
+  material     Material @relation("MainMaterial", fields: [materialId], references: [id], onDelete: Cascade)
+  substituteId String
+  substitute   Material @relation("SubstituteMaterial", fields: [substituteId], references: [id], onDelete: Cascade)
+  factor       Decimal  @default(1) @db.Decimal(14, 6)
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  @@unique([materialId, substituteId])
+  @@map("material_substitutes")
+}
+
+model SupplierMaterial {
+  id           String   @id @default(cuid())
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierCode String?
+  price        Decimal? @db.Decimal(14, 4)
+  currency     String   @default("MXN")
+  leadTimeDays Int?
+  minOrderQty  Decimal? @db.Decimal(14, 4)
+  preferred    Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([materialId, supplierId])
+  @@map("supplier_materials")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now())
+
+  materials MaterialTag[]
+
+  @@map("tags")
+}
+
+model MaterialTag {
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([materialId, tagId])
+  @@map("material_tags")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  4. PHYSICAL INVENTORY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A shipment. Captured ONCE, with N lots hanging off it — so the guide
+/// number, carrier and date are never retyped per roll.
+model Receipt {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  date        DateTime
+  guideNumber String?
+  carrierId   String?
+  carrier     Carrier?  @relation(fields: [carrierId], references: [id])
+  origin      String?
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+
+  invoiceRef        String?
+  orderRef          String?
+  purchaseRequestId String?
+  purchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
+
+  packageCount  Int?
+  totalWeightKg Decimal? @db.Decimal(14, 4)
+  notes         String?
+  extras        Json?
+
+  recordedById String?
+  recordedBy   User?   @relation("ReceiptRecordedBy", fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lots        Lot[]
+  attachments Attachment[]
+
+  @@index([date])
+  @@index([guideNumber])
+  @@index([clientId, date])
+  @@map("receipts")
+}
+
+/// THE PHYSICAL, IDENTIFIABLE UNIT.
+///   fabric  → one roll (code printed on the QR label)
+///   zippers → one box / homogeneous lot
+///   thread  → one cone or box of cones
+model Lot {
+  id   String @id @default(cuid())
+  code String @unique
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  receiptId  String?
+  receipt    Receipt? @relation(fields: [receiptId], references: [id])
+
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id])
+  productionRunId String?
+  productionRun   ProductionRun? @relation(fields: [productionRunId], references: [id])
+  locationId      String?
+  location        Location?      @relation(fields: [locationId], references: [id])
+
+  supplierLotNumber String?
+  /// Dye lot / shade batch. Two shades in one layup = rejected garment.
+  shade     String?
+  colorText String?
+
+  actualWidthMm     Int?
+  actualThicknessMm Decimal? @db.Decimal(8, 3)
+  actualWeightOz    Decimal? @db.Decimal(6, 2)
+  weightKg          Decimal? @db.Decimal(14, 4)
+
+  unit            Unit
+  initialQuantity Decimal @db.Decimal(14, 4)
+  /// Live balance. ONLY written inside the transaction that creates the
+  /// matching Movement (see InventoryService). Never edited by hand.
+  currentQuantity  Decimal @db.Decimal(14, 4)
+  /// Sum of ACTIVE reservations. available = currentQuantity - reservedQuantity
+  reservedQuantity Decimal @default(0) @db.Decimal(14, 4)
+
+  measurementSource MeasurementSource @default(SUPPLIER_LABEL)
+  verified          Boolean           @default(false)
+  verifiedAt        DateTime?
+
+  status      LotStatus @default(AVAILABLE)
+  isRemnant   Boolean   @default(false)
+  isBlocked   Boolean   @default(false)
+  blockReason String?
+
+  unitCost Decimal? @db.Decimal(14, 4)
+  currency String   @default("MXN")
+
+  receivedAt  DateTime  @default(now())
+  expiresAt   DateTime?
+  parentLotId String?
+  parentLot   Lot?      @relation("LotDerived", fields: [parentLotId], references: [id])
+  childLots   Lot[]     @relation("LotDerived")
+
+  comment String?
+  extras  Json?
+
+  createdById String?
+  createdBy   User?   @relation("LotCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements     Movement[]
+  reservations  Reservation[]
+  documentLines DocumentLine[]
+  countLines    CountLine[]
+  attachments   Attachment[]
+
+  @@index([materialId, status])
+  @@index([locationId, status])
+  @@index([clientId, productionRunId])
+  @@index([materialId, shade, status])
+  @@index([supplierLotNumber])
+  @@index([isRemnant, materialId])
+  @@index([verified])
+  @@index([receivedAt])
+  @@map("lots")
+}
+
+enum MeasurementSource {
+  SUPPLIER_LABEL
+  MEASURED
+  ESTIMATED_WEIGHT
+  ESTIMATED_VISUAL
+  PHYSICAL_COUNT
+}
+
+enum LotStatus {
+  AVAILABLE
+  RESERVED
+  IN_USE
+  REMNANT
+  DEPLETED
+  QUARANTINE
+  DEFECTIVE
+  RETURNED
+  WRITTEN_OFF
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  4.1 DOCUMENTS (receipts & issues) + LEDGER (movements)
+//      Rule: no movement exists on its own. Everything hangs off a document
+//      that can be printed, signed and cancelled.
+// ───────────────────────────────────────────────────────────────────────────
+
+model InventoryDocument {
+  id     String         @id @default(cuid())
+  code   String         @unique
+  type   DocumentType
+  date   DateTime       @default(now())
+  status DocumentStatus @default(DRAFT)
+
+  clientId          String?
+  productionRunId   String?
+  productionRun     ProductionRun?   @relation(fields: [productionRunId], references: [id])
+  productionOrderId String?
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
+
+  concept      String?
+  reference    String?
+  handedOverBy String?
+  receivedBy   String?
+
+  notes  String?
+  extras Json?
+
+  createdById        String?
+  createdBy          User?     @relation("DocumentCreatedBy", fields: [createdById], references: [id])
+  appliedById        String?
+  appliedBy          User?     @relation("DocumentAppliedBy", fields: [appliedById], references: [id])
+  appliedAt          DateTime?
+  cancelledById      String?
+  cancelledBy        User?     @relation("DocumentCancelledBy", fields: [cancelledById], references: [id])
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines       DocumentLine[]
+  movements   Movement[]
+  attachments Attachment[]
+
+  @@index([type, status, date])
+  @@index([date])
+  @@index([productionRunId])
+  @@map("inventory_documents")
+}
+
+enum DocumentType {
+  RECEIPT
+  ISSUE
+  TRANSFER
+  ADJUSTMENT
+  PRODUCTION_RETURN
+  SUPPLIER_RETURN
+  WRITE_OFF
+  COUNT
+}
+
+enum DocumentStatus {
+  DRAFT
+  APPLIED
+  CANCELLED
+}
+
+model DocumentLine {
+  id         String            @id @default(cuid())
+  documentId String
+  document   InventoryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  order      Int               @default(0)
+
+  lotId    String
+  lot      Lot     @relation(fields: [lotId], references: [id])
+  quantity Decimal @db.Decimal(14, 4)
+  unit     Unit
+
+  fromLocationId String?
+  toLocationId   String?
+
+  remainingQuantity Decimal? @db.Decimal(14, 4)
+  createsRemnant    Boolean  @default(false)
+  remnantLotId      String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+  @@index([lotId])
+  @@map("document_lines")
+}
+
+/// LEDGER. Append-only: never UPDATE, never DELETE.
+/// A correction is ANOTHER movement of type *_ADJUSTMENT.
+model Movement {
+  id   String @id @default(cuid())
+  code String @unique
+
+  lotId      String
+  lot        Lot      @relation(fields: [lotId], references: [id])
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+
+  type      MovementType
+  direction MovementDirection
+  /// Positive on receipts, NEGATIVE on issues. Running sum = balance.
+  quantity      Decimal @db.Decimal(14, 4)
+  unit          Unit
+  balanceBefore Decimal @db.Decimal(14, 4)
+  balanceAfter  Decimal @db.Decimal(14, 4)
+
+  documentId      String?
+  document        InventoryDocument? @relation(fields: [documentId], references: [id])
+  productionRunId String?
+  productionRun   ProductionRun?     @relation(fields: [productionRunId], references: [id])
+
+  fromLocationId String?
+  fromLocation   Location? @relation("MovementLocationFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String?
+  toLocation     Location? @relation("MovementLocationTo", fields: [toLocationId], references: [id])
+
+  unitCost Decimal? @db.Decimal(14, 4)
+
+  reason     String?
+  reversesId String?   @unique
+  reverses   Movement? @relation("MovementReversal", fields: [reversesId], references: [id])
+  reversedBy Movement? @relation("MovementReversal")
+
+  userId   String?
+  user     User?   @relation("MovementUser", fields: [userId], references: [id])
+  userName String?
+  source   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([lotId, createdAt])
+  @@index([materialId, createdAt])
+  @@index([type, createdAt])
+  @@index([productionRunId, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("movements")
+}
+
+enum MovementType {
+  RECEIPT_PURCHASE
+  RECEIPT_PRODUCTION_RETURN
+  RECEIPT_ADJUSTMENT
+  RECEIPT_TRANSFER
+  RECEIPT_INITIAL
+  ISSUE_PRODUCTION
+  ISSUE_SAMPLE
+  ISSUE_SCRAP
+  ISSUE_SUPPLIER_RETURN
+  ISSUE_ADJUSTMENT
+  ISSUE_TRANSFER
+  ISSUE_WRITE_OFF
+  RECLASSIFICATION
+  RECOUNT
+}
+
+enum MovementDirection {
+  IN
+  OUT
+  NEUTRAL
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  4.2 RESERVATIONS
+// ───────────────────────────────────────────────────────────────────────────
+
+model Reservation {
+  id    String @id @default(cuid())
+  lotId String
+  lot   Lot    @relation(fields: [lotId], references: [id])
+
+  productionOrderId String?
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
+  productionRunId   String?
+  productionRun     ProductionRun?   @relation(fields: [productionRunId], references: [id])
+  calculationId     String?
+  calculation       Calculation?     @relation(fields: [calculationId], references: [id])
+
+  quantity   Decimal           @db.Decimal(14, 4)
+  unit       Unit
+  status     ReservationStatus @default(ACTIVE)
+  validUntil DateTime?
+
+  createdById String?
+  createdBy   User?     @relation("ReservationCreatedBy", fields: [createdById], references: [id])
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  releasedAt  DateTime?
+
+  @@index([lotId, status])
+  @@index([productionOrderId, status])
+  @@map("reservations")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  FULFILLED
+  RELEASED
+  EXPIRED
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  4.3 CYCLE COUNTS
+// ───────────────────────────────────────────────────────────────────────────
+
+model Count {
+  id     String      @id @default(cuid())
+  code   String      @unique
+  name   String?
+  type   CountType   @default(CYCLE)
+  status CountStatus @default(OPEN)
+
+  locationId   String?
+  location     Location?     @relation(fields: [locationId], references: [id])
+  clientId     String?
+  materialType MaterialType?
+
+  startedAt DateTime  @default(now())
+  closedAt  DateTime?
+
+  responsibleId String?
+  responsible   User?   @relation("CountResponsible", fields: [responsibleId], references: [id])
+
+  totalExpected    Int?
+  totalCounted     Int?
+  totalMissing     Int?
+  totalExtra       Int?
+  quantityVariance Decimal? @db.Decimal(14, 4)
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines CountLine[]
+
+  @@index([status, startedAt])
+  @@map("counts")
+}
+
+model CountLine {
+  id      String @id @default(cuid())
+  countId String
+  count   Count  @relation(fields: [countId], references: [id], onDelete: Cascade)
+
+  lotId String
+  lot   Lot    @relation(fields: [lotId], references: [id])
+
+  systemQuantity  Decimal  @db.Decimal(14, 4)
+  countedQuantity Decimal? @db.Decimal(14, 4)
+  variance        Decimal? @db.Decimal(14, 4)
+
+  expectedLocationId String?
+  foundLocationId    String?
+  foundLocation      Location? @relation("CountLineLocationFound", fields: [foundLocationId], references: [id])
+
+  result            CountLineResult @default(PENDING)
+  adjustmentApplied Boolean         @default(false)
+  notes             String?
+
+  countedById String?
+  countedBy   User?     @relation("CountLineCountedBy", fields: [countedById], references: [id])
+  countedAt   DateTime?
+
+  @@unique([countId, lotId])
+  @@index([countId, result])
+  @@map("count_lines")
+}
+
+enum CountType {
+  CYCLE
+  FULL
+  BY_LOCATION
+  BY_CLIENT
+  SPOT_CHECK
+}
+
+enum CountStatus {
+  OPEN
+  IN_PROGRESS
+  UNDER_REVIEW
+  CLOSED
+  CANCELLED
+}
+
+enum CountLineResult {
+  PENDING
+  OK
+  MISSING
+  EXTRA
+  WRONG_LOCATION
+  NOT_FOUND
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  5. FINISHED PRODUCTS & BILLS OF MATERIALS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model FinishedProduct {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  description String?
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  category    String?
+  unit        Unit      @default(PIECE)
+  imageUrl    String?
+  active      Boolean   @default(true)
+  extras      Json?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  variants             Variant[]
+  billsOfMaterials     BillOfMaterials[]
+  calculationLines     CalculationLine[]
+  productionOrderLines ProductionOrderLine[]
+
+  @@index([active, category])
+  @@map("finished_products")
+}
+
+/// Size catalog with its consumption multiplier: an XL eats more fabric than
+/// an S, and this factor models that without duplicating the whole BOM.
+model Size {
+  id                String  @id @default(cuid())
+  code              String  @unique
+  name              String
+  order             Int     @default(0)
+  consumptionFactor Decimal @default(1) @db.Decimal(8, 4)
+  group             String?
+  active            Boolean @default(true)
+
+  variants             Variant[]
+  bomLines             BomLine[]
+  calculationLines     CalculationLine[]
+  productionOrderLines ProductionOrderLine[]
+
+  @@index([group, order])
+  @@map("sizes")
+}
+
+model Variant {
+  id        String          @id @default(cuid())
+  sku       String          @unique
+  productId String
+  product   FinishedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sizeId    String?
+  size      Size?           @relation(fields: [sizeId], references: [id])
+  color     String?
+  /// Overrides the size factor when linear scaling does not apply.
+  consumptionFactorOverride Decimal? @db.Decimal(8, 4)
+  active                    Boolean  @default(true)
+  extras                    Json?
+  createdAt                 DateTime @default(now())
+
+  calculationLines     CalculationLine[]
+  productionOrderLines ProductionOrderLine[]
+
+  @@unique([productId, sizeId, color])
+  @@index([productId, active])
+  @@map("variants")
+}
+
+/// The recipe. Versioned: a BOM already used by a calculation is never edited,
+/// a v2 is created instead, so old calculations stay reproducible.
+model BillOfMaterials {
+  id        String          @id @default(cuid())
+  productId String
+  product   FinishedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version   Int
+  name      String?
+  status    BomStatus       @default(DRAFT)
+
+  /// Process-wide waste (layup, ends, marker). Applied ON TOP of line waste.
+  globalWastePct Decimal @default(0) @db.Decimal(6, 3)
+
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  notes         String?
+  extras        Json?
+
+  createdById  String?
+  createdBy    User?     @relation("BomCreatedBy", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   User?     @relation("BomApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines                BomLine[]
+  calculationLines     CalculationLine[]
+  productionOrderLines ProductionOrderLine[]
+
+  @@unique([productId, version])
+  @@index([productId, status])
+  @@map("bills_of_materials")
+}
+
+enum BomStatus {
+  DRAFT
+  ACTIVE
+  OBSOLETE
+}
+
+/// One recipe line:
+///   Gas-station overall → MC ALLEN denim, 2 METER, 5% waste
+///   Gas-station overall → YKK #8 zipper, 4 PIECE, 1% waste
+///
+/// sizeId null → applies to ALL sizes and scales by Size.consumptionFactor.
+/// sizeId set  → that value is used AS-IS (linear scaling does not apply).
+model BomLine {
+  id    String          @id @default(cuid())
+  bomId String
+  bom   BillOfMaterials @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  order Int             @default(0)
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+
+  consumptionPerUnit Decimal @db.Decimal(14, 6)
+  unit               Unit
+  wastePct           Decimal @default(0) @db.Decimal(6, 3)
+
+  sizeId String?
+  size   Size?   @relation(fields: [sizeId], references: [id])
+
+  /// Fixed quantity per production BATCH instead of per unit
+  /// (e.g. 1 paper marker per run, regardless of piece count).
+  isFixedQuantity Boolean @default(false)
+
+  optional Boolean @default(false)
+  part     String?
+  notes    String?
+  extras   Json?
+
+  @@unique([bomId, materialId, sizeId, part])
+  @@index([bomId, order])
+  @@index([materialId])
+  @@map("bom_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  6. CALCULATION ENGINE (material explosion)
+//
+//    base      = Σ [ qty × consumptionPerUnit × sizeFactor ]
+//    required  = base × (1 + wastePct/100) × (1 + globalWastePct/100)
+//    available = Σ lots.currentQuantity − Σ lots.reservedQuantity
+//    shortage  = max(0, required − available − inTransit)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Calculation {
+  id     String            @id @default(cuid())
+  code   String            @unique
+  name   String?
+  type   CalculationType   @default(SIMULATION)
+  status CalculationStatus @default(DRAFT)
+
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id])
+  productionRunId String?
+  productionRun   ProductionRun? @relation(fields: [productionRunId], references: [id])
+
+  respectOwnership Boolean @default(true)
+  includeRemnants  Boolean @default(true)
+  safetyFactorPct  Decimal @default(0) @db.Decimal(6, 3)
+
+  neededByDate DateTime?
+  notes        String?
+  extras       Json?
+
+  totalUnits    Int?
+  estimatedCost Decimal? @db.Decimal(14, 4)
+  hasShortages  Boolean  @default(false)
+
+  calculatedAt DateTime?
+  createdById  String?
+  createdBy    User?     @relation("CalculationCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lines            CalculationLine[]
+  requirements     CalculationRequirement[]
+  reservations     Reservation[]
+  productionOrders ProductionOrder[]
+  purchaseRequests PurchaseRequest[]
+
+  @@index([status, createdAt])
+  @@index([clientId])
+  @@map("calculations")
+}
+
+enum CalculationType {
+  SIMULATION
+  PLANNING
+  QUOTE
+}
+
+enum CalculationStatus {
+  DRAFT
+  CALCULATED
+  RESERVED
+  CONVERTED
+  DISCARDED
+}
+
+model CalculationLine {
+  id            String      @id @default(cuid())
+  calculationId String
+  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   FinishedProduct @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   Variant?        @relation(fields: [variantId], references: [id])
+  sizeId    String?
+  size      Size?           @relation(fields: [sizeId], references: [id])
+
+  /// Frozen here so the calculation stays reproducible even after a BOM v2.
+  bomId String
+  bom   BillOfMaterials @relation(fields: [bomId], references: [id])
+
+  quantity      Int
+  appliedFactor Decimal @default(1) @db.Decimal(8, 4)
+
+  notes String?
+  order Int     @default(0)
+
+  @@index([calculationId])
+  @@map("calculation_lines")
+}
+
+/// RESULT of the explosion, one row per material. This is the screen:
+/// "you need 1,050 m of denim, 780 available, short 270".
+model CalculationRequirement {
+  id            String      @id @default(cuid())
+  calculationId String
+  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  unit       Unit
+
+  baseQuantity     Decimal @db.Decimal(14, 4)
+  appliedWastePct  Decimal @default(0) @db.Decimal(6, 3)
+  requiredQuantity Decimal @db.Decimal(14, 4)
+
+  totalStock     Decimal @default(0) @db.Decimal(14, 4)
+  reservedStock  Decimal @default(0) @db.Decimal(14, 4)
+  availableStock Decimal @default(0) @db.Decimal(14, 4)
+  remnantStock   Decimal @default(0) @db.Decimal(14, 4)
+  inTransit      Decimal @default(0) @db.Decimal(14, 4)
+
+  shortage   Decimal @default(0) @db.Decimal(14, 4)
+  sufficient Boolean @default(true)
+
+  unitCost      Decimal? @db.Decimal(14, 4)
+  estimatedCost Decimal? @db.Decimal(14, 4)
+
+  /// [{ lotId, code, shade, location, quantity }] in FIFO/shade order
+  suggestedLots Json?
+  warnings      String[]
+
+  notes String?
+
+  @@unique([calculationId, materialId])
+  @@index([calculationId, sufficient])
+  @@map("calculation_requirements")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  7. PRODUCTION ORDERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ProductionOrder {
+  id     String                @id @default(cuid())
+  code   String                @unique
+  status ProductionOrderStatus @default(DRAFT)
+
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id])
+  productionRunId String?
+  productionRun   ProductionRun? @relation(fields: [productionRunId], references: [id])
+  calculationId   String?
+  calculation     Calculation?   @relation(fields: [calculationId], references: [id])
+
+  requestedAt DateTime  @default(now())
+  neededBy    DateTime?
+  startedAt   DateTime?
+  closedAt    DateTime?
+
+  requestedBy String?
+  notes       String?
+  extras      Json?
+
+  createdById String?
+  createdBy   User?    @relation("ProductionOrderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines        ProductionOrderLine[]
+  reservations Reservation[]
+  documents    InventoryDocument[]
+
+  @@index([status, neededBy])
+  @@index([clientId])
+  @@map("production_orders")
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  PLANNED
+  MATERIAL_RESERVED
+  MATERIAL_ISSUED
+  IN_PROGRESS
+  FINISHED
+  CLOSED
+  CANCELLED
+}
+
+model ProductionOrderLine {
+  id                String          @id @default(cuid())
+  productionOrderId String
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   FinishedProduct  @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   Variant?         @relation(fields: [variantId], references: [id])
+  sizeId    String?
+  size      Size?            @relation(fields: [sizeId], references: [id])
+  bomId     String?
+  bom       BillOfMaterials? @relation(fields: [bomId], references: [id])
+
+  plannedQuantity  Int
+  producedQuantity Int @default(0)
+
+  notes String?
+  order Int     @default(0)
+
+  @@index([productionOrderId])
+  @@map("production_order_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  8. PURCHASE REQUESTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model PurchaseRequest {
+  id     String                @id @default(cuid())
+  code   String                @unique
+  status PurchaseRequestStatus @default(DRAFT)
+
+  calculationId   String?
+  calculation     Calculation? @relation(fields: [calculationId], references: [id])
+  supplierId      String?
+  supplier        Supplier?    @relation(fields: [supplierId], references: [id])
+  clientId        String?
+  productionRunId String?
+
+  requestedAt   DateTime  @default(now())
+  neededBy      DateTime?
+  justification String?
+  notes         String?
+  extras        Json?
+
+  requestedById   String?
+  requestedBy     User?     @relation("PurchaseRequestRequestedBy", fields: [requestedById], references: [id])
+  approvedById    String?
+  approvedBy      User?     @relation("PurchaseRequestApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  estimatedTotal Decimal? @db.Decimal(14, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines       PurchaseRequestLine[]
+  receipts    Receipt[]
+  attachments Attachment[]
+
+  @@index([status, neededBy])
+  @@map("purchase_requests")
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseRequestLine {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+
+  requestedQuantity Decimal  @db.Decimal(14, 4)
+  approvedQuantity  Decimal? @db.Decimal(14, 4)
+  receivedQuantity  Decimal  @default(0) @db.Decimal(14, 4)
+  unit              Unit
+
+  estimatedPrice Decimal? @db.Decimal(14, 4)
+  specification  String?
+  notes          String?
+  order          Int      @default(0)
+
+  @@index([purchaseRequestId])
+  @@index([materialId])
+  @@map("purchase_request_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  9. EXTENSIBILITY — add fields and tune rules WITHOUT a migration
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CustomField {
+  id         String    @id @default(cuid())
+  entity     String
+  key        String
+  label      String
+  type       FieldType
+  options    String[]
+  required   Boolean   @default(false)
+  searchable Boolean   @default(false)
+  group      String?
+  helpText   String?
+  order      Int       @default(0)
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([entity, key])
+  @@index([entity, active, order])
+  @@map("custom_fields")
+}
+
+enum FieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  DECIMAL
+  DATE
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  URL
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  description String?
+  group       String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+/// Code counters. Incremented inside a transaction so codes never duplicate.
+model Sequence {
+  key       String   @id
+  prefix    String
+  next      Int      @default(1)
+  padding   Int      @default(5)
+  updatedAt DateTime @updatedAt
+
+  @@map("sequences")
+}
+
+model Attachment {
+  id        String         @id @default(cuid())
+  url       String
+  name      String
+  mimeType  String?
+  sizeBytes Int?
+  type      AttachmentType @default(PHOTO)
+
+  lotId             String?
+  lot               Lot?               @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  receiptId         String?
+  receipt           Receipt?           @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  documentId        String?
+  document          InventoryDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  purchaseRequestId String?
+  purchaseRequest   PurchaseRequest?   @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([lotId])
+  @@index([receiptId])
+  @@map("attachments")
+}
+
+enum AttachmentType {
+  PHOTO
+  ORIGINAL_LABEL
+  GUIDE
+  INVOICE
+  CERTIFICATE
+  DOCUMENT
+  OTHER
+}
