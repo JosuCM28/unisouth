@@ -19,6 +19,19 @@ export interface LotFilters extends PaginationInput {
   status?: LotStatus;
   isRemnant?: boolean;
   verified?: boolean;
+  /**
+   * Los cancelados (WRITTEN_OFF) NO salen en el listado diario: el auxiliar
+   * busca rollos que puede tomar, y ver bajas mezcladas con material vivo
+   * sólo estorba. Se piden aparte con el filtro "Cancelados".
+   */
+  includeCancelled?: boolean;
+  /**
+   * Llegada dentro de los últimos N días.
+   *
+   * Se recibe como número de días y no como par de fechas porque la pregunta
+   * real del piso es "¿qué llegó esta semana?", no un rango arbitrario.
+   */
+  arrivedWithinDays?: number;
 }
 
 export interface AvailableForIssueParams {
@@ -72,12 +85,33 @@ export class LotRepository extends BaseRepository<
     if (filters.materialId) where.materialId = filters.materialId;
     if (filters.locationId) where.locationId = filters.locationId;
     if (filters.clientId) where.clientId = filters.clientId;
-    if (filters.status) where.status = filters.status;
+
+    // El estado pedido manda: si alguien filtra por "Dado de baja" quiere
+    // verlos, y ocultarlos ahí dejaría la pantalla vacía sin explicación.
+    if (filters.status) {
+      where.status = filters.status;
+    } else if (!filters.includeCancelled) {
+      where.status = { not: "WRITTEN_OFF" };
+    }
+    if (filters.arrivedWithinDays && filters.arrivedWithinDays > 0) {
+      const since = new Date();
+      since.setDate(since.getDate() - filters.arrivedWithinDays);
+      where.receivedAt = { gte: since };
+    }
+
     if (filters.isRemnant !== undefined) where.isRemnant = filters.isRemnant;
     if (filters.verified !== undefined) where.verified = filters.verified;
 
     return this.paginate<Lot>(where, { receivedAt: "desc" }, filters, {
-      material: { select: { id: true, code: true, name: true, baseUnit: true } },
+      material: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          baseUnit: true,
+          composition: true,
+        },
+      },
       location: { select: { id: true, code: true, name: true } },
       client: { select: { id: true, name: true } },
     });

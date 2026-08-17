@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { MapPin, Palette, User } from "lucide-react";
+import { CalendarDays, MapPin, Package, Palette, User } from "lucide-react";
 import type { Lot, LotStatus, Material, Unit } from "@prisma/client";
 import { LOT_STATUS_LABELS, LOT_STATUS_STYLES, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
-import { cn, formatQuantity } from "@/lib/utils";
+import { cn, formatDate, formatQuantity } from "@/lib/utils";
 
 export interface LotCardData extends Lot {
-  material: Pick<Material, "id" | "code" | "name"> & { baseUnit?: Unit };
+  material: Pick<Material, "id" | "code" | "name"> & {
+    baseUnit?: Unit;
+    composition?: string | null;
+  };
   location: { code: string; name: string } | null;
   client: { name: string } | null;
 }
@@ -24,6 +27,7 @@ export function LotCard({ lot }: { lot: LotCardData }) {
   const unit = UNIT_SHORT_LABELS[lot.unit];
   const available = Number(lot.currentQuantity) - Number(lot.reservedQuantity);
   const hasReserved = Number(lot.reservedQuantity) > 0;
+  const isCancelled = lot.status === "WRITTEN_OFF";
 
   return (
     <Link
@@ -32,7 +36,12 @@ export function LotCard({ lot }: { lot: LotCardData }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="tabular text-base font-semibold leading-tight">
+          <p
+            className={cn(
+              "tabular text-base font-semibold leading-tight",
+              isCancelled && "text-muted-foreground line-through",
+            )}
+          >
             {lot.code}
           </p>
           <p className="mt-0.5 truncate text-sm">{lot.material.name}</p>
@@ -73,6 +82,40 @@ export function LotCard({ lot }: { lot: LotCardData }) {
           </span>
         )}
       </div>
+
+      {/* Llegada y procedencia. Van abajo y en una línea aparte: no sirven
+          para identificar el rollo —eso es el folio— sino para decidir cuál
+          tomar primero y de qué carga venía. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
+        {/* shrink-0: la llegada es el dato que se vino a consultar, así que
+            si algo se encoge que sea la composición, nunca la fecha. */}
+        <span className="flex shrink-0 items-center gap-1">
+          <CalendarDays className="size-3 shrink-0" aria-hidden />
+          <span className="tabular">Llegó {formatDate(lot.receivedAt)}</span>
+        </span>
+
+        {lot.supplierLotNumber && (
+          <span className="flex min-w-0 items-center gap-1">
+            <Package className="size-3 shrink-0" aria-hidden />
+            <span className="tabular truncate">{lot.supplierLotNumber}</span>
+          </span>
+        )}
+
+        {/* min-w-0 para que pueda encogerse: sin él, una composición larga
+            estira la fila y empuja la fecha fuera de la tarjeta. */}
+        {lot.material.composition && (
+          <span className="min-w-0 truncate">{lot.material.composition}</span>
+        )}
+      </div>
+
+      {/* El motivo de la baja se lee en la lista sin abrir el rollo: si alguien
+          lo está buscando es justo para saber por qué ya no está. */}
+      {isCancelled && lot.blockReason && (
+        <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">
+          <span className="font-medium text-destructive">Cancelado:</span>{" "}
+          {lot.blockReason}
+        </p>
+      )}
     </Link>
   );
 }

@@ -30,6 +30,8 @@ interface PageProps {
     status?: string;
     onlyRemnants?: string;
     onlyUnverified?: string;
+    includeCancelled?: string;
+    arrivedWithin?: string;
   }>;
 }
 
@@ -92,6 +94,10 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
     status: params.status as LotStatus | undefined,
     isRemnant: params.onlyRemnants === "true" ? true : undefined,
     verified: params.onlyUnverified === "true" ? false : undefined,
+    includeCancelled: params.includeCancelled === "true",
+    // Viene de la URL y el usuario puede teclear cualquier cosa: un NaN
+    // colado en el where haría fallar la consulta entera.
+    arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
     pageSize: 50,
   });
 
@@ -100,6 +106,14 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
   const isFiltered = Object.entries(params).some(([, value]) => Boolean(value));
 
   return <LotList lots={lots} total={result.total} isFiltered={isFiltered} />;
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 function ListSkeleton() {

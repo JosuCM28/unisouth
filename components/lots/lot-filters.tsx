@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, SlidersHorizontal, X } from "lucide-react";
 import { LOT_STATUS_LABELS } from "@/lib/constants/labels";
 import type { LotStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,18 @@ interface LotFiltersProps {
 
 /** Estados que el auxiliar filtra a diario; el resto vive en el select. */
 const QUICK_STATUSES: LotStatus[] = ["AVAILABLE", "REMNANT", "RESERVED"];
+
+/**
+ * Rangos de llegada, en días hacia atrás.
+ *
+ * Se ofrecen ventanas cerradas en vez de un calendario: en el piso nadie
+ * escoge "del 3 al 17", se pregunta "¿qué llegó esta semana?".
+ */
+const ARRIVAL_RANGES: { value: string; label: string; days: number }[] = [
+  { value: "7", label: "Última semana", days: 7 },
+  { value: "30", label: "Último mes", days: 30 },
+  { value: "90", label: "Últimos 3 meses", days: 90 },
+];
 
 /**
  * Filtros del inventario.
@@ -51,6 +64,16 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
   const status = searchParams.get("status");
   const onlyRemnants = searchParams.get("onlyRemnants") === "true";
   const onlyUnverified = searchParams.get("onlyUnverified") === "true";
+  const includeCancelled = searchParams.get("includeCancelled") === "true";
+  const arrivedWithin = searchParams.get("arrivedWithin");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  /* Cuántos filtros de detalle están puestos. Se muestra en el botón para que
+     el auxiliar sepa que la lista está acotada aunque el panel esté cerrado:
+     una lista corta sin explicación se lee como "no hay material". */
+  const advancedCount = ["materialId", "locationId", "clientId", "arrivedWithin"]
+    .filter((key) => searchParams.get(key))
+    .length;
   const hasFilters = [...searchParams.keys()].some((key) => key !== "q");
 
   return (
@@ -77,8 +100,100 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
             setParam("onlyUnverified", onlyUnverified ? null : "true")
           }
         />
+        {/* Los cancelados están fuera del listado diario; este chip los trae
+            de vuelta cuando alguien va a buscar por qué se dio de baja uno. */}
+        <Chip
+          label="Cancelados"
+          active={includeCancelled}
+          onClick={() =>
+            setParam("includeCancelled", includeCancelled ? null : "true")
+          }
+        />
         {hasFilters && (
           <Chip label="Limpiar" icon={X} onClick={() => router.replace(pathname)} />
+        )}
+      </div>
+
+      {/* ── Celular: filtros de detalle ──
+          Van detrás de un botón porque son los que se usan de vez en cuando;
+          los de diario son los chips de arriba, que quedan siempre a la vista. */}
+      <div className="flex flex-col gap-2 md:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          className="touch-target justify-between"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((open) => !open)}
+        >
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal className="size-4" aria-hidden />
+            Filtros
+          </span>
+          {advancedCount > 0 && (
+            <span className="tabular rounded bg-primary px-1.5 text-xs text-primary-foreground">
+              {advancedCount}
+            </span>
+          )}
+        </Button>
+
+        {showAdvanced && (
+          <div className="flex flex-col gap-2 border border-border p-3">
+            <MobileFilter label="Llegada">
+              <FilterSelect
+                placeholder="Cuándo llegó"
+                value={arrivedWithin}
+                options={ARRIVAL_RANGES.map(({ value, label }) => ({
+                  id: value,
+                  label,
+                }))}
+                onChange={(v) => setParam("arrivedWithin", v)}
+                full
+              />
+            </MobileFilter>
+
+            <MobileFilter label="Material">
+              <FilterSelect
+                placeholder="Material"
+                value={searchParams.get("materialId")}
+                options={materials}
+                onChange={(v) => setParam("materialId", v)}
+                full
+              />
+            </MobileFilter>
+
+            <MobileFilter label="Ubicación">
+              <FilterSelect
+                placeholder="Ubicación"
+                value={searchParams.get("locationId")}
+                options={locations}
+                onChange={(v) => setParam("locationId", v)}
+                full
+              />
+            </MobileFilter>
+
+            <MobileFilter label="Cliente dueño">
+              <FilterSelect
+                placeholder="Cliente"
+                value={searchParams.get("clientId")}
+                options={clients}
+                onChange={(v) => setParam("clientId", v)}
+                full
+              />
+            </MobileFilter>
+
+            <MobileFilter label="Estado">
+              <FilterSelect
+                placeholder="Estado"
+                value={status}
+                options={Object.entries(LOT_STATUS_LABELS).map(([id, label]) => ({
+                  id,
+                  label,
+                }))}
+                onChange={(v) => setParam("status", v)}
+                full
+              />
+            </MobileFilter>
+          </div>
         )}
       </div>
 
@@ -101,6 +216,22 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
           options={Object.entries(LOT_STATUS_LABELS).map(([id, label]) => ({ id, label }))}
           onChange={(v) => setParam("status", v)}
         />
+        <FilterSelect
+          placeholder="Llegada" value={arrivedWithin}
+          options={ARRIVAL_RANGES.map(({ value, label }) => ({ id: value, label }))}
+          onChange={(v) => setParam("arrivedWithin", v)}
+        />
+
+        <Button
+          variant={includeCancelled ? "secondary" : "outline"}
+          className="touch-target"
+          onClick={() =>
+            setParam("includeCancelled", includeCancelled ? null : "true")
+          }
+        >
+          {includeCancelled ? "Ocultar cancelados" : "Ver cancelados"}
+        </Button>
+
         {hasFilters && (
           <Button variant="ghost" className="touch-target" onClick={() => router.replace(pathname)}>
             <X className="size-4" aria-hidden />
@@ -136,20 +267,37 @@ function Chip({
   );
 }
 
+function MobileFilter({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 function FilterSelect({
-  placeholder, value, options, onChange,
+  placeholder, value, options, onChange, full,
 }: {
   placeholder: string;
   value: string | null;
   options: Option[];
   onChange: (value: string | null) => void;
+  /** En el panel de celular ocupan el ancho completo, no 11rem. */
+  full?: boolean;
 }) {
   return (
     <Select
       value={value ?? "all"}
       onValueChange={(next) => onChange(next === "all" ? null : next)}
     >
-      <SelectTrigger className="touch-target w-44">
+      <SelectTrigger className={cn("touch-target", full ? "w-full" : "w-44")}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
