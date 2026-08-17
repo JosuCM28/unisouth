@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   Boxes,
   Building2,
   Calculator,
@@ -44,6 +45,7 @@ export const NAV_ICONS = {
   helpers: HardHat,
   documents: FileText,
   issues: PackageMinus,
+  movements: ArrowLeftRight,
   purchases: ShoppingCart,
   audit: ClipboardList,
   reports: ChartColumn,
