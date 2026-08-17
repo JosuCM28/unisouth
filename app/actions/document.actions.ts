@@ -6,7 +6,7 @@ import { cuidSchema } from "@/lib/validations/common";
 import { cancelDocumentSchema, documentSchema } from "@/lib/validations/document.schema";
 import { DocumentService } from "@/lib/services/document.service";
 
-const REVALIDATE = ["/documents", "/lots", "/dashboard"];
+const REVALIDATE = ["/documents", "/issues", "/lots", "/dashboard"];
 
 const updateDocumentSchema = z.object({ id: cuidSchema, data: documentSchema });
 const applySchema = z.object({ id: cuidSchema });

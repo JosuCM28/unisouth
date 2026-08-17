@@ -123,6 +123,15 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:read",
       },
       {
+        // Apunta al registro y no a /issues/new por la misma razón que
+        // Recepciones: consultar "¿qué salió para tal producción?" es lo
+        // que se hace a cada rato; el alta se alcanza con el botón "Nueva".
+        href: "/issues",
+        label: "Salidas",
+        icon: "issues",
+        permission: "inventory:read",
+      },
+      {
         href: "/documents",
         label: "Documentos",
         icon: "documents",
