@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/core/session";
 import { ReceiptRepository } from "@/lib/repositories/receipt.repository";
 import { cn, formatDate, formatDateTime, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
+import { ExportButton } from "@/components/shared/export-button";
 import { ReceiptLots } from "@/components/receipts/receipt-lots";
 import { Button } from "@/components/ui/button";
 
@@ -52,16 +53,22 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
         title={formatDate(receipt.date)}
         description={receipt.code}
         action={
-          <Button asChild variant="outline" className="touch-target">
-            <a
-              href={`/print/lots?receiptId=${receipt.id}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <Printer className="size-4" aria-hidden />
-              Imprimir hojas
-            </a>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              href={`/api/export/receipts/${receipt.code}`}
+              label="Excel"
+            />
+            <Button asChild variant="outline" className="touch-target">
+              <a
+                href={`/print/lots?receiptId=${receipt.id}`}
+                target="_blank"
+                rel="noopener"
+              >
+                <Printer className="size-4" aria-hidden />
+                Imprimir hojas
+              </a>
+            </Button>
+          </div>
         }
       />
 
