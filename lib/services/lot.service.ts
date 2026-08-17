@@ -3,6 +3,7 @@ import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import type {
+  CancelLotInput,
   CreateLotInput,
   CutLotInput,
   RecountLotInput,
@@ -296,6 +297,77 @@ export class LotService extends BaseService {
       });
 
       return movement;
+    });
+  }
+
+  /**
+   * Cancelación (baja) de un rollo.
+   *
+   * Soft delete de verdad: el registro NO se borra ni se le pone `deletedAt`
+   * —la tabla no tiene esa columna a propósito—, pasa a WRITTEN_OFF y sigue
+   * ahí con su historial completo y el motivo a la vista.
+   *
+   * Lo que queda del saldo se descarga con un ISSUE_ADJUSTMENT, no con un
+   * `currentQuantity = 0`. Es la regla sagrada: si escribiéramos el saldo a
+   * mano, el rollo diría 0 pero la suma de sus movimientos diría 300, y
+   * verify-integrity.ts marcaría la fila como corrupta para siempre.
+   *
+   * El motivo se guarda en `blockReason` (el campo que ya existe para
+   * explicar por qué un rollo no se puede tomar) y además queda en el
+   * movimiento y en la bitácora.
+   */
+  async cancel(input: CancelLotInput): Promise<Lot> {
+    return this.transaction(async (tx) => {
+      const lot = await this.requireLot(tx, input.id);
+
+      if (lot.status === "WRITTEN_OFF") {
+        throw new BusinessRuleError("Este rollo ya está cancelado.");
+      }
+
+      // Con material reservado hay una salida comprometida contra este rollo:
+      // cancelarlo dejaría esa reserva apuntando a algo que ya no existe.
+      const reserved = round4(Number(lot.reservedQuantity));
+      if (reserved > 0) {
+        throw new BusinessRuleError(
+          `El rollo tiene ${reserved} reservados. Libera la reserva antes de cancelarlo.`,
+        );
+      }
+
+      // Sólo si queda saldo: un rollo ya agotado se cancela sin movimiento,
+      // porque no hay nada que descargar.
+      const remaining = round4(Number(lot.currentQuantity));
+      if (remaining > 0) {
+        await this.inventory.applyMovementWithin(tx, {
+          lotId: lot.id,
+          type: "ISSUE_ADJUSTMENT",
+          quantity: remaining,
+          reason: input.reason,
+        });
+      }
+
+      const cancelled = await tx.lot.update({
+        where: { id: lot.id },
+        data: {
+          status: "WRITTEN_OFF",
+          isBlocked: true,
+          blockReason: input.reason,
+        },
+      });
+
+      // CRITICAL: es la acción más destructiva sobre un rollo. Sale destacada
+      // en el tablero de auditoría junto con quién la hizo y desde dónde.
+      await this.auditWith(tx).record({
+        entity: "Lot",
+        entityId: lot.id,
+        action: "CANCEL",
+        reference: lot.code,
+        oldValue: { status: lot.status, currentQuantity: remaining },
+        newValue: { status: "WRITTEN_OFF", currentQuantity: 0 },
+        sensitivity: "CRITICAL",
+        reason: input.reason,
+      });
+
+      return cancelled;
     });
   }
 

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   ClipboardCheck,
+  Ban,
   Printer,
   QrCode,
   Scissors,
@@ -14,6 +15,7 @@ import { LotRepository } from "@/lib/repositories/lot.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity, toPlainObject } from "@/lib/utils";
 import { StatusChip } from "@/components/lots/lot-card";
+import { CancelLotDialog } from "@/components/lots/cancel-lot-dialog";
 import { CutLotDialog } from "@/components/lots/cut-lot-dialog";
 import { RecountDialog } from "@/components/lots/recount-dialog";
 import { TransferDialog } from "@/components/lots/transfer-dialog";
@@ -43,6 +45,7 @@ export default async function LotDetailPage({ params }: PageProps) {
   const plain = toPlainObject(lot);
   const unitLabel = UNIT_SHORT_LABELS[lot.unit];
   const available = plain.currentQuantity - plain.reservedQuantity;
+  const isCancelled = lot.status === "WRITTEN_OFF";
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,6 +89,17 @@ export default async function LotDetailPage({ params }: PageProps) {
           {!lot.verified && <Chip label="Sin medir" />}
         </div>
 
+        {/* Un rollo cancelado se anuncia arriba y con el motivo: es lo primero
+            que hay que saber antes de intentar hacer nada con él. */}
+        {isCancelled && lot.blockReason && (
+          <div className="mt-3 border border-destructive p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-destructive">
+              Rollo cancelado
+            </p>
+            <p className="mt-1 text-sm">{lot.blockReason}</p>
+          </div>
+        )}
+
         {plain.reservedQuantity > 0 && (
           <p className="tabular mt-3 border-t border-border pt-3 text-sm text-state-reserved">
             {formatQuantity(plain.reservedQuantity, { unit: unitLabel })} reservados ·{" "}
@@ -95,8 +109,11 @@ export default async function LotDetailPage({ params }: PageProps) {
       </section>
 
       {/* Las acciones van ARRIBA del kárdex: son a lo que el auxiliar entra,
-          y buscarlas después de una lista larga costaría scroll. */}
-      <section className="grid grid-cols-3 gap-2">
+          y buscarlas después de una lista larga costaría scroll.
+          Un rollo cancelado no las muestra: no hay material que mover, y
+          ofrecer "Cortar" sobre una baja sólo lleva a un error. */}
+      {!isCancelled && (
+      <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <CutLotDialog
           lotId={lot.id}
           lotCode={lot.code}
@@ -137,7 +154,24 @@ export default async function LotDetailPage({ params }: PageProps) {
             </Button>
           }
         />
+
+        <CancelLotDialog
+          lotId={lot.id}
+          lotCode={lot.code}
+          currentQuantity={plain.currentQuantity}
+          unit={lot.unit}
+          trigger={
+            <Button
+              variant="outline"
+              className="h-16 flex-col gap-1 text-xs text-destructive hover:text-destructive"
+            >
+              <Ban className="size-5" aria-hidden />
+              Cancelar
+            </Button>
+          }
+        />
       </section>
+      )}
 
       {/* Impresión: la etiqueta se pega en el rollo, la hoja lo acompaña. */}
       <section className="grid grid-cols-2 gap-2">

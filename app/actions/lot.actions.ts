@@ -2,6 +2,7 @@
 
 import { executeAction } from "@/lib/core/action-handler";
 import {
+  cancelLotSchema,
   createLotSchema,
   cutLotSchema,
   recountLotSchema,
@@ -70,5 +71,25 @@ export async function transferLotAction(input: unknown) {
     successMessage: "Rollo traspasado",
     handler: ({ input, auditContext }) =>
       new LotService(auditContext).transfer(input),
+  });
+}
+
+/**
+ * Cancelación (baja) de un rollo.
+ *
+ * Exige `inventory:adjust`, igual que el reconteo y por el mismo motivo:
+ * cancelar hace desaparecer material del inventario sin que sea una salida,
+ * y eso pesa más que registrar una entrada normal.
+ *
+ * El registro NO se borra: pasa a WRITTEN_OFF conservando su historial.
+ */
+export async function cancelLotAction(input: unknown) {
+  return executeAction(input, {
+    schema: cancelLotSchema,
+    permission: "inventory:adjust",
+    revalidate: REVALIDATE,
+    successMessage: "Rollo cancelado",
+    handler: ({ input, auditContext }) =>
+      new LotService(auditContext).cancel(input),
   });
 }

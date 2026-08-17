@@ -133,3 +133,18 @@ export const updateLotSchema = z.object({
 });
 
 export type UpdateLotInput = z.infer<typeof updateLotSchema>;
+
+/**
+ * Cancelación (baja) de un rollo.
+ *
+ * El motivo es OBLIGATORIO y no se puede dejar en blanco: cancelar hace
+ * desaparecer material del inventario, y sin explicación nadie puede
+ * reconstruir seis meses después por qué ese rollo dejó de contar. Es la
+ * misma exigencia que el reconteo, por la misma razón.
+ */
+export const cancelLotSchema = z.object({
+  id: cuidSchema,
+  reason: requiredText("El motivo de la cancelación", 500),
+});
+
+export type CancelLotInput = z.infer<typeof cancelLotSchema>;
