@@ -11,6 +11,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  /// The container runs Alpine (musl). Without listing that target here the
+  /// engine compiled on the build machine does not load and the app dies at
+  /// boot with "Query engine binary could not be found".
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -27,13 +31,13 @@ datasource db {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model User {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // ── Custom fields (BetterAuth admin plugin + app-specific) ──
   /// Stored as String because the BetterAuth admin plugin requires it.
@@ -74,17 +78,17 @@ model User {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  expiresAt DateTime
-  token     String   @unique
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  expiresAt      DateTime
+  token          String   @unique
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Set by the BetterAuth admin plugin when an admin impersonates a user.
   impersonatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
   @@map("session")
@@ -337,12 +341,12 @@ model Material {
   purchaseFactor Decimal? @db.Decimal(14, 6)
 
   // ── Fabric attributes ──
-  composition String?
-  colorName   String?
-  colorHex    String?
-  widthMm     Int?
+  composition  String?
+  colorName    String?
+  colorHex     String?
+  widthMm      Int?
   /// Fabric thickness in millimetres — how flat/technical fabrics are specced.
-  thicknessMm Decimal? @db.Decimal(8, 3)
+  thicknessMm  Decimal? @db.Decimal(8, 3)
   /// Weight in ounces (oz/yd²) — how DENIM is specced. Coexists with thicknessMm.
   weightOz     Decimal? @db.Decimal(6, 2)
   gsm          Decimal? @db.Decimal(8, 2)
@@ -532,16 +536,16 @@ model Lot {
 
   supplierLotNumber String?
   /// Dye lot / shade batch. Two shades in one layup = rejected garment.
-  shade     String?
-  colorText String?
+  shade             String?
+  colorText         String?
 
   actualWidthMm     Int?
   actualThicknessMm Decimal? @db.Decimal(8, 3)
   actualWeightOz    Decimal? @db.Decimal(6, 2)
   weightKg          Decimal? @db.Decimal(14, 4)
 
-  unit            Unit
-  initialQuantity Decimal @db.Decimal(14, 4)
+  unit             Unit
+  initialQuantity  Decimal @db.Decimal(14, 4)
   /// Live balance. ONLY written inside the transaction that creates the
   /// matching Movement (see InventoryService). Never edited by hand.
   currentQuantity  Decimal @db.Decimal(14, 4)
@@ -716,13 +720,13 @@ model Movement {
   materialId String
   material   Material @relation(fields: [materialId], references: [id])
 
-  type      MovementType
-  direction MovementDirection
+  type          MovementType
+  direction     MovementDirection
   /// Positive on receipts, NEGATIVE on issues. Running sum = balance.
-  quantity      Decimal @db.Decimal(14, 4)
+  quantity      Decimal           @db.Decimal(14, 4)
   unit          Unit
-  balanceBefore Decimal @db.Decimal(14, 4)
-  balanceAfter  Decimal @db.Decimal(14, 4)
+  balanceBefore Decimal           @db.Decimal(14, 4)
+  balanceAfter  Decimal           @db.Decimal(14, 4)
 
   documentId      String?
   document        InventoryDocument? @relation(fields: [documentId], references: [id])
@@ -962,18 +966,18 @@ model Size {
 }
 
 model Variant {
-  id        String          @id @default(cuid())
-  sku       String          @unique
-  productId String
-  product   FinishedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sizeId    String?
-  size      Size?           @relation(fields: [sizeId], references: [id])
-  color     String?
+  id                        String          @id @default(cuid())
+  sku                       String          @unique
+  productId                 String
+  product                   FinishedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sizeId                    String?
+  size                      Size?           @relation(fields: [sizeId], references: [id])
+  color                     String?
   /// Overrides the size factor when linear scaling does not apply.
-  consumptionFactorOverride Decimal? @db.Decimal(8, 4)
-  active                    Boolean  @default(true)
+  consumptionFactorOverride Decimal?        @db.Decimal(8, 4)
+  active                    Boolean         @default(true)
   extras                    Json?
-  createdAt                 DateTime @default(now())
+  createdAt                 DateTime        @default(now())
 
   calculationLines     CalculationLine[]
   productionOrderLines ProductionOrderLine[]

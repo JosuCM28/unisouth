@@ -183,6 +183,9 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /* Inter, cargada en app/layout.tsx con next/font. */
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+
   /* Todos los radios apuntan al mismo valor: el sistema es plano y parejo. */
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
@@ -217,7 +220,7 @@
 @layer components {
   /* Toda tarjeta del sistema. Jerarquía por borde, no por sombra. */
   .flat-surface {
-    @apply border border-border bg-card;
+    @apply rounded border border-border bg-card;
   }
 
   /* Obligatoria en TODO folio y TODA cantidad: alinea las columnas de
@@ -249,5 +252,37 @@
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* ─── Impresión ───────────────────────────────────────────────────────────
+   Los vales y requisiciones se firman en papel. La hoja sale en blanco y
+   negro, sin navegación ni controles. */
+@media print {
+  @page {
+    margin: 1.5cm;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Nada de la app se imprime: ni sidebar, ni barra móvil, ni botones. */
+  aside,
+  nav,
+  header.sticky,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  /* Que una tabla no se parta a la mitad entre dos hojas. */
+  tr,
+  li {
+    break-inside: avoid;
   }
 }

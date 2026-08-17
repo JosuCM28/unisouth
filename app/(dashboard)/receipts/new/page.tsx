@@ -1,0 +1,43 @@
+import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { ClientRepository } from "@/lib/repositories/client.repository";
+import { LocationRepository } from "@/lib/repositories/location.repository";
+import { MaterialRepository } from "@/lib/repositories/material.repository";
+import { PageHeader } from "@/components/layout/page-header";
+import { ReceiptWizard } from "@/components/receipts/receipt-wizard";
+
+export const metadata: Metadata = { title: "Nueva recepción" };
+
+export default async function NewReceiptPage() {
+  const [materials, locations, clients, suppliers, carriers] = await Promise.all([
+    new MaterialRepository().findOptions(),
+    new LocationRepository().findOptions(),
+    new ClientRepository().findOptions(),
+    prisma.supplier.findMany({
+      where: { active: true, deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.carrier.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Nueva recepción"
+        description="Registra la carga que acaba de llegar"
+      />
+      <ReceiptWizard
+        materials={materials}
+        locations={locations}
+        clients={clients}
+        suppliers={suppliers}
+        carriers={carriers}
+      />
+    </div>
+  );
+}

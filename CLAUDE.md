@@ -80,7 +80,7 @@ lib/
   prisma.ts  auth.ts  auth-client.ts  utils.ts
 prisma/
   schema.prisma  seed.ts
-middleware.ts
+proxy.ts                   (antes middleware.ts; Next 16 lo renombró)
 ```
 
 **Regla de oro:** en `app/` sólo van Server Components delgados que resuelven
@@ -249,7 +249,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 
 Los permisos son capacidades (`inventory:write`, `inventory:adjust`,
 `catalog:write`…), no pantallas. `executeAction` exige el permiso antes de
-ejecutar. El `middleware.ts` sólo hace la redirección optimista mirando la
+ejecutar. El `proxy.ts` sólo hace la redirección optimista mirando la
 cookie; **la autorización real siempre es en el servidor**.
 
 ---

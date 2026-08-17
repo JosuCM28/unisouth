@@ -1,0 +1,43 @@
+# Alternativa a la configuración por UI de Dokploy.
+#
+# Si prefieres apuntar Dokploy a un Compose en vez de a un Dockerfile suelto,
+# usa este archivo. La base de datos NO va aquí: vive en Neon, gestionada,
+# con respaldos automáticos y sin ocupar disco del VPS.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Se hornea en el bundle del cliente: es la base del QR de cada rollo.
+        # Tiene que ser la URL pública real, no localhost.
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+      # Neon: la cadena CON -pooler para el runtime.
+      DATABASE_URL: ${DATABASE_URL}
+      # La MISMA cadena SIN -pooler. El pooler no soporta migraciones.
+      DIRECT_URL: ${DIRECT_URL}
+
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+
+    # Dokploy publica el puerto por su propio proxy (Traefik), así que no se
+    # expone al host: dejarlo abierto sería saltarse el TLS del proxy.
+    expose:
+      - "3000"
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

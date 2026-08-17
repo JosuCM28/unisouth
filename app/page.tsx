@@ -1,15 +1,17 @@
-export default function Home() {
-  return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="flat-surface w-full max-w-sm p-6">
-        <h1 className="text-lg font-semibold">UNISOUTH</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sistema de almacén textil
-        </p>
-        <p className="tabular mt-4 text-sm text-muted-foreground">
-          Fase 0 — andamiaje listo
-        </p>
-      </div>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/core/session";
+
+/**
+ * La raíz no tiene contenido propio: es un desvío.
+ *
+ * Con sesión manda al tablero; sin ella, al login. Sin esto, quien entra a
+ * `/` —o quien inicia sesión con `?redirect=/`— aterriza en una página en
+ * blanco en vez de en la app.
+ */
+export default async function RootPage() {
+  const user = await getCurrentUser();
+
+  if (!user) redirect("/login");
+
+  redirect("/dashboard");
 }

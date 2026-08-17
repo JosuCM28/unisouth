@@ -1,20 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "UNISOUTH — Almacén",
+  title: {
+    default: "Unisouth",
+    template: "%s · Unisouth",
+  },
   description: "Control de inventario textil rollo por rollo",
 };
 
@@ -26,6 +25,11 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  // Pinta la barra del navegador del mismo slate del sistema.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e293b" },
+  ],
 };
 
 export default function RootLayout({
@@ -34,11 +38,12 @@ export default function RootLayout({
   return (
     <html
       lang="es-MX"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col font-sans">
         {children}
-        <Toaster />
+        {/* Arriba y al centro: abajo lo taparía la barra de navegación móvil. */}
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );

@@ -1,0 +1,39 @@
+# ── Secretos ────────────────────────────────────────────────────────────
+# Lo más importante de este archivo: las credenciales de Neon y el secreto
+# de BetterAuth JAMÁS deben quedar horneados en una capa de la imagen.
+# En Dokploy se inyectan como variables de entorno del servicio.
+.env
+.env.*
+!.env.example
+
+# ── Dependencias y build ────────────────────────────────────────────────
+# Se instalan dentro del contenedor: las de aquí son de Windows y no sirven
+# en Linux (Prisma trae binarios nativos por plataforma).
+node_modules
+.next
+out
+build
+dist
+*.tsbuildinfo
+
+# ── Control de versiones y herramientas ─────────────────────────────────
+.git
+.gitignore
+.github
+.vscode
+.idea
+.claude
+
+# ── Documentación y scratch ─────────────────────────────────────────────
+README.md
+CLAUDE.md
+PROMPTS.md
+SETUP.md
+*.log
+npm-debug.log*
+
+# ── Sistema ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+coverage
+.vercel
