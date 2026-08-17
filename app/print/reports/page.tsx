@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/core/session";
+import { parseRangeDays } from "@/lib/constants/report-ranges";
 import { ReportService } from "@/lib/services/report.service";
 import { formatDate, formatQuantity } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
@@ -9,8 +10,6 @@ export const metadata: Metadata = { title: "Reporte" };
 interface PageProps {
   searchParams: Promise<{ dias?: string }>;
 }
-
-const ALLOWED_RANGES = [30, 90, 365];
 
 const RANGE_LABELS: Record<number, string> = {
   30: "del último mes",
@@ -29,7 +28,7 @@ export default async function PrintReportPage({ searchParams }: PageProps) {
   await requirePermission("inventory:read");
 
   const params = await searchParams;
-  const days = parseRange(params.dias);
+  const days = parseRangeDays(params.dias);
   const report = await new ReportService().getReport(days);
 
   return (
@@ -201,9 +200,4 @@ function Table({
       </tbody>
     </table>
   );
-}
-
-function parseRange(value: string | undefined): number {
-  const parsed = Number(value);
-  return ALLOWED_RANGES.includes(parsed) ? parsed : 30;
 }

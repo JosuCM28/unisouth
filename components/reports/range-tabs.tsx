@@ -1,27 +1,18 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  DEFAULT_RANGE_DAYS,
+  RANGE_OPTIONS,
+} from "@/lib/constants/report-ranges";
 import { cn } from "@/lib/utils";
-
-/**
- * Ventanas del reporte.
- *
- * Son las tres que se preguntan de verdad: el mes corriente, el trimestre y
- * el año. Un selector de fechas libre daría infinitas combinaciones que nadie
- * pide y obligaría a un calendario en pantalla de celular.
- */
-export const RANGE_OPTIONS = [
-  { days: 30, label: "Mes" },
-  { days: 90, label: "Trimestre" },
-  { days: 365, label: "Año" },
-] as const;
 
 export function RangeTabs() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const current = Number(searchParams.get("dias")) || 30;
+  const current = Number(searchParams.get("dias")) || DEFAULT_RANGE_DAYS;
 
   function select(days: number) {
     const params = new URLSearchParams(searchParams.toString());

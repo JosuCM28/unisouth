@@ -9,7 +9,8 @@ import { ExportButton } from "@/components/shared/export-button";
 import { BarChart } from "@/components/reports/bar-chart";
 import { FlowChart } from "@/components/reports/flow-chart";
 import { ProductionRanking } from "@/components/reports/production-ranking";
-import { RangeTabs, RANGE_OPTIONS } from "@/components/reports/range-tabs";
+import { parseRangeDays } from "@/lib/constants/report-ranges";
+import { RangeTabs } from "@/components/reports/range-tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,7 +24,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   await requirePermission("inventory:read");
 
   const params = await searchParams;
-  const days = parseRange(params.dias);
+  const days = parseRangeDays(params.dias);
 
   return (
     <div className="flex flex-col gap-4">
@@ -179,13 +180,6 @@ function Block({
       {children}
     </section>
   );
-}
-
-/** El rango viene de la URL: cualquier valor fuera del catálogo se ignora. */
-function parseRange(value: string | undefined): number {
-  const parsed = Number(value);
-  const allowed = RANGE_OPTIONS.some((option) => option.days === parsed);
-  return allowed ? parsed : 30;
 }
 
 function ReportSkeleton() {

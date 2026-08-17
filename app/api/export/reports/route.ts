@@ -2,6 +2,7 @@ import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
 import { csvResponse, toCsv, type CsvColumn } from "@/lib/csv";
 import { ReportService } from "@/lib/services/report.service";
+import { parseRangeDays } from "@/lib/constants/report-ranges";
 
 /**
  * Un renglón del CSV.
@@ -25,15 +26,13 @@ const COLUMNS: CsvColumn<ReportCsvRow>[] = [
   { header: "Cantidad", value: (row) => row.value },
 ];
 
-const ALLOWED_RANGES = [30, 90, 365];
-
 export async function GET(request: Request) {
   // Recorre el kárdex completo: sin límite es un vector de denegación.
   await enforceRateLimit("export:reports", EXPORT_LIMIT);
 
   await requirePermission("inventory:read");
 
-  const days = parseRange(new URL(request.url).searchParams.get("dias"));
+  const days = parseRangeDays(new URL(request.url).searchParams.get("dias"));
   const report = await new ReportService().getReport(days);
 
   const rows: ReportCsvRow[] = [
@@ -98,9 +97,4 @@ export async function GET(request: Request) {
   ];
 
   return csvResponse(toCsv(rows, COLUMNS), `reporte-${days}d`);
-}
-
-function parseRange(value: string | null): number {
-  const parsed = Number(value);
-  return ALLOWED_RANGES.includes(parsed) ? parsed : 30;
 }
