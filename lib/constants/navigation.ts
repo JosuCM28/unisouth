@@ -108,10 +108,13 @@ export const NAVIGATION: NavSection[] = [
     label: "Documentos",
     items: [
       {
-        href: "/receipts/new",
-        label: "Recepción",
+        // Apunta al registro y no a /receipts/new: dar de alta es cosa de
+        // una vez al día, pero "¿qué llegó en tal guía?" se pregunta a cada
+        // rato. El alta se alcanza desde ahí con el botón "Nueva".
+        href: "/receipts",
+        label: "Recepciones",
         icon: "receipts",
-        permission: "inventory:write",
+        permission: "inventory:read",
       },
       {
         href: "/documents",
@@ -124,6 +127,12 @@ export const NAVIGATION: NavSection[] = [
         label: "Requisiciones",
         icon: "purchases",
         permission: "purchase:request",
+      },
+      {
+        href: "/reports",
+        label: "Reportes",
+        icon: "reports",
+        permission: "inventory:read",
       },
       {
         href: "/audit",

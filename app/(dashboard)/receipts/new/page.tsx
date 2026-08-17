@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/core/session";
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
@@ -10,6 +11,12 @@ import { ReceiptWizard } from "@/components/receipts/receipt-wizard";
 export const metadata: Metadata = { title: "Nueva recepción" };
 
 export default async function NewReceiptPage() {
+  // Ocultar el enlace es comodidad visual, no seguridad: la barrera real es
+  // ésta. Antes bastaba con que el sidebar no lo pintara, pero el registro de
+  // recepciones ya es visible para roles de sólo lectura y desde ahí se
+  // alcanza esta ruta.
+  await requirePermission("inventory:write");
+
   const [materials, helpers, locations, clients, suppliers, carriers] = await Promise.all([
     new MaterialRepository().findOptions(),
     new HelperRepository().findOptions(),

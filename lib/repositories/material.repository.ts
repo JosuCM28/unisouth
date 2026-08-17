@@ -13,13 +13,23 @@ export interface MaterialFilters extends PaginationInput {
   active?: boolean;
 }
 
-/** Lo mínimo que necesita un <Select> para pintar una opción. */
+/**
+ * Lo que necesita un <Select> para pintar una opción, más los datos que se
+ * muestran al elegirla.
+ *
+ * Composición y color viajan aquí a propósito: al capturar una recepción el
+ * auxiliar tiene el rollo enfrente y necesita confirmar que el material que
+ * eligió en la lista es el que trae en la mano, sin salirse de la pantalla.
+ */
 export interface MaterialOption {
   id: string;
   code: string;
   name: string;
   baseUnit: Unit;
   type: MaterialType;
+  composition: string | null;
+  colorName: string | null;
+  requiresShade: boolean;
 }
 
 export class MaterialRepository extends BaseRepository<
@@ -55,7 +65,7 @@ export class MaterialRepository extends BaseRepository<
     return this.paginate<Material>(where, { name: "asc" }, filters);
   }
 
-  /** Opciones para los <Select>. Trae 5 columnas, no la ficha completa. */
+  /** Opciones para los <Select>. Trae 8 columnas, no la ficha completa. */
   async findOptions(type?: MaterialType): Promise<MaterialOption[]> {
     return this.db.material.findMany({
       where: {
@@ -69,6 +79,9 @@ export class MaterialRepository extends BaseRepository<
         name: true,
         baseUnit: true,
         type: true,
+        composition: true,
+        colorName: true,
+        requiresShade: true,
       },
       orderBy: { name: "asc" },
     });

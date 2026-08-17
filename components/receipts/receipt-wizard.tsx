@@ -21,6 +21,7 @@ import type { Unit } from "@prisma/client";
 import { createReceiptAction } from "@/app/actions/receipt.actions";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
+import { cn } from "@/lib/utils";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +104,12 @@ export function ReceiptWizard({
    * select sin recargar: recargar perdería los rollos ya capturados.
    */
   const [materialOptions, setMaterialOptions] = useState(materials);
+
+  /* El dueño no es un dato del material sino de la recepción: se eligió en el
+     paso 1 y aplica a todos los rollos de esta carga. Se muestra en cada
+     renglón porque surtir tela del cliente equivocado es el error caro. */
+  const clientName =
+    clients.find((client) => client.id === header.clientId)?.name ?? null;
 
   /** Igual que los materiales: uno nuevo debe aparecer sin recargar. */
   const [helperOptions, setHelperOptions] = useState(helpers);
@@ -435,6 +442,16 @@ export function ReceiptWizard({
                       }
                     />
                   </div>
+
+                  {/* Ficha rápida del material elegido: el auxiliar tiene el
+                      rollo en la mano y necesita confirmar que la etiqueta
+                      coincide con lo que acaba de escoger de la lista. */}
+                  <MaterialPreview
+                    material={materialOptions.find(
+                      (item) => item.id === row.materialId,
+                    )}
+                    clientName={clientName}
+                  />
                 </FormSelectField>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -634,6 +651,73 @@ export function ReceiptWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+/**
+ * Ficha rápida del material seleccionado.
+ *
+ * No repite el nombre —ya se lee en el select de arriba— sino lo que el
+ * auxiliar necesita cotejar contra la etiqueta física: de quién es la tela,
+ * de qué está hecha y de qué color. Si el material no trae esos datos
+ * capturados, se dice explícitamente en vez de mostrar un hueco: "sin
+ * composición registrada" es información, un espacio en blanco no.
+ */
+function MaterialPreview({
+  material,
+  clientName,
+}: {
+  material: MaterialOption | undefined;
+  clientName: string | null;
+}) {
+  if (!material) return null;
+
+  return (
+    <dl className="mt-2 flex flex-col gap-1 border border-border bg-muted/40 p-2.5 text-xs">
+      <PreviewRow
+        label="Cliente dueño"
+        value={clientName ?? "De la fábrica"}
+      />
+      <PreviewRow label="Color" value={material.colorName} />
+      <PreviewRow label="Composición" value={material.composition} />
+      <PreviewRow label="Código" value={material.code} tabular />
+
+      {/* Sólo si aplica: en telas que lo exigen, capturar el tono no es
+          opcional; dos partidas distintas en un tendido salen con franjas. */}
+      {material.requiresShade && (
+        <p className="mt-1 border-t border-border pt-1 text-state-reserved">
+          Este material exige registrar el tono.
+        </p>
+      )}
+    </dl>
+  );
+}
+
+function PreviewRow({
+  label,
+  value,
+  tabular,
+}: {
+  label: string;
+  value: string | null;
+  tabular?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      {/* break-words y NO truncate: la composición es justo el dato que se
+          coteja contra la etiqueta del rollo, y cortarla con "…" en celular
+          la vuelve inútil. Mejor que ocupe dos renglones. */}
+      <dd
+        className={cn(
+          "min-w-0 break-words text-right",
+          tabular && "tabular",
+          !value && "text-muted-foreground",
+        )}
+      >
+        {value || "Sin registrar"}
+      </dd>
     </div>
   );
 }
