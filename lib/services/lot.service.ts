@@ -103,10 +103,12 @@ export class LotService extends BaseService {
   }
 
   /**
-   * Edición de la ficha.
+   * Edición de la ficha: corregir el error de dedo.
    *
-   * NO toca cantidades: `currentQuantity` sólo se escribe dentro de
-   * InventoryService. Corregir un saldo es un reconteo, no una edición.
+   * NO toca cantidades ni fecha de llegada ni estado: eso lo fija el esquema,
+   * que sólo deja pasar los campos descriptivos. El saldo se escribe
+   * únicamente dentro de InventoryService, y `receivedAt` es un hecho
+   * histórico —el material entró ese día— que no se reescribe.
    */
   async update(input: UpdateLotInput): Promise<Lot> {
     return this.transaction(async (tx) => {
@@ -125,23 +127,25 @@ export class LotService extends BaseService {
           actualThicknessMm: input.actualThicknessMm,
           actualWeightOz: input.actualWeightOz,
           weightKg: input.weightKg,
-          status: input.status,
-          isBlocked: input.isBlocked,
-          blockReason: input.blockReason,
           unitCost: input.unitCost,
           expiresAt: input.expiresAt,
           comment: input.comment,
         },
       });
 
+      /* Se auditan SÓLO los campos editables y no el registro completo: si se
+         mandara `before` y `lot` enteros, `changedFields` incluiría updatedAt
+         en cada corrección y la bitácora diría que cambió algo que el usuario
+         nunca tocó. Con esto, quien revise ve exactamente qué se corrigió. */
       await this.auditWith(tx).record({
         entity: "Lot",
         entityId: lot.id,
         action: "UPDATE",
         reference: lot.code,
-        oldValue: before,
-        newValue: lot,
+        oldValue: pickEditable(before),
+        newValue: pickEditable(lot),
         sensitivity: "MEDIUM",
+        reason: input.reason,
       });
 
       return lot;
@@ -376,4 +380,28 @@ export class LotService extends BaseService {
     if (!lot) throw new NotFoundError("el rollo", lotId);
     return lot;
   }
+}
+
+/**
+ * Los campos que la edición puede tocar.
+ *
+ * Se usa para acotar lo que se manda a la bitácora: comparar el registro
+ * completo metería `updatedAt` en `changedFields` de cada corrección, y quien
+ * audite no sabría distinguir lo que el usuario cambió de lo que cambió solo.
+ */
+function pickEditable(lot: Lot): Record<string, unknown> {
+  return {
+    clientId: lot.clientId,
+    locationId: lot.locationId,
+    supplierLotNumber: lot.supplierLotNumber,
+    shade: lot.shade,
+    colorText: lot.colorText,
+    actualWidthMm: lot.actualWidthMm,
+    actualThicknessMm: lot.actualThicknessMm,
+    actualWeightOz: lot.actualWeightOz,
+    weightKg: lot.weightKg,
+    unitCost: lot.unitCost,
+    expiresAt: lot.expiresAt,
+    comment: lot.comment,
+  };
 }

@@ -103,11 +103,23 @@ export const transferLotSchema = z.object({
 export type TransferLotInput = z.infer<typeof transferLotSchema>;
 
 /**
- * Edición de la ficha del rollo.
+ * Edición de la ficha del rollo: corregir el error de dedo.
  *
- * Nota que NO incluye `quantity`: el saldo se escribe únicamente dentro de
- * InventoryService, junto al movimiento que lo justifica. Corregir un saldo
- * es un reconteo, no una edición.
+ * Aquí SÓLO viven los campos descriptivos, los que alguien pudo teclear mal
+ * al dar de alta el rollo. Lo que está fuera lo está a propósito:
+ *
+ * · `quantity` / `currentQuantity` — el saldo se escribe únicamente dentro de
+ *   InventoryService junto al movimiento que lo justifica. Corregir un saldo
+ *   es un reconteo, no una edición.
+ * · `receivedAt` — la fecha de llegada es un hecho histórico: el material
+ *   entró por la puerta ese día. Moverla desalinearía el rollo de su
+ *   recepción y de los reportes que ya se imprimieron.
+ * · `status` — lo gobiernan los movimientos, el reconteo y la cancelación.
+ *   Editarlo a mano permitiría "descancelar" un rollo o marcarlo agotado sin
+ *   un kárdex que lo respalde.
+ * · `isBlocked` / `blockReason` — bloquear es una decisión operativa con su
+ *   propio motivo, no un campo de captura.
+ * · `code` — el folio es la identidad del rollo y está impreso en su QR.
  */
 export const updateLotSchema = z.object({
   id: cuidSchema,
@@ -123,13 +135,16 @@ export const updateLotSchema = z.object({
   actualWeightOz: optionalNumber,
   weightKg: optionalNumber,
 
-  status: z.nativeEnum(LotStatus).optional(),
-  isBlocked: z.boolean().optional(),
-  blockReason: optionalText,
-
   unitCost: optionalNumber,
   expiresAt: z.coerce.date().optional(),
   comment: optionalText,
+
+  /**
+   * Por qué se corrige. Opcional: la mayoría de las correcciones son un dedazo
+   * evidente y exigir justificación en cada una haría que nadie corrija nada.
+   * Cuando se escribe, queda en la bitácora junto al resto del cambio.
+   */
+  reason: optionalText,
 });
 
 export type UpdateLotInput = z.infer<typeof updateLotSchema>;

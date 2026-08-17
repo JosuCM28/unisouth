@@ -6,16 +6,19 @@ import {
   ArrowRightLeft,
   ClipboardCheck,
   Ban,
+  Pencil,
   Printer,
   QrCode,
   Scissors,
 } from "lucide-react";
+import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity, toPlainObject } from "@/lib/utils";
 import { StatusChip } from "@/components/lots/lot-card";
 import { CancelLotDialog } from "@/components/lots/cancel-lot-dialog";
+import { LotEditSheet } from "@/components/lots/lot-edit-sheet";
 import { CutLotDialog } from "@/components/lots/cut-lot-dialog";
 import { RecountDialog } from "@/components/lots/recount-dialog";
 import { TransferDialog } from "@/components/lots/transfer-dialog";
@@ -35,9 +38,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function LotDetailPage({ params }: PageProps) {
   const { code } = await params;
 
-  const [lot, locations] = await Promise.all([
+  const [lot, locations, clients] = await Promise.all([
     new LotRepository().findDetail(decodeURIComponent(code)),
     new LocationRepository().findOptions(),
+    new ClientRepository().findOptions(),
   ]);
 
   if (!lot) notFound();
@@ -113,7 +117,7 @@ export default async function LotDetailPage({ params }: PageProps) {
           Un rollo cancelado no las muestra: no hay material que mover, y
           ofrecer "Cortar" sobre una baja sólo lleva a un error. */}
       {!isCancelled && (
-      <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <CutLotDialog
           lotId={lot.id}
           lotCode={lot.code}
@@ -151,6 +155,32 @@ export default async function LotDetailPage({ params }: PageProps) {
             <Button variant="outline" className="h-16 flex-col gap-1 text-xs">
               <ArrowRightLeft className="size-5" aria-hidden />
               Traspasar
+            </Button>
+          }
+        />
+
+        <LotEditSheet
+          lot={{
+            id: lot.id,
+            code: lot.code,
+            locationId: lot.locationId,
+            clientId: lot.clientId,
+            supplierLotNumber: lot.supplierLotNumber,
+            shade: lot.shade,
+            colorText: lot.colorText,
+            actualWidthMm: lot.actualWidthMm,
+            actualThicknessMm: plain.actualThicknessMm,
+            actualWeightOz: plain.actualWeightOz,
+            weightKg: plain.weightKg,
+            unitCost: plain.unitCost,
+            comment: lot.comment,
+          }}
+          locations={locations}
+          clients={clients}
+          trigger={
+            <Button variant="outline" className="h-16 flex-col gap-1 text-xs">
+              <Pencil className="size-5" aria-hidden />
+              Corregir
             </Button>
           }
         />
