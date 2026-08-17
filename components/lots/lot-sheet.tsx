@@ -3,7 +3,7 @@ import {
   MEASUREMENT_SOURCE_LABELS,
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
-import { formatDate, formatQuantity } from "@/lib/utils";
+import { cn, formatDate, formatQuantity } from "@/lib/utils";
 import type { LotSheetData } from "@/lib/lot-sheet-data";
 
 /**
@@ -19,11 +19,14 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
   const unitLabel = UNIT_SHORT_LABELS[lot.unit];
 
   return (
-    <article className="break-after-page bg-white p-8 text-black">
+    /* break-after-page separa un rollo del siguiente al imprimir varios.
+       El salto y el padding del ÚLTIMO se anulan en globals.css (@media print):
+       si no, sobra una hoja en blanco al final. */
+    <article className="break-after-page bg-white p-4 text-black sm:p-8 print:p-8">
       <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide">UNISOUTH · Almacén</p>
-          <h1 className="tabular mt-1 text-3xl font-bold leading-none">
+          <h1 className="tabular mt-1 text-2xl font-bold leading-none sm:text-3xl print:text-3xl">
             {lot.code}
           </h1>
           <p className="mt-2 text-lg">{lot.materialName}</p>
@@ -34,7 +37,7 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
 
         {/* El QR se inyecta como SVG generado en el servidor. */}
         <div
-          className="size-36 shrink-0"
+          className="size-24 shrink-0 sm:size-36 print:size-36"
           dangerouslySetInnerHTML={{ __html: qrSvg }}
         />
       </header>
@@ -115,7 +118,12 @@ function Section({
       <h2 className="border-b border-black pb-1 text-sm font-bold uppercase">
         {title}
       </h2>
-      <dl className="mt-2 grid grid-cols-2 gap-x-8 gap-y-1">{children}</dl>
+      {/* Una columna en celular: con dos, una etiqueta como "Tono / partida
+          de tintura" parte en dos líneas y su valor se sale de pantalla.
+          En papel siempre van dos, que es donde el ancho alcanza. */}
+      <dl className="mt-2 grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2 print:grid-cols-2">
+        {children}
+      </dl>
     </section>
   );
 }
@@ -139,7 +147,15 @@ function Row({
   return (
     <div className="flex justify-between gap-3 border-b border-neutral-200 py-0.5 text-sm">
       <dt className="shrink-0 text-neutral-600">{label}</dt>
-      <dd className={tabular ? "tabular text-right" : "text-right"}>
+      {/* min-w-0 + break-words: una composición larga ("80% algodón 18%
+          poliéster 2% elastano") se parte en varias líneas en vez de
+          empujar el renglón fuera de la pantalla. */}
+      <dd
+        className={cn(
+          "min-w-0 break-words text-right",
+          tabular && "tabular",
+        )}
+      >
         {value || "—"}
       </dd>
     </div>

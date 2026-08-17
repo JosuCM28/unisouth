@@ -35,7 +35,7 @@ export default async function PrintLotPage({ params, searchParams }: PageProps) 
   const qrSvg = await generateLotQr(lot.code);
 
   return (
-    <main className="mx-auto max-w-3xl">
+    <main className="mx-auto w-full max-w-3xl">
       <div className="p-4 print:hidden">
         <PrintButton />
       </div>

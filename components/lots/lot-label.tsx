@@ -21,7 +21,10 @@ export function LotLabel({
   const unitLabel = UNIT_SHORT_LABELS[lot.unit];
 
   return (
-    <article className="mx-auto w-[10cm] border-2 border-black bg-white p-4 text-black">
+    /* En papel mide 10cm exactos; en pantalla de celular eso desborda (10cm
+       ≈ 378px y el viewport son 375), así que ahí manda el ancho disponible.
+       print:w-[10cm] restituye la medida física al imprimir. */
+    <article className="mx-auto w-full max-w-[10cm] border-2 border-black bg-white p-4 text-black print:w-[10cm] print:max-w-none">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="tabular text-2xl font-bold leading-none">{lot.code}</p>

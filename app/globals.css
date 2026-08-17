@@ -285,4 +285,23 @@
   li {
     break-inside: avoid;
   }
+
+  /* La última hoja no debe arrastrar salto ni padding extra.
+     El padding es la causa real de la hoja en blanco: se suma al margen de
+     @page y empuja unos píxeles fuera del alto útil, así que la impresora
+     abre otra hoja para nada. Comprobado con Chrome headless: hoja casi
+     llena daba 2 páginas, con esto da 1.
+     El :last-child cubre las dos estructuras: la hoja de un solo rollo
+     (article directo bajo main) y la lista de varios (dentro de un div). */
+  article:last-child {
+    padding: 0 !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  main,
+  main > div:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
 }

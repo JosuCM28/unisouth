@@ -54,8 +54,8 @@ export default async function PrintLotsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-3xl">
-      <div className="flex items-center justify-between gap-3 p-4 print:hidden">
+    <main className="mx-auto w-full max-w-3xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 print:hidden">
         <p className="tabular text-sm text-muted-foreground">
           {lots.length} {lots.length === 1 ? "hoja" : "hojas"}
         </p>
@@ -63,7 +63,7 @@ export default async function PrintLotsPage({ searchParams }: PageProps) {
       </div>
 
       {/* Las etiquetas van varias por hoja; las fichas, una por página. */}
-      <div className={isLabel ? "flex flex-wrap gap-4 p-4 print:p-0" : ""}>
+      <div className={isLabel ? "flex flex-col items-center gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-start print:flex-row print:flex-wrap print:p-0" : ""}>
         {lots.map((lot) =>
           isLabel ? (
             <LotLabel key={lot.id} lot={lot} qrSvg={qrs.get(lot.code) ?? ""} />
