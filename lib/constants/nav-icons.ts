@@ -1,6 +1,7 @@
 import {
   Boxes,
   Calculator,
+  ChartColumn,
   ClipboardList,
   Factory,
   HardHat,
@@ -42,6 +43,7 @@ export const NAV_ICONS = {
   documents: FileText,
   purchases: ShoppingCart,
   audit: ClipboardList,
+  reports: ChartColumn,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;
