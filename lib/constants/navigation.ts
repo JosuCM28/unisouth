@@ -73,6 +73,12 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:read",
       },
       {
+        href: "/warehouses",
+        label: "Almacenes",
+        icon: "warehouses",
+        permission: "inventory:read",
+      },
+      {
         href: "/locations",
         label: "Ubicaciones",
         icon: "locations",

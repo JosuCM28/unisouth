@@ -19,16 +19,30 @@ const SIZES = [
   { code: "2XG", name: "Doble extra grande", order: 5, consumptionFactor: "1.24" },
 ] as const;
 
-const LOCATIONS = [
-  { code: "F1", name: "Fila 1", type: LocationType.ROW, order: 1 },
-  { code: "F2", name: "Fila 2", type: LocationType.ROW, order: 2 },
-  { code: "F3", name: "Fila 3", type: LocationType.ROW, order: 3 },
-  { code: "F4", name: "Fila 4", type: LocationType.ROW, order: 4 },
+/**
+ * Almacenes.
+ *
+ * El principal nace como `isDefault`: los rollos que se dan de alta sin
+ * especificar almacén caen ahí, para que el auxiliar no tenga que elegir en
+ * el andén con la carga esperando.
+ */
+const WAREHOUSES = [
   {
-    code: "RETAZOS",
-    name: "Retazos",
-    type: LocationType.REMNANTS,
-    order: 99,
+    code: "PRINCIPAL",
+    name: "Almacén principal",
+    isDefault: true,
+    locations: [
+      { code: "F1", name: "Fila 1", type: LocationType.ROW, order: 1 },
+      { code: "F2", name: "Fila 2", type: LocationType.ROW, order: 2 },
+      { code: "F3", name: "Fila 3", type: LocationType.ROW, order: 3 },
+      { code: "F4", name: "Fila 4", type: LocationType.ROW, order: 4 },
+      {
+        code: "RETAZOS",
+        name: "Retazos",
+        type: LocationType.REMNANTS,
+        order: 99,
+      },
+    ],
   },
 ] as const;
 
@@ -95,20 +109,45 @@ async function seedSizes() {
   console.log(`  ✓ ${SIZES.length} tallas`);
 }
 
-async function seedLocations() {
-  for (const location of LOCATIONS) {
-    await prisma.location.upsert({
-      where: { code: location.code },
-      update: { name: location.name, type: location.type, order: location.order },
+async function seedWarehouses() {
+  let locationCount = 0;
+
+  for (const warehouse of WAREHOUSES) {
+    const saved = await prisma.warehouse.upsert({
+      where: { code: warehouse.code },
+      update: { name: warehouse.name, isDefault: warehouse.isDefault },
       create: {
-        code: location.code,
-        name: location.name,
-        type: location.type,
-        order: location.order,
+        code: warehouse.code,
+        name: warehouse.name,
+        isDefault: warehouse.isDefault,
       },
     });
+
+    for (const location of warehouse.locations) {
+      // La clave natural es el par almacén+código: dos almacenes pueden tener
+      // cada uno su "F1" sin pisarse.
+      await prisma.location.upsert({
+        where: {
+          warehouseId_code: { warehouseId: saved.id, code: location.code },
+        },
+        update: {
+          name: location.name,
+          type: location.type,
+          order: location.order,
+        },
+        create: {
+          warehouseId: saved.id,
+          code: location.code,
+          name: location.name,
+          type: location.type,
+          order: location.order,
+        },
+      });
+      locationCount += 1;
+    }
   }
-  console.log(`  ✓ ${LOCATIONS.length} ubicaciones`);
+
+  console.log(`  ✓ ${WAREHOUSES.length} almacén(es), ${locationCount} ubicaciones`);
 }
 
 async function seedClients() {
@@ -205,7 +244,7 @@ async function main() {
   console.log("Sembrando datos base…");
 
   await seedSizes();
-  await seedLocations();
+  await seedWarehouses();
   await seedClients();
   await seedMaterials();
   await seedSequences();

@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
+import { WarehouseRepository } from "@/lib/repositories/warehouse.repository";
 import { LocationFormDialog } from "@/components/locations/location-form-dialog";
 import { LocationList } from "@/components/locations/location-list";
 import { WarehouseMap } from "@/components/locations/warehouse-map";
@@ -20,6 +21,7 @@ interface PageProps {
 
 export default async function LocationsPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
+  const warehouses = await new WarehouseRepository().findOptions();
 
   return (
     <div className="flex flex-col gap-6">
@@ -28,6 +30,7 @@ export default async function LocationsPage({ searchParams }: PageProps) {
         description="Filas, racks y estantes de la bodega"
         action={
           <LocationFormDialog
+            warehouses={warehouses}
             trigger={
               <Button className="touch-target">
                 <Plus className="size-4" aria-hidden />
@@ -66,10 +69,11 @@ async function ListSection({ search }: { search?: string }) {
 
   // El conteo de rollos viene de findAllWithLotCount; la búsqueda, de search().
   // Se cruzan por id para no repetir el _count en dos consultas distintas.
-  const [withCount, filtered, parents] = await Promise.all([
+  const [withCount, filtered, parents, warehouses] = await Promise.all([
     repository.findAllWithLotCount(),
     term ? repository.search({ search: term, pageSize: 100 }) : null,
     repository.findOptions(),
+    new WarehouseRepository().findOptions(),
   ]);
 
   const matchedIds = filtered
@@ -84,6 +88,7 @@ async function ListSection({ search }: { search?: string }) {
     <LocationList
       locations={locations}
       parents={parents}
+      warehouses={warehouses}
       isFiltered={Boolean(term)}
     />
   );

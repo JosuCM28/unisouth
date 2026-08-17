@@ -27,6 +27,9 @@ export const locationSchema = z.object({
   code: locationCode,
   name: requiredText("El nombre", 120),
 
+  /** Obligatorio: una ubicación existe DENTRO de un almacén, no en el aire. */
+  warehouseId: z.string().min(1, "Elige el almacén"),
+
   type: z.nativeEnum(LocationType).default(LocationType.ROW),
   order: optionalNumber,
   lotCapacity: optionalNumber,
@@ -53,6 +56,7 @@ export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;
  * lado del servidor, que es donde importa.
  */
 export const locationFormSchema = z.object({
+  warehouseId: z.string().min(1, "Elige el almacén"),
   code: z
     .string()
     .trim()

@@ -15,6 +15,7 @@ import { LocationActions } from "./location-actions";
 interface LocationListProps {
   locations: LocationWithLotCount[];
   parents: Pick<Location, "id" | "code" | "name">[];
+  warehouses: { id: string; code: string; name: string }[];
   /** Para distinguir "no hay nada" de "la búsqueda no encontró nada". */
   isFiltered?: boolean;
 }
@@ -22,6 +23,7 @@ interface LocationListProps {
 export function LocationList({
   locations,
   parents,
+  warehouses,
   isFiltered,
 }: LocationListProps) {
   const columns: DataTableColumn<LocationWithLotCount>[] = [
@@ -62,7 +64,11 @@ export function LocationList({
       enableSorting: false,
       cell: ({ row }) => (
         <div className="text-right">
-          <LocationActions location={row.original} parents={parents} />
+          <LocationActions
+            location={row.original}
+            parents={parents}
+            warehouses={warehouses}
+          />
         </div>
       ),
     },
@@ -110,7 +116,11 @@ export function LocationList({
             </p>
           </div>
 
-          <LocationActions location={location} parents={parents} />
+          <LocationActions
+            location={location}
+            parents={parents}
+            warehouses={warehouses}
+          />
         </div>
       )}
     />

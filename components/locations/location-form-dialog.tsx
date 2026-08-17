@@ -33,6 +33,7 @@ interface LocationFormDialogProps {
   /** Si viene, el formulario edita; si no, crea. */
   location?: Location;
   parents?: Pick<Location, "id" | "code" | "name">[];
+  warehouses: { id: string; code: string; name: string }[];
   trigger: ReactNode;
 }
 
@@ -45,6 +46,7 @@ const FORM_FIELDS = Object.keys(
 export function LocationFormDialog({
   location,
   parents = [],
+  warehouses,
   trigger,
 }: LocationFormDialogProps) {
   const [open, setOpen] = useState(false);
@@ -60,7 +62,7 @@ export function LocationFormDialog({
     formState: { errors, isSubmitting },
   } = useForm<LocationFormValues>({
     resolver: zodResolver(locationFormSchema),
-    defaultValues: toDefaults(location),
+    defaultValues: toDefaults(location, warehouses),
   });
 
   async function onSubmit(values: LocationFormValues) {
@@ -95,7 +97,7 @@ export function LocationFormDialog({
     setOpen(false);
     // Sólo al crear: al editar, conservar los valores permite corregir algo
     // y volver a abrir sin recapturar todo.
-    if (!isEditing) reset(toDefaults());
+    if (!isEditing) reset(toDefaults(undefined, warehouses));
   }
 
   return (
@@ -111,6 +113,28 @@ export function LocationFormDialog({
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        {/* El almacén va primero: es el que da contexto al código de abajo.
+            "F1" sólo significa algo una vez que se sabe de qué nave se habla. */}
+        <FormSelectField id="warehouseId" label="Almacén" error={errors.warehouseId?.message}>
+          <Select
+            value={watch("warehouseId")}
+            onValueChange={(value) =>
+              setValue("warehouseId", value, { shouldDirty: true })
+            }
+          >
+            <SelectTrigger id="warehouseId" className="touch-target w-full">
+              <SelectValue placeholder="Elige el almacén" />
+            </SelectTrigger>
+            <SelectContent>
+              {warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormSelectField>
+
         {/* Los dos obligatorios, arriba y a la vista. */}
         <FormField
           id="code"
@@ -231,8 +255,15 @@ export function LocationFormDialog({
   );
 }
 
-function toDefaults(location?: Location): LocationFormValues {
+function toDefaults(
+  location: Location | undefined,
+  warehouses: { id: string }[],
+): LocationFormValues {
   return {
+    /* Al crear se preselecciona el primer almacén: con una sola nave —que es
+       el caso de casi todos— obligar a elegirlo cada vez es un toque de más
+       en el celular. */
+    warehouseId: location?.warehouseId ?? warehouses[0]?.id ?? "",
     code: location?.code ?? "",
     name: location?.name ?? "",
     type: location?.type ?? "ROW",

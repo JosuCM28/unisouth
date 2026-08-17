@@ -10,9 +10,14 @@ import { LocationFormDialog } from "./location-form-dialog";
 interface LocationActionsProps {
   location: Location;
   parents?: Pick<Location, "id" | "code" | "name">[];
+  warehouses: { id: string; code: string; name: string }[];
 }
 
-export function LocationActions({ location, parents }: LocationActionsProps) {
+export function LocationActions({
+  location,
+  parents,
+  warehouses,
+}: LocationActionsProps) {
   return (
     <RowActions
       label={location.code}
@@ -20,6 +25,7 @@ export function LocationActions({ location, parents }: LocationActionsProps) {
         <LocationFormDialog
           location={location}
           parents={parents}
+          warehouses={warehouses}
           trigger={
             <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
               <Pencil className="size-4" aria-hidden />

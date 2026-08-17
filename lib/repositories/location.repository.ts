@@ -9,6 +9,7 @@ import {
 
 export interface LocationFilters extends PaginationInput {
   search?: string;
+  warehouseId?: string;
   type?: LocationType;
   active?: boolean;
 }
@@ -44,6 +45,7 @@ export class LocationRepository extends BaseRepository<
 
     if (filters.type) where.type = filters.type;
     if (filters.active !== undefined) where.active = filters.active;
+    if (filters.warehouseId) where.warehouseId = filters.warehouseId;
 
     return this.paginate<Location>(
       where,

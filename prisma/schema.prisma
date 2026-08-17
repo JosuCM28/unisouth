@@ -186,10 +186,39 @@ enum Sensitivity {
 //  2. CATALOGS
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// A physical building or yard. Each one has its own set of locations:
+/// "FILA 1" in the main warehouse is a different place from "FILA 1" in the
+/// fabric centre, so location codes are unique PER WAREHOUSE, not globally.
+model Warehouse {
+  id      String  @id @default(cuid())
+  code    String  @unique
+  name    String
+  address String?
+  notes   String?
+
+  /// Exactly one warehouse carries this. New lots land here when nobody says
+  /// otherwise, so the auxiliary never has to pick on the receiving dock.
+  isDefault Boolean @default(false)
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  locations Location[]
+
+  @@index([active])
+  @@map("warehouses")
+}
+
 model Location {
-  id       String       @id @default(cuid())
-  code     String       @unique
-  name     String
+  id   String @id @default(cuid())
+  code String
+  name String
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
   type     LocationType @default(ROW)
   order    Int          @default(0)
   parentId String?
@@ -209,6 +238,10 @@ model Location {
   counts          Count[]
   countLinesFound CountLine[] @relation("CountLineLocationFound")
 
+  /// Two warehouses may both have a "F1". What must not repeat is the code
+  /// INSIDE one warehouse.
+  @@unique([warehouseId, code])
+  @@index([warehouseId, active])
   @@index([type, active])
   @@index([order])
   @@map("locations")

@@ -19,14 +19,23 @@ export class LocationService extends BaseService {
     return this.transaction(async (tx) => {
       const repository = new LocationRepository(tx);
 
-      // El código es la clave natural: es lo que está pintado en el piso.
-      if (await repository.exists({ code: input.code })) {
+      /* El código es la clave natural DENTRO del almacén: la "Fila 1" de la
+         bodega y la del centro de telas son lugares distintos que legítimamente
+         comparten código. Sin el warehouseId aquí, dar de alta la segunda
+         fallaría por duplicado. */
+      if (
+        await repository.exists({
+          code: input.code,
+          warehouseId: input.warehouseId,
+        })
+      ) {
         throw new DuplicateError("la ubicación", "código", input.code, "code");
       }
 
       const location = await repository.create({
         code: input.code,
         name: input.name,
+        warehouse: { connect: { id: input.warehouseId } },
         type: input.type,
         order: input.order ?? 0,
         lotCapacity: input.lotCapacity,
@@ -53,7 +62,12 @@ export class LocationService extends BaseService {
       const repository = new LocationRepository(tx);
       const before = await repository.findByIdOrThrow(id);
 
-      if (await repository.exists({ code: input.code }, id)) {
+      if (
+        await repository.exists(
+          { code: input.code, warehouseId: input.warehouseId },
+          id,
+        )
+      ) {
         throw new DuplicateError("la ubicación", "código", input.code, "code");
       }
 
