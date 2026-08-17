@@ -29,6 +29,7 @@ const editFormSchema = z.object({
   supplierLotNumber: z.string().optional(),
   shade: z.string().optional(),
   colorText: z.string().optional(),
+  productionNote: z.string().optional(),
   actualWidthMm: z.string().optional(),
   actualThicknessMm: z.string().optional(),
   actualWeightOz: z.string().optional(),
@@ -48,6 +49,7 @@ export interface EditableLot {
   supplierLotNumber: string | null;
   shade: string | null;
   colorText: string | null;
+  productionNote: string | null;
   actualWidthMm: number | null;
   actualThicknessMm: number | null;
   actualWeightOz: number | null;
@@ -100,6 +102,7 @@ export function LotEditSheet({
       supplierLotNumber: values.supplierLotNumber || undefined,
       shade: values.shade || undefined,
       colorText: values.colorText || undefined,
+      productionNote: values.productionNote || undefined,
       actualWidthMm: values.actualWidthMm || undefined,
       actualThicknessMm: values.actualThicknessMm || undefined,
       actualWeightOz: values.actualWeightOz || undefined,
@@ -208,6 +211,13 @@ export function LotEditSheet({
             className="tabular"
             {...form.register("supplierLotNumber")}
           />
+          <FormField
+            id="productionNote"
+            label="Producción"
+            placeholder="TERNIUM PANTALON/CHAMARRA"
+            autoCapitalize="characters"
+            {...form.register("productionNote")}
+          />
         </FormSection>
 
         <FormSection title="Medidas">
@@ -308,6 +318,7 @@ function toFormValues(lot: EditableLot): EditFormValues {
     supplierLotNumber: lot.supplierLotNumber ?? "",
     shade: lot.shade ?? "",
     colorText: lot.colorText ?? "",
+    productionNote: lot.productionNote ?? "",
     actualWidthMm: numberToText(lot.actualWidthMm),
     actualThicknessMm: numberToText(lot.actualThicknessMm),
     actualWeightOz: numberToText(lot.actualWeightOz),

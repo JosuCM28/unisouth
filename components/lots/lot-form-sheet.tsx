@@ -36,6 +36,7 @@ const lotFormSchema = z.object({
   shade: z.string().optional(),
   supplierLotNumber: z.string().optional(),
   colorText: z.string().optional(),
+  productionNote: z.string().optional(),
   actualWidthMm: z.string().optional(),
   actualWeightOz: z.string().optional(),
   comment: z.string().optional(),
@@ -110,6 +111,7 @@ export function LotFormSheet({
       shade: values.shade || undefined,
       supplierLotNumber: values.supplierLotNumber || undefined,
       colorText: values.colorText || undefined,
+      productionNote: values.productionNote || undefined,
       actualWidthMm: values.actualWidthMm || undefined,
       actualWeightOz: values.actualWeightOz || undefined,
       comment: values.comment || undefined,
@@ -288,6 +290,16 @@ export function LotFormSheet({
           />
 
           <FormField id="colorText" label="Color" {...register("colorText")} />
+
+          {/* Para qué se usa la tela. Texto libre y no el catálogo de
+              producciones: se teclea en el andén sin dar nada de alta antes. */}
+          <FormField
+            id="productionNote"
+            label="Producción"
+            placeholder="TERNIUM PANTALON/CHAMARRA"
+            autoCapitalize="characters"
+            {...register("productionNote")}
+          />
         </FormSection>
 
         <FormSection title="Medidas">
@@ -339,6 +351,7 @@ function emptyValues(): LotFormValues {
     shade: "",
     supplierLotNumber: "",
     colorText: "",
+    productionNote: "",
     actualWidthMm: "",
     actualWeightOz: "",
     comment: "",

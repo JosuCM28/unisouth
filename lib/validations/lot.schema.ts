@@ -32,6 +32,9 @@ export const createLotSchema = z.object({
   /// mismo tendido salen con franjas y la prenda se rechaza.
   shade: optionalText,
   colorText: optionalText,
+  /// Para qué se usa esta tela: "TERNIUM PANTALON/CHAMARRA". Texto libre, se
+  /// teclea en el andén con el rollo en la mano.
+  productionNote: optionalText,
 
   actualWidthMm: optionalNumber,
   actualThicknessMm: optionalNumber,
@@ -129,6 +132,7 @@ export const updateLotSchema = z.object({
   supplierLotNumber: optionalText,
   shade: optionalText,
   colorText: optionalText,
+  productionNote: optionalText,
 
   actualWidthMm: optionalNumber,
   actualThicknessMm: optionalNumber,

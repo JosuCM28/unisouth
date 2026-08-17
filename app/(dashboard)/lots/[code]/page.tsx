@@ -168,6 +168,7 @@ export default async function LotDetailPage({ params }: PageProps) {
             supplierLotNumber: lot.supplierLotNumber,
             shade: lot.shade,
             colorText: lot.colorText,
+            productionNote: lot.productionNote,
             actualWidthMm: lot.actualWidthMm,
             actualThicknessMm: plain.actualThicknessMm,
             actualWeightOz: plain.actualWeightOz,

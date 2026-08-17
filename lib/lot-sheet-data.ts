@@ -19,6 +19,7 @@ export interface LotSheetData {
   colorText: string | null;
   shade: string | null;
   supplierLotNumber: string | null;
+  productionNote: string | null;
   status: LotStatus;
 
   clientName: string | null;
@@ -88,6 +89,7 @@ function toSheetData(lot: LotWithRelations): LotSheetData {
     colorText: lot.colorText,
     shade: lot.shade,
     supplierLotNumber: lot.supplierLotNumber,
+    productionNote: lot.productionNote,
     status: lot.status,
 
     clientName: lot.client?.name ?? null,

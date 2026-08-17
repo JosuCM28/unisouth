@@ -591,6 +591,12 @@ model Lot {
   shade             String?
   colorText         String?
 
+  /// Free text: what this fabric is for ("TERNIUM PANTALON/CHAMARRA").
+  /// Deliberately NOT the productionRun relation: that one needs the run to
+  /// exist in the catalogue first, and this gets typed on the dock with the
+  /// roll in hand. Prints on the roll sheet.
+  productionNote String?
+
   actualWidthMm     Int?
   actualThicknessMm Decimal? @db.Decimal(8, 3)
   actualWeightOz    Decimal? @db.Decimal(6, 2)

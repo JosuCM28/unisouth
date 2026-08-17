@@ -1,8 +1,4 @@
-import {
-  LOT_STATUS_LABELS,
-  MEASUREMENT_SOURCE_LABELS,
-  UNIT_SHORT_LABELS,
-} from "@/lib/constants/labels";
+import { LOT_STATUS_LABELS, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { cn, formatDate, formatQuantity } from "@/lib/utils";
 import type { LotSheetData } from "@/lib/lot-sheet-data";
 
@@ -26,13 +22,21 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
       <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide">UNISOUTH · Almacén</p>
-          <h1 className="tabular mt-1 text-2xl font-bold leading-none sm:text-3xl print:text-3xl">
+          <h1 className="tabular mt-1 text-3xl font-bold leading-none sm:text-4xl print:text-4xl">
             {lot.code}
           </h1>
-          <p className="mt-2 text-lg">{lot.materialName}</p>
-          <p className="tabular text-2xl font-bold">
+          <p className="mt-2 text-xl">{lot.materialName}</p>
+          <p className="tabular text-3xl font-bold">
             {formatQuantity(lot.currentQuantity, { unit: unitLabel })}
           </p>
+
+          {/* Para qué es esta tela. Va en el encabezado y grande: es lo que se
+              quiere saber al levantar la hoja del piso, junto con el folio. */}
+          {lot.productionNote && (
+            <p className="mt-2 border-2 border-black px-2 py-1 text-lg font-bold uppercase">
+              {lot.productionNote}
+            </p>
+          )}
         </div>
 
         {/* El QR se inyecta como SVG generado en el servidor. */}
@@ -54,7 +58,13 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
 
       <Section title="Dueño y destino">
         <Row label="Cliente dueño" value={lot.clientName ?? "De la fábrica"} />
-        <Row label="Producción" value={lot.productionRunName} />
+        {/* La producción del catálogo sólo se pinta si el rollo la trae: el
+            dato que se usa a diario es el de texto libre del encabezado, y
+            dos renglones llamados "Producción" —uno de ellos vacío— confunden
+            a quien lee la hoja en el piso. */}
+        {lot.productionRunName && (
+          <Row label="Orden de producción" value={lot.productionRunName} />
+        )}
         <Row label="Ubicación" value={lot.locationName} tabular />
       </Section>
 
@@ -71,11 +81,6 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
         />
         <Row label="Ancho" value={formatMillimeters(lot.actualWidthMm)} tabular />
         <Row label="Peso" value={formatOunces(lot.actualWeightOz)} tabular />
-        <Row
-          label="Metraje según"
-          value={MEASUREMENT_SOURCE_LABELS[lot.measurementSource]}
-        />
-        <Row label="Verificado" value={lot.verified ? "Sí" : "No"} />
       </Section>
 
       <Section title="Recepción">
@@ -145,7 +150,7 @@ function Row({
   tabular?: boolean;
 }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-neutral-200 py-0.5 text-sm">
+    <div className="flex justify-between gap-3 border-b border-neutral-200 py-1 text-base">
       <dt className="shrink-0 text-neutral-600">{label}</dt>
       {/* min-w-0 + break-words: una composición larga ("80% algodón 18%
           poliéster 2% elastano") se parte en varias líneas en vez de
