@@ -12,7 +12,11 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "verify:integrity": "tsx scripts/verify-integrity.ts"
+    "verify:integrity": "tsx scripts/verify-integrity.ts",
+    "user:create": "tsx scripts/create-user.ts",
+    "user:list": "tsx scripts/manage-users.ts list",
+    "user:role": "tsx scripts/manage-users.ts role",
+    "user:disable": "tsx scripts/manage-users.ts disable"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -20,6 +24,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.9.0",
     "@prisma/client": "^6.19.3",
+    "@tanstack/react-table": "^9.1.2",
     "better-auth": "^1.6.29",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

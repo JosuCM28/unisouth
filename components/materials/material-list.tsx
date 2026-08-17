@@ -1,3 +1,5 @@
+"use client";
+
 import { AlertTriangle, Package } from "lucide-react";
 import type { Material } from "@prisma/client";
 import {
@@ -7,15 +9,11 @@ import {
 import { formatFabricSpec } from "@/lib/material-spec";
 import { cn, formatQuantity, type PlainObject } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DataTable,
+  type DataTableColumn,
+} from "@/components/shared/data-table";
+import { Badge } from "@/components/ui/badge";
 import { MaterialActions } from "./material-actions";
 
 /** Material con los Decimal ya convertidos: es lo que puede cruzar al cliente. */
@@ -33,136 +31,141 @@ export function MaterialList({
   stock,
   isFiltered,
 }: MaterialListProps) {
-  if (materials.length === 0) {
-    return (
-      <div className="flat-surface">
-        <EmptyState
-          icon={Package}
-          title={isFiltered ? "Sin resultados" : "Aún no hay materiales"}
-          description={
-            isFiltered
-              ? "Prueba con otro código, nombre o color."
-              : "Da de alta la primera tela o insumo."
-          }
-        />
-      </div>
-    );
-  }
+  const columns: DataTableColumn<PlainMaterial>[] = [
+    {
+      accessorKey: "code",
+      header: "Código",
+      cell: ({ row }) => (
+        <div className="tabular flex items-center gap-2 font-medium">
+          {row.original.code}
+          {!row.original.active && (
+            <Badge variant="secondary" className="text-xs">
+              Inactivo
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    { accessorKey: "name", header: "Nombre" },
+    {
+      accessorKey: "type",
+      header: "Tipo",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {MATERIAL_TYPE_LABELS[row.original.type]}
+        </span>
+      ),
+    },
+    {
+      id: "especificacion",
+      header: "Especif.",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="tabular text-muted-foreground">
+          {formatFabricSpec(row.original) ?? "—"}
+        </span>
+      ),
+    },
+    {
+      id: "existencia",
+      header: "Existencia",
+      // Ordena por el número real, no por el texto formateado: si no,
+      // "1,000" quedaría antes que "9".
+      accessorFn: (material) => stock.get(material.id) ?? 0,
+      cell: ({ row }) => {
+        const available = stock.get(row.original.id) ?? 0;
+        const isLow = isBelowReorder(row.original, available);
+
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {isLow && (
+              <AlertTriangle
+                className="size-3.5 text-state-reserved"
+                aria-label="Bajo el punto de reorden"
+              />
+            )}
+            <span
+              className={cn(
+                "tabular",
+                isLow && "font-medium text-state-reserved",
+              )}
+            >
+              {formatQuantity(available, {
+                unit: UNIT_SHORT_LABELS[row.original.baseUnit],
+              })}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      id: "acciones",
+      header: "",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <MaterialActions material={row.original} />
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <>
-      <ul className="flex flex-col gap-2 md:hidden">
-        {materials.map((material) => {
-          const available = stock.get(material.id) ?? 0;
-          const isLow = isBelowReorder(material, available);
+    <DataTable
+      columns={columns}
+      data={materials}
+      getRowId={(material) => material.id}
+      emptyState={
+        <div className="flat-surface">
+          <EmptyState
+            icon={Package}
+            title={isFiltered ? "Sin resultados" : "Aún no hay materiales"}
+            description={
+              isFiltered
+                ? "Prueba con otro código, nombre o color."
+                : "Da de alta la primera tela o insumo."
+            }
+          />
+        </div>
+      }
+      renderMobileRow={(material) => {
+        const available = stock.get(material.id) ?? 0;
+        const isLow = isBelowReorder(material, available);
 
-          return (
-            <li
-              key={material.id}
-              className="flat-surface flex items-start gap-3 p-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="tabular text-sm font-medium">
-                    {material.code}
-                  </span>
-                  {!material.active && (
-                    <Badge variant="secondary" className="text-xs">
-                      Inactivo
-                    </Badge>
-                  )}
-                </div>
-
-                <p className="truncate text-sm">{material.name}</p>
-
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {MATERIAL_TYPE_LABELS[material.type]}
-                  <MaterialSpec material={material} />
-                </p>
-
-                <StockLine
-                  available={available}
-                  unit={UNIT_SHORT_LABELS[material.baseUnit]}
-                  isLow={isLow}
-                  reorderPoint={Number(material.reorderPoint)}
-                />
+        return (
+          <div className="flat-surface flex items-start gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="tabular text-sm font-medium">
+                  {material.code}
+                </span>
+                {!material.active && (
+                  <Badge variant="secondary" className="text-xs">
+                    Inactivo
+                  </Badge>
+                )}
               </div>
 
-              <MaterialActions material={material} />
-            </li>
-          );
-        })}
-      </ul>
+              <p className="truncate text-sm">{material.name}</p>
 
-      <div className="hidden md:block">
-        <div className="flat-surface overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-40">Código</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead className="w-28">Tipo</TableHead>
-                <TableHead className="w-24">Especif.</TableHead>
-                <TableHead className="w-36 text-right">Existencia</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {MATERIAL_TYPE_LABELS[material.type]}
+                <MaterialSpec material={material} />
+              </p>
 
-            <TableBody>
-              {materials.map((material) => {
-                const available = stock.get(material.id) ?? 0;
-                const isLow = isBelowReorder(material, available);
+              <StockLine
+                available={available}
+                unit={UNIT_SHORT_LABELS[material.baseUnit]}
+                isLow={isLow}
+                reorderPoint={Number(material.reorderPoint)}
+              />
+            </div>
 
-                return (
-                  <TableRow key={material.id}>
-                    <TableCell className="tabular font-medium">
-                      <div className="flex items-center gap-2">
-                        {material.code}
-                        {!material.active && (
-                          <Badge variant="secondary" className="text-xs">
-                            Inactivo
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{material.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {MATERIAL_TYPE_LABELS[material.type]}
-                    </TableCell>
-                    <TableCell className="tabular text-muted-foreground">
-                      {formatFabricSpec(material) ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {isLow && (
-                          <AlertTriangle
-                            className="size-3.5 text-state-reserved"
-                            aria-label="Bajo el punto de reorden"
-                          />
-                        )}
-                        <span
-                          className={cn(
-                            "tabular",
-                            isLow && "font-medium text-state-reserved",
-                          )}
-                        >
-                          {formatQuantity(available, {
-                            unit: UNIT_SHORT_LABELS[material.baseUnit],
-                          })}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <MaterialActions material={material} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </>
+            <MaterialActions material={material} />
+          </div>
+        );
+      }}
+    />
   );
 }
 
@@ -208,7 +211,8 @@ function StockLine({
       </span>
       {isLow && (
         <span className="text-xs text-muted-foreground">
-          (reorden <span className="tabular">{formatQuantity(reorderPoint)}</span>)
+          (reorden{" "}
+          <span className="tabular">{formatQuantity(reorderPoint)}</span>)
         </span>
       )}
     </div>

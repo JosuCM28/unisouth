@@ -257,15 +257,41 @@ El `Dockerfile` de la raíz ya está listo; no hace falta configurar el build.
 
 ### 2. Variables de entorno
 
-En **Environment**, pega las cinco. La base vive en Neon, no en el VPS:
+Son cinco. En **Environment** de la aplicación:
 
 ```
-DATABASE_URL=postgresql://...-pooler...neon.tech/neondb?sslmode=require&channel_binding=require
-DIRECT_URL=postgresql://...neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://usuario:password@unisouth-db:5432/unisouth
+DIRECT_URL=postgresql://usuario:password@unisouth-db:5432/unisouth
 BETTER_AUTH_SECRET=<openssl rand -base64 32>
 BETTER_AUTH_URL=https://tu-dominio.com
 NEXT_PUBLIC_APP_URL=https://tu-dominio.com
 ```
+
+#### Si la base está DENTRO de Dokploy
+
+El host es el **nombre del servicio** en la red interna de Docker
+(`unisouth-db` en el ejemplo), no `localhost`: desde el contenedor de la app,
+`localhost` es él mismo. Dokploy muestra ese nombre en la pestaña del
+servicio de base de datos.
+
+`DATABASE_URL` y `DIRECT_URL` llevan **exactamente la misma cadena**. La
+diferencia entre ambas sólo existe en Neon, que tiene un endpoint con pooler
+para runtime y otro directo para migraciones. Un Postgres normal no tiene esa
+separación, pero Prisma exige las dos variables porque el `schema.prisma` las
+declara.
+
+Tampoco lleva `sslmode=require`: el tráfico no sale del host, va por la red
+interna de Docker.
+
+#### Si la base está en Neon
+
+```
+DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/db?sslmode=require&channel_binding=require
+DIRECT_URL=postgresql://user:pass@ep-xxx.region.aws.neon.tech/db?sslmode=require
+```
+
+Misma contraseña, mismo host, pero `DIRECT_URL` va **sin** `-pooler` y sin
+`channel_binding`.
 
 ### 3. Build arg (el paso que se olvida)
 
@@ -284,8 +310,12 @@ de sesión —que va con `secure` en producción— no se guardará.
 
 ### 5. Primer despliegue
 
-Antes de que entre el primer usuario, desde tu máquina y con el `.env` de
-producción:
+El esquema hay que aplicarlo una vez. Con la base dentro de Dokploy, publica
+temporalmente el puerto **5432** en el servicio de Postgres, apunta tu `.env`
+local al host público del VPS, y corre los comandos desde tu máquina.
+
+**Vuelve a cerrar el puerto en cuanto termines:** un Postgres abierto a
+internet recibe intentos de acceso en cuestión de horas.
 
 ```bash
 npm run db:push
@@ -328,3 +358,68 @@ cuadrar con su kárdex.
 - El `HEALTHCHECK` pega a `/login`, que es público y no toca la base.
 - `.dockerignore` excluye `.env`: los secretos se inyectan como variables del
   servicio, nunca horneados en una capa de la imagen.
+
+## Gestión de usuarios
+
+No hay pantalla de registro: al auxiliar lo da de alta el administrador. Los
+usuarios se manejan desde la terminal.
+
+### Crear un usuario
+
+```bash
+npm run user:create
+```
+
+Pregunta correo, nombre, rol y contraseña. Sugiere una contraseña legible por
+si hay que dictarla por teléfono; se acepta con Enter.
+
+Sin interacción, para el primer administrador o un pipeline:
+
+```bash
+npm run user:create -- --email juan@empresa.com --name "Juan Pérez" --role WAREHOUSE --password "unaContraseñaLarga"
+```
+
+### Ver quién existe
+
+```bash
+npm run user:list
+```
+
+### Cambiar el rol
+
+```bash
+npm run user:role
+```
+
+O directo:
+
+```bash
+npm run user:role -- --email juan@empresa.com --role PURCHASING
+```
+
+El cambio surte efecto en su siguiente navegación: la sesión se revalida
+contra la base en cada carga.
+
+### Dar de baja
+
+```bash
+npm run user:disable -- --email juan@empresa.com
+```
+
+Se **desactiva**, no se borra: sus movimientos y su rastro de auditoría deben
+seguir apuntando a una persona con nombre. Sus sesiones abiertas se cierran de
+inmediato.
+
+### Los roles
+
+| Rol | Para quién |
+|---|---|
+| `ADMIN` | Todo, incluidos usuarios y configuración |
+| `WAREHOUSE` | El auxiliar: entradas, salidas, cortes, conteos, ajustes |
+| `PRODUCTION` | Consulta inventario, edita fichas técnicas, corre cálculos |
+| `PURCHASING` | Consulta, crea y autoriza requisiciones |
+| `MANAGEMENT` | Sólo lectura, reportes y auditoría |
+| `READ_ONLY` | Sólo lectura |
+
+Toda alta, cambio de rol y baja queda en la bitácora con sensibilidad `HIGH`,
+visible en `/audit`.
