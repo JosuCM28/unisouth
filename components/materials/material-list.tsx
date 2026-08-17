@@ -114,6 +114,7 @@ export function MaterialList({
     <DataTable
       columns={columns}
       data={materials}
+      pageSize={25}
       getRowId={(material) => material.id}
       emptyState={
         <div className="flat-surface">

@@ -83,6 +83,7 @@ export function ProductionRunList({ runs, clients, isFiltered }: Props) {
     <DataTable
       columns={columns}
       data={runs}
+      pageSize={25}
       getRowId={(run) => run.id}
       emptyState={
         <div className="flat-surface">

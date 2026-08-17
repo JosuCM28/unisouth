@@ -72,6 +72,7 @@ export function LocationList({
     <DataTable
       columns={columns}
       data={locations}
+      pageSize={25}
       getRowId={(location) => location.id}
       emptyState={
         <div className="flat-surface">

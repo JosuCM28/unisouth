@@ -17,7 +17,15 @@ import {
   type RowData,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronsUpDown,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -190,10 +198,17 @@ export function DataTable<TData>({
           page={pagination.pageIndex + 1}
           pageCount={table.getPageCount()}
           total={data.length}
+          from={pagination.pageIndex * pagination.pageSize + 1}
+          to={Math.min(
+            (pagination.pageIndex + 1) * pagination.pageSize,
+            data.length,
+          )}
           canPrevious={table.getCanPreviousPage()}
           canNext={table.getCanNextPage()}
+          onFirst={() => table.setPageIndex(0)}
           onPrevious={() => table.previousPage()}
           onNext={() => table.nextPage()}
+          onLast={() => table.setPageIndex(table.getPageCount() - 1)}
         />
       )}
     </div>
@@ -218,50 +233,110 @@ function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
   );
 }
 
+/**
+ * Controles de paginación.
+ *
+ * Lleva "primera" y "última" además de anterior/siguiente: con 10 páginas,
+ * llegar al final picando "Siguiente" nueve veces es inaceptable, y en
+ * celular todavía peor.
+ *
+ * Se declara el rango visible ("26–50 de 120") y no sólo el número de
+ * página: quien busca un registro necesita saber si ya pasó por él.
+ */
 function Pagination({
   page,
   pageCount,
   total,
+  from,
+  to,
   canPrevious,
   canNext,
+  onFirst,
   onPrevious,
   onNext,
+  onLast,
 }: {
   page: number;
   pageCount: number;
   total: number;
+  from: number;
+  to: number;
   canPrevious: boolean;
   canNext: boolean;
+  onFirst: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  onLast: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <p className="tabular text-xs text-muted-foreground">
-        Página {page} de {pageCount} · {total}{" "}
-        {total === 1 ? "registro" : "registros"}
+        {from}–{to} de {total} {total === 1 ? "registro" : "registros"} · Página{" "}
+        {page} de {pageCount}
       </p>
 
       <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className={cn("touch-target", !canPrevious && "opacity-50")}
+        <PageButton
+          label="Primera"
+          onClick={onFirst}
           disabled={!canPrevious}
+          icon={ChevronsLeft}
+          iconOnly
+        />
+        <PageButton
+          label="Anterior"
           onClick={onPrevious}
-        >
-          Anterior
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className={cn("touch-target", !canNext && "opacity-50")}
-          disabled={!canNext}
+          disabled={!canPrevious}
+          icon={ChevronLeft}
+        />
+        <PageButton
+          label="Siguiente"
           onClick={onNext}
-        >
-          Siguiente
-        </Button>
+          disabled={!canNext}
+          icon={ChevronRight}
+          trailingIcon
+        />
+        <PageButton
+          label="Última"
+          onClick={onLast}
+          disabled={!canNext}
+          icon={ChevronsRight}
+          iconOnly
+        />
       </div>
     </div>
+  );
+}
+
+function PageButton({
+  label,
+  onClick,
+  disabled,
+  icon: Icon,
+  iconOnly,
+  trailingIcon,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  icon: typeof ChevronLeft;
+  /** Sólo el icono: "primera" y "última" no necesitan texto y ahorran ancho. */
+  iconOnly?: boolean;
+  trailingIcon?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={cn("touch-target", disabled && "opacity-50")}
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      {!trailingIcon && <Icon className="size-4" aria-hidden />}
+      {!iconOnly && <span className="hidden sm:inline">{label}</span>}
+      {trailingIcon && <Icon className="size-4" aria-hidden />}
+    </Button>
   );
 }

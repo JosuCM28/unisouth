@@ -72,6 +72,7 @@ export function ClientList({ clients, isFiltered }: Props) {
     <DataTable
       columns={columns}
       data={clients}
+      pageSize={25}
       getRowId={(client) => client.id}
       emptyState={
         <div className="flat-surface">

@@ -66,6 +66,7 @@ export function HelperList({ helpers }: { helpers: HelperWithWork[] }) {
     <DataTable
       columns={columns}
       data={helpers}
+      pageSize={25}
       getRowId={(helper) => helper.id}
       emptyState={
         <div className="flat-surface">
