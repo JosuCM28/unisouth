@@ -96,6 +96,12 @@ export const NAVIGATION: NavSection[] = [
         icon: "partners",
         permission: "inventory:read",
       },
+      {
+        href: "/helpers",
+        label: "Ayudantes",
+        icon: "helpers",
+        permission: "inventory:read",
+      },
     ],
   },
   {

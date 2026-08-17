@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
+import { HelperFormDialog } from "@/components/helpers/helper-form-dialog";
 import { ReceiptTotals } from "./receipt-totals";
 import { toast } from "sonner";
 import type { Unit } from "@prisma/client";
@@ -47,12 +48,16 @@ interface LotRow {
   quantity: string;
   unit: Unit | "";
   locationId: string;
+  /** Quién bajó este rollo. Va por rollo: dos ayudantes pueden repartirse
+   *  un mismo camión y cada uno cobra lo suyo. */
+  helperId: string;
   shade: string;
   supplierLotNumber: string;
 }
 
 interface ReceiptWizardProps {
   materials: MaterialOption[];
+  helpers: { id: string; name: string }[];
   locations: { id: string; code: string; name: string }[];
   clients: { id: string; name: string }[];
   suppliers: { id: string; name: string }[];
@@ -68,6 +73,7 @@ interface ReceiptWizardProps {
  */
 export function ReceiptWizard({
   materials,
+  helpers,
   locations,
   clients,
   suppliers,
@@ -97,6 +103,9 @@ export function ReceiptWizard({
    * select sin recargar: recargar perdería los rollos ya capturados.
    */
   const [materialOptions, setMaterialOptions] = useState(materials);
+
+  /** Igual que los materiales: uno nuevo debe aparecer sin recargar. */
+  const [helperOptions, setHelperOptions] = useState(helpers);
 
   /** Fila que se va a borrar. `null` = el diálogo está cerrado. */
   const [rowToDelete, setRowToDelete] = useState<number | null>(null);
@@ -189,6 +198,7 @@ export function ReceiptWizard({
         quantity: row.quantity,
         unit: row.unit,
         locationId: row.locationId || undefined,
+        helperId: row.helperId || undefined,
         shade: row.shade || undefined,
         supplierLotNumber: row.supplierLotNumber || undefined,
       }));
@@ -496,6 +506,59 @@ export function ReceiptWizard({
                     }
                   />
                 </div>
+
+                {/* Quién bajó ESTE rollo: es lo que sostiene su bonificación. */}
+                <FormSelectField
+                  id={`helper-row-${index}`}
+                  label="Ayudante que lo bajó"
+                >
+                  <div className="flex gap-2">
+                    <Select
+                      value={row.helperId || "none"}
+                      onValueChange={(value) =>
+                        updateRow(index, {
+                          helperId: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger
+                        id={`helper-row-${index}`}
+                        className="touch-target min-w-0 flex-1"
+                      >
+                        <SelectValue placeholder="Sin asignar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {helperOptions.map((helper) => (
+                          <SelectItem key={helper.id} value={helper.id}>
+                            {helper.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Llega un ayudante nuevo con el camión: se registra sin
+                        salir de la captura. */}
+                    <HelperFormDialog
+                      onCreated={(helper) => {
+                        setHelperOptions((current) => [...current, helper]);
+                        updateRow(index, { helperId: helper.id });
+                      }}
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="touch-target shrink-0"
+                          aria-label="Registrar ayudante nuevo"
+                          title="Registrar ayudante nuevo"
+                        >
+                          <Plus className="size-4" aria-hidden />
+                        </Button>
+                      }
+                    />
+                  </div>
+                </FormSelectField>
               </div>
             ))}
           </div>
@@ -649,6 +712,7 @@ function emptyRow(): LotRow {
     quantity: "",
     unit: "",
     locationId: "",
+    helperId: "",
     shade: "",
     supplierLotNumber: "",
   };

@@ -55,6 +55,8 @@ export class ReceiptService extends BaseService {
             // suele ser del mismo cliente.
             clientId: input.clientId,
             locationId: lotInput.locationId,
+            // Quien lo bajó: sostiene el cálculo de su bonificación.
+            helperId: lotInput.helperId,
             unit: lotInput.unit,
             initialQuantity: lotInput.quantity,
             // Nace en cero: el saldo lo pone el movimiento, nunca una

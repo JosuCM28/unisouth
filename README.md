@@ -423,3 +423,36 @@ inmediato.
 
 Toda alta, cambio de rol y baja queda en la bitácora con sensibilidad `HIGH`,
 visible en `/audit`.
+
+## Ayudantes de descarga
+
+Las personas que bajan el material del camión. **No son usuarios del sistema**:
+nunca entran a la app, sólo se les nombra en cada rollo para poder calcular su
+bonificación.
+
+### Dónde
+
+Sidebar → **Catálogos → Ayudantes** (`/helpers`).
+
+La pantalla muestra cuántos rollos ha bajado cada uno y la cantidad total, que
+es la base del pago extra.
+
+### Cómo se asigna
+
+Al capturar rollos en `/receipts/new`, **cada renglón** tiene un campo
+"Ayudante que lo bajó". Va por rollo y no por recepción porque dos personas
+pueden repartirse un mismo camión y cada una cobra lo suyo.
+
+Si llega alguien que no está dado de alta, el botón **+** junto al select lo
+registra sin salir de la captura.
+
+### Por qué no se pueden borrar
+
+Un ayudante con rollos descargados **no se elimina**, se desactiva: su
+historial sostiene las bonificaciones que ya se le pagaron, y borrarlo dejaría
+esos rollos sin responsable.
+
+### La cantidad que cuenta
+
+Se usa `initialQuantity`, no `currentQuantity`: se le paga por lo que bajó del
+camión, no por lo que queda después de los cortes.

@@ -22,6 +22,9 @@ export const receiptLotSchema = z.object({
   quantity: positiveQuantity,
   unit: z.nativeEnum(Unit),
   locationId: optionalCuid,
+  /// Quién bajó ESTE rollo del camión. Va por rollo y no por recepción
+  /// porque dos ayudantes pueden repartirse un mismo camión.
+  helperId: optionalCuid,
   shade: optionalText,
   supplierLotNumber: optionalText,
   colorText: optionalText,

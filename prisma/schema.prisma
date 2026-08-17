@@ -225,6 +225,25 @@ enum LocationType {
   TRANSIT
 }
 
+/// Yard hand who unloads the truck. Not a system user: they never log in,
+/// they are only named on each roll so the extra pay can be worked out.
+model Helper {
+  id        String    @id @default(cuid())
+  code      String?   @unique
+  name      String    @unique
+  phone     String?
+  notes     String?
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  lots Lot[]
+
+  @@index([active])
+  @@map("helpers")
+}
+
 /// The OWNER of the material. Fabric usually belongs to whoever commissioned
 /// the job, so all stock is segregated by owner.
 model Client {
@@ -572,6 +591,10 @@ model Lot {
 
   comment String?
   extras  Json?
+
+  /// Who physically unloaded this roll. Drives the unloading bonus.
+  helperId String?
+  helper   Helper? @relation(fields: [helperId], references: [id])
 
   createdById String?
   createdBy   User?   @relation("LotCreatedBy", fields: [createdById], references: [id])

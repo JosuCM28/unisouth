@@ -1,7 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ArrowRightLeft, ClipboardCheck, Scissors } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  ClipboardCheck,
+  Printer,
+  QrCode,
+  Scissors,
+} from "lucide-react";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
@@ -130,6 +137,23 @@ export default async function LotDetailPage({ params }: PageProps) {
             </Button>
           }
         />
+      </section>
+
+      {/* Impresión: la etiqueta se pega en el rollo, la hoja lo acompaña. */}
+      <section className="grid grid-cols-2 gap-2">
+        <Button asChild variant="outline" className="touch-target">
+          <a href={`/print/lots/${lot.code}?formato=etiqueta`} target="_blank" rel="noopener">
+            <QrCode className="size-4" aria-hidden />
+            Etiqueta con QR
+          </a>
+        </Button>
+
+        <Button asChild variant="outline" className="touch-target">
+          <a href={`/print/lots/${lot.code}`} target="_blank" rel="noopener">
+            <Printer className="size-4" aria-hidden />
+            Hoja completa
+          </a>
+        </Button>
       </section>
 
       <LotReceiptInfo lot={plain} />

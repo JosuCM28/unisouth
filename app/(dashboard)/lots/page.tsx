@@ -13,6 +13,7 @@ import { ExportButton } from "@/components/shared/export-button";
 import { SearchInput } from "@/components/shared/search-input";
 import { LotFilters } from "@/components/lots/lot-filters";
 import { LotFormSheet } from "@/components/lots/lot-form-sheet";
+import { PrintLotsButton } from "@/components/lots/print-lots-button";
 import { LotList } from "@/components/lots/lot-list";
 import type { LotCardData } from "@/components/lots/lot-card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export default async function LotsPage({ searchParams }: PageProps) {
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Folio, tono, material…" className="flex-1 md:max-w-sm" />
+        <PrintLotsButton />
         <ExportButton href="/api/export/lots" label="Excel" />
       </div>
 

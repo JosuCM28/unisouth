@@ -3,14 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
+import { HelperRepository } from "@/lib/repositories/helper.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { ReceiptWizard } from "@/components/receipts/receipt-wizard";
 
 export const metadata: Metadata = { title: "Nueva recepción" };
 
 export default async function NewReceiptPage() {
-  const [materials, locations, clients, suppliers, carriers] = await Promise.all([
+  const [materials, helpers, locations, clients, suppliers, carriers] = await Promise.all([
     new MaterialRepository().findOptions(),
+    new HelperRepository().findOptions(),
     new LocationRepository().findOptions(),
     new ClientRepository().findOptions(),
     prisma.supplier.findMany({
@@ -33,6 +35,7 @@ export default async function NewReceiptPage() {
       />
       <ReceiptWizard
         materials={materials}
+        helpers={helpers}
         locations={locations}
         clients={clients}
         suppliers={suppliers}
