@@ -9,6 +9,7 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { Badge } from "@/components/ui/badge";
 import { LocationActions } from "./location-actions";
 
@@ -20,6 +21,7 @@ interface LocationListProps {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   /** Para distinguir "no hay nada" de "la búsqueda no encontró nada". */
   isFiltered?: boolean;
 }
@@ -31,8 +33,11 @@ export function LocationList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: LocationListProps) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<LocationWithLotCount>[] = [
     {
       accessorKey: "code",
@@ -83,16 +88,18 @@ export function LocationList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "ubicación" : "ubicaciones"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={locations}
-        // 0 = sin paginar en memoria: la página la sirve el servidor.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "ubicación", many: "ubicaciones" }}
         getRowId={(location) => location.id}
         emptyState={
           <div className="flat-surface">

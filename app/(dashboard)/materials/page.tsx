@@ -8,7 +8,6 @@ import { ExportButton } from "@/components/shared/export-button";
 import { SearchInput } from "@/components/shared/search-input";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
 import { MaterialList } from "@/components/materials/material-list";
-import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -17,7 +16,7 @@ export const metadata: Metadata = { title: "Materiales" };
 const PAGE_SIZE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
 }
 
 export default async function MaterialsPage({ searchParams }: PageProps) {
@@ -64,7 +63,7 @@ async function ListSection({
   const search = params.q;
   const page = parsePositiveInt(params.page) ?? 1;
 
-  const result = await repository.search({ search, page, pageSize: PAGE_SIZE });
+  const result = await repository.search({ search, page, pageSize: PAGE_SIZE, accumulate: params.all === "1" });
 
   // La existencia se resuelve con groupBy en la base, no trayendo los lotes.
   const stock = await repository.getStockByMaterial(
@@ -72,23 +71,16 @@ async function ListSection({
   );
 
   return (
-    <>
-      <MaterialList
-        // Material trae 9 columnas Decimal y el menú de acciones es cliente.
-        materials={toPlainObject(result.items)}
-        stock={stock}
-        total={result.total}
-        page={result.page}
-        totalPages={result.totalPages}
-        isFiltered={Boolean(search?.trim())}
-      />
-      <Pager
-        page={result.page}
-        totalPages={result.totalPages}
-        basePath="/materials"
-        params={params}
-      />
-    </>
+    <MaterialList
+      // Material trae 9 columnas Decimal y el menú de acciones es cliente.
+      materials={toPlainObject(result.items)}
+      stock={stock}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      pageSize={result.pageSize}
+      isFiltered={Boolean(search?.trim())}
+    />
   );
 }
 

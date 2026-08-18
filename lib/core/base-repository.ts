@@ -16,6 +16,15 @@ export type PrismaDelegate = any;
 export interface PaginationInput {
   page?: number;
   pageSize?: number;
+  /**
+   * Trae TODO desde la página 1 hasta `page`, en vez de sólo esa página.
+   *
+   * Es lo que necesita el "cargar más" del celular: cada toque es una
+   * navegación que remonta el componente, así que lo ya mostrado no puede
+   * vivir en estado del cliente —se borraría— y tiene que volver a llegar
+   * desde la base junto con lo nuevo.
+   */
+  accumulate?: boolean;
 }
 
 export interface PaginatedResult<T> {
@@ -28,6 +37,15 @@ export interface PaginatedResult<T> {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+/**
+ * Tope del acumulado de "cargar más".
+ *
+ * Sin él, la página 20 pediría 1 000 filas y el celular acabaría bajándose la
+ * bodega entera con datos móviles. Al llegar aquí el botón deja de crecer y
+ * el usuario sigue con el buscador, que es más rápido que seguir cargando.
+ */
+const MAX_ACCUMULATED = 300;
 
 /**
  * Base de todo acceso a datos.
@@ -207,14 +225,22 @@ export abstract class BaseRepository<TEntity, TCreate, TUpdate> {
       { id: "asc" },
     ];
 
+    /* Acumulado: desde la primera fila hasta el final de la página pedida.
+       Se topa igual que una página normal —el tope por página sigue siendo
+       `pageSize`—, sólo que el bloque empieza en cero. */
+    const skip = pagination.accumulate ? 0 : (page - 1) * pageSize;
+    const take = pagination.accumulate
+      ? Math.min(page * pageSize, MAX_ACCUMULATED)
+      : pageSize;
+
     // En paralelo: son dos consultas independientes.
     const [total, items] = await Promise.all([
       this.delegate.count({ where: fullWhere }),
       this.delegate.findMany({
         where: fullWhere,
         orderBy: stableOrderBy,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip,
+        take,
         ...(include ? { include } : {}),
       }),
     ]);

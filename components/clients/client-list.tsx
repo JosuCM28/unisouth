@@ -7,6 +7,7 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { Badge } from "@/components/ui/badge";
 import { ClientActions } from "./client-actions";
 
@@ -16,6 +17,7 @@ interface Props {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   isFiltered?: boolean;
 }
 
@@ -24,8 +26,11 @@ export function ClientList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: Props) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<ClientWithLotCount>[] = [
     {
       accessorKey: "name",
@@ -80,16 +85,18 @@ export function ClientList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "cliente" : "clientes"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={clients}
-        // 0 = sin paginar en memoria: la página la sirve el servidor.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "cliente", many: "clientes" }}
         getRowId={(client) => client.id}
         emptyState={
           <div className="flat-surface">

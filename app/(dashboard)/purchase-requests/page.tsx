@@ -6,18 +6,42 @@ import { PURCHASE_STATUS_LABELS, PURCHASE_STATUS_STYLES } from "@/lib/constants/
 import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pager } from "@/components/shared/pager";
 
 export const metadata: Metadata = { title: "Requisiciones" };
 
-export default async function PurchaseRequestsPage() {
-  const requests = await prisma.purchaseRequest.findMany({
-    orderBy: { requestedAt: "desc" },
-    take: 50,
-    include: {
-      requestedBy: { select: { name: true } },
-      _count: { select: { lines: true } },
-    },
-  });
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; all?: string }>;
+}
+
+export default async function PurchaseRequestsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = parsePositiveInt(params.page) ?? 1;
+  /* "Cargar más" del celular: trae desde la primera fila hasta el final de
+     esta página, porque cada toque es una navegación y lo ya mostrado no
+     sobrevive en estado del cliente. Se topa para no bajar la tabla entera. */
+  const accumulate = params.all === "1";
+  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
+  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+
+  const [total, requests] = await Promise.all([
+    prisma.purchaseRequest.count(),
+    prisma.purchaseRequest.findMany({
+      // El id desempata: `requestedAt` no es único y sin criterio estable las
+      // filas se barajan entre páginas.
+      orderBy: [{ requestedAt: "desc" }, { id: "asc" }],
+      skip,
+      take,
+      include: {
+        requestedBy: { select: { name: true } },
+        _count: { select: { lines: true } },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,6 +76,23 @@ export default async function PurchaseRequestsPage() {
           ))}
         </ul>
       )}
+
+      <Pager
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        itemLabel={{ one: "requisición", many: "requisiciones" }}
+        basePath="/purchase-requests"
+        params={params}
+      />
     </div>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }

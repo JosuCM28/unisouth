@@ -6,6 +6,7 @@ import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatDate, formatQuantity } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { LotCard, StatusChip, type LotCardData } from "./lot-card";
 
 interface LotListProps {
@@ -14,6 +15,7 @@ interface LotListProps {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   isFiltered?: boolean;
 }
 
@@ -22,8 +24,11 @@ export function LotList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: LotListProps) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<LotCardData>[] = [
     {
       accessorKey: "code",
@@ -105,18 +110,18 @@ export function LotList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "rollo" : "rollos"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={lots}
-        // 0 = sin paginar en memoria. La página la sirve el servidor: partir
-        // aquí otra vez el bloque que ya llegó haría que las flechas sólo
-        // recorrieran esos rollos y el resto del inventario quedara oculto.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "rollo", many: "rollos" }}
         getRowId={(lot) => lot.id}
         emptyState={
           <div className="flat-surface">

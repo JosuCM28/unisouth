@@ -15,7 +15,6 @@ import { LotFilters } from "@/components/lots/lot-filters";
 import { LotFormSheet } from "@/components/lots/lot-form-sheet";
 import { PrintLotsButton } from "@/components/lots/print-lots-button";
 import { LotList } from "@/components/lots/lot-list";
-import { Pager } from "@/components/shared/pager";
 import type { LotCardData } from "@/components/lots/lot-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +35,7 @@ interface PageProps {
     includeCancelled?: string;
     arrivedWithin?: string;
     page?: string;
+    all?: string;
   }>;
 }
 
@@ -106,6 +106,8 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
     arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
     page,
     pageSize: PAGE_SIZE,
+    // "Cargar más" del celular: trae desde la primera fila hasta ésta.
+    accumulate: params.all === "1",
   });
 
   // Los Decimal de Prisma no cruzan al cliente sin convertirse.
@@ -113,25 +115,18 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
   // La página no cuenta como filtro: estar en la 3 no significa que el
   // usuario haya buscado algo, y el mensaje de lista vacía cambia según eso.
   const isFiltered = Object.entries(params).some(
-    ([key, value]) => key !== "page" && Boolean(value),
+    ([key, value]) => !["page", "all"].includes(key) && Boolean(value),
   );
 
   return (
-    <>
-      <LotList
-        lots={lots}
-        total={result.total}
-        page={result.page}
-        totalPages={result.totalPages}
-        isFiltered={isFiltered}
-      />
-      <Pager
-        page={result.page}
-        totalPages={result.totalPages}
-        basePath="/lots"
-        params={params}
-      />
-    </>
+    <LotList
+      lots={lots}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      pageSize={result.pageSize}
+      isFiltered={isFiltered}
+    />
   );
 }
 

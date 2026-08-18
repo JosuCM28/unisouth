@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { ProductionRunFormDialog } from "@/components/production-runs/production-run-form-dialog";
 import { ProductionRunList } from "@/components/production-runs/production-run-list";
-import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,7 +15,7 @@ export const metadata: Metadata = { title: "Producciones" };
 const PAGE_SIZE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
 }
 
 export default async function ProductionRunsPage({ searchParams }: PageProps) {
@@ -67,25 +66,20 @@ async function ListSection({
     search: term,
     page,
     pageSize: PAGE_SIZE,
+    // "Cargar más" del celular: trae desde la primera fila hasta ésta.
+    accumulate: params.all === "1",
   });
 
   return (
-    <>
-      <ProductionRunList
-        runs={result.items}
-        clients={clients}
-        total={result.total}
-        page={result.page}
-        totalPages={result.totalPages}
-        isFiltered={Boolean(term)}
-      />
-      <Pager
-        page={result.page}
-        totalPages={result.totalPages}
-        basePath="/production-runs"
-        params={params}
-      />
-    </>
+    <ProductionRunList
+      runs={result.items}
+      clients={clients}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      pageSize={result.pageSize}
+      isFiltered={Boolean(term)}
+    />
   );
 }
 

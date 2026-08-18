@@ -13,6 +13,7 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { Badge } from "@/components/ui/badge";
 import { MaterialActions } from "./material-actions";
 
@@ -27,6 +28,7 @@ interface MaterialListProps {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   isFiltered?: boolean;
 }
 
@@ -36,8 +38,11 @@ export function MaterialList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: MaterialListProps) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<PlainMaterial>[] = [
     {
       accessorKey: "code",
@@ -119,16 +124,18 @@ export function MaterialList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "material" : "materiales"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={materials}
-        // 0 = sin paginar en memoria: la página la sirve el servidor.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "material", many: "materiales" }}
         getRowId={(material) => material.id}
         emptyState={
           <div className="flat-surface">

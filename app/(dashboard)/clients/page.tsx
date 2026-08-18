@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { ClientList } from "@/components/clients/client-list";
-import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,7 +14,7 @@ export const metadata: Metadata = { title: "Clientes" };
 const PAGE_SIZE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
@@ -62,24 +61,19 @@ async function ListSection({
     search: term,
     page,
     pageSize: PAGE_SIZE,
+    // "Cargar más" del celular: trae desde la primera fila hasta ésta.
+    accumulate: params.all === "1",
   });
 
   return (
-    <>
-      <ClientList
-        clients={result.items}
-        total={result.total}
-        page={result.page}
-        totalPages={result.totalPages}
-        isFiltered={Boolean(term)}
-      />
-      <Pager
-        page={result.page}
-        totalPages={result.totalPages}
-        basePath="/clients"
-        params={params}
-      />
-    </>
+    <ClientList
+      clients={result.items}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      pageSize={result.pageSize}
+      isFiltered={Boolean(term)}
+    />
   );
 }
 

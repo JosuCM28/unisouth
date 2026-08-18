@@ -12,6 +12,7 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { ProductionRunActions } from "./production-run-actions";
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   isFiltered?: boolean;
 }
 
@@ -30,8 +32,11 @@ export function ProductionRunList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: Props) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<ProductionRunWithDetail>[] = [
     {
       accessorKey: "code",
@@ -92,16 +97,18 @@ export function ProductionRunList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "producción" : "producciones"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={runs}
-        // 0 = sin paginar en memoria: la página la sirve el servidor.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "producción", many: "producciones" }}
         getRowId={(run) => run.id}
         emptyState={
           <div className="flat-surface">

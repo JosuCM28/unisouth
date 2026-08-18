@@ -23,6 +23,7 @@ interface PageProps {
     from?: string;
     to?: string;
     page?: string;
+    all?: string;
   }>;
 }
 
@@ -69,7 +70,7 @@ async function ListSection({
   const page = Math.max(1, Number(params.page ?? 1) || 1);
 
   const [result, totals] = await Promise.all([
-    repository.search({ ...filters, page, pageSize: PAGE_SIZE }),
+    repository.search({ ...filters, page, pageSize: PAGE_SIZE, accumulate: params.all === "1" }),
     repository.totalsByDirection(filters),
   ]);
 
@@ -101,6 +102,8 @@ async function ListSection({
       <Pager
         page={result.page}
         totalPages={result.totalPages}
+        total={result.total}
+        itemLabel={{ one: "movimiento", many: "movimientos" }}
         basePath="/movements"
         params={params}
       />

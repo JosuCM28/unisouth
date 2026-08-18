@@ -4,17 +4,39 @@ import { FileText, Package2, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { PageHeader } from "@/components/layout/page-header";
+import { Pager } from "@/components/shared/pager";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Productos" };
 
-export default async function ProductsPage() {
-  const [products, clients] = await Promise.all([
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; all?: string }>;
+}
+
+export default async function ProductsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = parsePositiveInt(params.page) ?? 1;
+  /* "Cargar más" del celular: trae desde la primera fila hasta el final de
+     esta página, porque cada toque es una navegación y lo ya mostrado no
+     sobrevive en estado del cliente. Se topa para no bajar la tabla entera. */
+  const accumulate = params.all === "1";
+  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
+  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+  const where = { deletedAt: null };
+
+  const [total, products, clients] = await Promise.all([
+    prisma.finishedProduct.count({ where }),
     prisma.finishedProduct.findMany({
-      where: { deletedAt: null },
-      orderBy: { name: "asc" },
+      where,
+      // El id desempata: dos productos pueden llamarse igual y sin criterio
+      // estable se barajarían entre páginas.
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip,
+      take,
       include: {
         client: { select: { name: true } },
         billsOfMaterials: {
@@ -26,6 +48,8 @@ export default async function ProductsPage() {
     }),
     new ClientRepository().findOptions(),
   ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -71,6 +95,23 @@ export default async function ProductsPage() {
           })}
         </ul>
       )}
+
+      <Pager
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        itemLabel={{ one: "producto", many: "productos" }}
+        basePath="/products"
+        params={params}
+      />
     </div>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }

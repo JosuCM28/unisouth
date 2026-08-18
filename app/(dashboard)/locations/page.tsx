@@ -8,7 +8,6 @@ import { WarehouseRepository } from "@/lib/repositories/warehouse.repository";
 import { LocationFormDialog } from "@/components/locations/location-form-dialog";
 import { LocationList } from "@/components/locations/location-list";
 import { WarehouseMap } from "@/components/locations/warehouse-map";
-import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
 const PAGE_SIZE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
 }
 
 export default async function LocationsPage({ searchParams }: PageProps) {
@@ -79,29 +78,22 @@ async function ListSection({
   // la bodega COMPLETA y se cruzaba en memoria con la búsqueda: con miles de
   // ubicaciones eso significa bajarlas todas en cada visita.
   const [result, parents, warehouses] = await Promise.all([
-    repository.searchWithLotCount({ search: term, page, pageSize: PAGE_SIZE }),
+    repository.searchWithLotCount({ search: term, page, pageSize: PAGE_SIZE, accumulate: params.all === "1" }),
     repository.findOptions(),
     new WarehouseRepository().findOptions(),
   ]);
 
   return (
-    <>
-      <LocationList
-        locations={result.items}
-        parents={parents}
-        warehouses={warehouses}
-        total={result.total}
-        page={result.page}
-        totalPages={result.totalPages}
-        isFiltered={Boolean(term)}
-      />
-      <Pager
-        page={result.page}
-        totalPages={result.totalPages}
-        basePath="/locations"
-        params={params}
-      />
-    </>
+    <LocationList
+      locations={result.items}
+      parents={parents}
+      warehouses={warehouses}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      pageSize={result.pageSize}
+      isFiltered={Boolean(term)}
+    />
   );
 }
 

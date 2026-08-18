@@ -6,6 +6,7 @@ import type { ReceiptCardData } from "@/lib/repositories/receipt.repository";
 import { formatDate } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { usePageParam } from "@/components/shared/use-page-param";
 import { ReceiptCard } from "./receipt-card";
 
 interface ReceiptListProps {
@@ -14,6 +15,7 @@ interface ReceiptListProps {
   total: number;
   page: number;
   totalPages: number;
+  pageSize: number;
   isFiltered?: boolean;
 }
 
@@ -22,8 +24,11 @@ export function ReceiptList({
   total,
   page,
   totalPages,
+  pageSize,
   isFiltered,
 }: ReceiptListProps) {
+  const { onPageChange, onLoadMore } = usePageParam();
+
   const columns: DataTableColumn<ReceiptCardData>[] = [
     {
       accessorKey: "date",
@@ -97,16 +102,18 @@ export function ReceiptList({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="tabular text-xs text-muted-foreground">
-        {total} {total === 1 ? "recepción" : "recepciones"}
-        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
-      </p>
-
       <DataTable
         columns={columns}
         data={receipts}
-        // 0 = sin paginar en memoria: la página la sirve el servidor.
-        pageSize={0}
+        server={{
+          page,
+          totalPages,
+          total,
+          pageSize,
+          onPageChange,
+          onLoadMore: () => onLoadMore(page),
+        }}
+        itemLabel={{ one: "recepción", many: "recepciones" }}
         getRowId={(receipt) => receipt.id}
         emptyState={
           <div className="flat-surface">

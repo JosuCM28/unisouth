@@ -6,15 +6,42 @@ import { DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES, DOCUMENT_TYPE_LABELS } 
 import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pager } from "@/components/shared/pager";
 
 export const metadata: Metadata = { title: "Documentos" };
 
-export default async function DocumentsPage() {
-  const documents = await prisma.inventoryDocument.findMany({
-    orderBy: { date: "desc" },
-    take: 50,
-    include: { _count: { select: { lines: true } } },
-  });
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; all?: string }>;
+}
+
+export default async function DocumentsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = parsePositiveInt(params.page) ?? 1;
+  /* "Cargar más" del celular: trae desde la primera fila hasta el final de
+     esta página, porque cada toque es una navegación y lo ya mostrado no
+     sobrevive en estado del cliente. Se topa para no bajar la tabla entera. */
+  const accumulate = params.all === "1";
+  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
+  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+
+  /* Se cuenta y se trae en paralelo: sin el total no hay forma de saber
+     cuántas páginas hay, y sin páginas los vales viejos quedan inalcanzables
+     conforme se acumulan. */
+  const [total, documents] = await Promise.all([
+    prisma.inventoryDocument.count(),
+    prisma.inventoryDocument.findMany({
+      // El id desempata: `date` no es único y sin criterio estable las filas
+      // se barajan entre páginas, duplicando unas y escondiendo otras.
+      orderBy: [{ date: "desc" }, { id: "asc" }],
+      skip,
+      take,
+      include: { _count: { select: { lines: true } } },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -49,6 +76,23 @@ export default async function DocumentsPage() {
           ))}
         </ul>
       )}
+
+      <Pager
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        itemLabel={{ one: "documento", many: "documentos" }}
+        basePath="/documents"
+        params={params}
+      />
     </div>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }

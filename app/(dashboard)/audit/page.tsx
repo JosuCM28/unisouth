@@ -23,6 +23,7 @@ interface PageProps {
     from?: string;
     to?: string;
     page?: string;
+    all?: string;
   }>;
 }
 
@@ -71,6 +72,8 @@ async function ListSection({
     to: params.to ? new Date(`${params.to}T23:59:59`) : undefined,
     page,
     pageSize: PAGE_SIZE,
+    // "Cargar más" del celular: trae desde la primera fila hasta ésta.
+    accumulate: params.all === "1",
   });
 
   return (
@@ -84,6 +87,8 @@ async function ListSection({
       <Pager
         page={result.page}
         totalPages={result.totalPages}
+        total={result.total}
+        itemLabel={{ one: "registro", many: "registros" }}
         basePath="/audit"
         params={params}
       />

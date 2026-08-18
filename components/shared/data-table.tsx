@@ -69,6 +69,31 @@ type Features = typeof tableFeaturesConfig;
  */
 export type DataTableColumn<TData> = ColumnDef<Features, TData & RowData>;
 
+/**
+ * Paginación servida por la BASE DE DATOS.
+ *
+ * La tabla no reparte estas filas: ya vienen recortadas. TanStack entra en
+ * `manualPagination` para seguir gobernando el estado —qué página es, cuántas
+ * hay— sin volver a cortar un bloque que ya viene cortado.
+ */
+export interface ServerPagination {
+  page: number;
+  totalPages: number;
+  /** Total que cumple el filtro, no las filas de esta página. */
+  total: number;
+  pageSize: number;
+  /** Navega a la página pedida. En la práctica, cambia la URL. */
+  onPageChange: (page: number) => void;
+  /**
+   * "Cargar más" del celular: pide la siguiente página ACUMULANDO.
+   *
+   * Va aparte de `onPageChange` porque el servidor no sabe qué ancho tiene la
+   * pantalla: el modo acumulado se pide explícitamente desde la URL, y así el
+   * escritorio sigue trayendo una sola página aunque compartan el enlace.
+   */
+  onLoadMore?: () => void;
+}
+
 interface DataTableProps<TData> {
   columns: DataTableColumn<TData>[];
   data: TData[];
@@ -76,11 +101,16 @@ interface DataTableProps<TData> {
   renderMobileRow: (row: TData) => ReactNode;
   emptyState: ReactNode;
   /**
-   * Filas por página en el navegador.
+   * Filas por página EN EL NAVEGADOR.
    *
-   * 0 = desactivada, para listas que ya llegan paginadas desde el servidor.
+   * Sólo para listas cortas que llegan completas. Con `server` presente se
+   * ignora: mandan los datos de la base.
    */
   pageSize?: number;
+  /** Presente = la página la sirve Postgres, no el navegador. */
+  server?: ServerPagination;
+  /** Sustantivo para los contadores ("rollo"/"rollos"). */
+  itemLabel?: { one: string; many: string };
   getRowId?: (row: TData) => string;
 }
 
@@ -100,19 +130,21 @@ export function DataTable<TData>({
   renderMobileRow,
   emptyState,
   pageSize = 25,
+  server,
+  itemLabel = { one: "registro", many: "registros" },
   getRowId,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 1 });
 
   /**
-   * ¿Pagina esta tabla en el navegador?
+   * ¿Reparte esta tabla las filas en el navegador?
    *
-   * Con `pageSize = 0` NO: las filas que llegaron son la página completa y ya
-   * la eligió el servidor. Se pinta todo tal cual, sin dejar que TanStack
-   * vuelva a recortar un bloque que ya viene recortado.
+   * Con `server` NO: llegaron ya recortadas por Postgres. Volver a cortarlas
+   * aquí es justo lo que escondía registros —el navegador sólo puede repartir
+   * lo que ya recibió, y el resto no se alcanzaba por ninguna página.
    */
-  const paginatesInMemory = pageSize > 0;
+  const paginatesInMemory = !server && pageSize > 0;
 
   /**
    * ÚNICO `any` de la capa de tablas.
@@ -128,10 +160,24 @@ export function DataTable<TData>({
     features: tableFeaturesConfig,
     columns,
     data,
-    // Sin paginación en memoria no se le pasa estado de página: si se le
-    // diera un `pageSize` fijo calculado al montar, quedaría congelado y al
-    // navegar a una página del servidor con más filas cortaría las últimas.
-    state: { sorting, ...(paginatesInMemory ? { pagination } : {}) },
+    // En modo servidor TanStack sigue llevando el estado de la página —para
+    // que los controles y el orden salgan de un solo lugar— pero no recorta:
+    // eso ya lo hizo la consulta.
+    manualPagination: Boolean(server),
+    ...(server ? { rowCount: server.total } : {}),
+    state: {
+      sorting,
+      ...(server
+        ? {
+            pagination: {
+              pageIndex: server.page - 1,
+              pageSize: server.pageSize,
+            },
+          }
+        : paginatesInMemory
+          ? { pagination }
+          : {}),
+    },
     // Sin esto, v9 arranca en descendente para columnas numéricas: el
     // usuario pica "Cantidad" esperando ver lo más chico primero y ve lo
     // más grande, con la flecha diciendo "ascendente".
@@ -147,14 +193,55 @@ export function DataTable<TData>({
 
   if (data.length === 0) return <>{emptyState}</>;
 
+  /* En celular `data` YA viene acumulada desde el servidor: al pedir la
+     página 3 llegan las filas de la 1 a la 3. El acumulado NO puede vivir en
+     estado del cliente porque cada "cargar más" es una navegación y remonta
+     el componente, borrando cualquier `useState`. */
+  const mobileRows = server
+    ? data
+    : rows.map((row) => row.original as TData);
+  const hasMore = server ? server.page < server.totalPages : false;
+
   return (
     <div className="flex flex-col gap-3">
       {/* ── Celular: tarjetas ── */}
       <ul className="flex flex-col gap-2 md:hidden">
-        {rows.map((row) => (
-          <li key={row.id}>{renderMobileRow(row.original as TData)}</li>
+        {mobileRows.map((item, index) => (
+          <li key={getRowId?.(item) ?? index}>{renderMobileRow(item)}</li>
         ))}
       </ul>
+
+      {/* Avance de una mano: un botón ancho al final en vez de flechitas.
+          Se apunta con el pulgar sin mirar, que es como se usa en el piso. */}
+      {server && (
+        <div className="flex flex-col gap-2 md:hidden">
+          {hasMore ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="touch-target h-12 w-full"
+              onClick={() =>
+                server.onLoadMore
+                  ? server.onLoadMore()
+                  : server.onPageChange(server.page + 1)
+              }
+            >
+              Cargar más
+            </Button>
+          ) : (
+            mobileRows.length > 0 && (
+              <p className="tabular py-2 text-center text-xs text-muted-foreground">
+                No hay más {itemLabel.many}.
+              </p>
+            )
+          )}
+
+          <p className="tabular text-center text-xs text-muted-foreground">
+            {mobileRows.length} de {server.total}{" "}
+            {server.total === 1 ? itemLabel.one : itemLabel.many}
+          </p>
+        </div>
+      )}
 
       {/* ── Desde md: tabla ── */}
       <div className="hidden md:block">
@@ -207,6 +294,26 @@ export function DataTable<TData>({
           </Table>
         </div>
       </div>
+
+      {/* Escritorio: el paginador completo, con "primera" y "última". En
+          celular se esconde porque ahí manda el botón de "cargar más". */}
+      {server && server.totalPages > 1 && (
+        <div className="hidden md:block">
+          <Pagination
+            page={server.page}
+            pageCount={server.totalPages}
+            total={server.total}
+            from={(server.page - 1) * server.pageSize + 1}
+            to={Math.min(server.page * server.pageSize, server.total)}
+            canPrevious={server.page > 1}
+            canNext={server.page < server.totalPages}
+            onFirst={() => server.onPageChange(1)}
+            onPrevious={() => server.onPageChange(server.page - 1)}
+            onNext={() => server.onPageChange(server.page + 1)}
+            onLast={() => server.onPageChange(server.totalPages)}
+          />
+        </div>
+      )}
 
       {paginatesInMemory && table.getPageCount() > 1 && (
         <Pagination

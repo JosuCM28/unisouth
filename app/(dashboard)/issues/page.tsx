@@ -9,23 +9,49 @@ import {
 import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Salidas" };
 
-export default async function IssuesPage() {
-  const issues = await prisma.inventoryDocument.findMany({
-    // Sólo salidas: los vales de entrada tienen su propio registro y
-    // mezclarlos obligaría a leer el tipo de cada renglón para saber si el
-    // material entró o salió.
-    where: { type: "ISSUE" },
-    orderBy: { date: "desc" },
-    take: 50,
-    include: {
-      _count: { select: { lines: true } },
-      productionRun: { select: { code: true } },
-    },
-  });
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; all?: string }>;
+}
+
+export default async function IssuesPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = parsePositiveInt(params.page) ?? 1;
+  /* "Cargar más" del celular: trae desde la primera fila hasta el final de
+     esta página, porque cada toque es una navegación y lo ya mostrado no
+     sobrevive en estado del cliente. Se topa para no bajar la tabla entera. */
+  const accumulate = params.all === "1";
+  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
+  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+
+  // Sólo salidas: los vales de entrada tienen su propio registro y mezclarlos
+  // obligaría a leer el tipo de cada renglón para saber si el material entró
+  // o salió.
+  const where = { type: "ISSUE" as const };
+
+  const [total, issues] = await Promise.all([
+    prisma.inventoryDocument.count({ where }),
+    prisma.inventoryDocument.findMany({
+      where,
+      // El id desempata: `date` no es único y sin criterio estable las filas
+      // se barajan entre páginas.
+      orderBy: [{ date: "desc" }, { id: "asc" }],
+      skip,
+      take,
+      include: {
+        _count: { select: { lines: true } },
+        productionRun: { select: { code: true } },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -88,6 +114,23 @@ export default async function IssuesPage() {
           ))}
         </ul>
       )}
+
+      <Pager
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        itemLabel={{ one: "salida", many: "salidas" }}
+        basePath="/issues"
+        params={params}
+      />
     </div>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
