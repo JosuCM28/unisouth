@@ -190,6 +190,37 @@ export class LotRepository extends BaseRepository<
     });
   }
 
+  /**
+   * Lo que DE VERDAD se puede surtir hoy: dueños y materiales con existencia.
+   *
+   * El formulario de salida ofrecía los catálogos completos —26 clientes, 6
+   * materiales— cuando sólo 3 dueños y 4 materiales tenían rollos. Elegir
+   * cualquiera de los otros devolvía una lista vacía sin explicación, y desde
+   * el piso eso se lee como "el sistema no sirve".
+   *
+   * Se resuelve con un groupBy y no trayendo los rollos: la pantalla sólo
+   * necesita saber cuántos hay de cada combinación, no cuáles son.
+   */
+  async findIssuableOptions() {
+    const grouped = await this.db.lot.groupBy({
+      by: ["clientId", "materialId"],
+      where: {
+        status: { in: [...STATUSES_ISSUABLE] },
+        isBlocked: false,
+        currentQuantity: { gt: 0 },
+      },
+      _count: { _all: true },
+    });
+
+    return grouped.map(
+      (row: { clientId: string | null; materialId: string; _count: { _all: number } }) => ({
+        clientId: row.clientId,
+        materialId: row.materialId,
+        count: row._count._all,
+      }),
+    );
+  }
+
   /** Rollos que ocupan lugar físico en la bodega. */
   async countPhysicallyPresent(): Promise<number> {
     return this.db.lot.count({

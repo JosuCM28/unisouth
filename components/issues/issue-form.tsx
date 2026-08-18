@@ -37,7 +37,20 @@ interface MaterialOption {
   id: string;
   code: string;
   name: string;
+  /** Rollos surtibles hoy. Se muestra para no elegir a ciegas. */
+  lotCount: number;
+  /** Dueños que tienen rollos de este material. */
+  clientIds: string[];
 }
+
+interface ClientOption {
+  id: string;
+  name: string;
+  lotCount: number;
+}
+
+/** Centinela del material propio: en la base es `clientId = null`. */
+const FACTORY_OWNER = "__factory__";
 
 interface Props {
   materials: MaterialOption[];
@@ -45,7 +58,7 @@ interface Props {
   sizes: { id: string; code: string; name: string }[];
   /** Catálogo completo para la tabla de corte, con su grupo de escala. */
   cutSizes: SizeOption[];
-  clients: { id: string; name: string }[];
+  clients: ClientOption[];
   productionRuns: { id: string; code: string; name: string | null }[];
 }
 
@@ -87,6 +100,11 @@ export function IssueForm({
   const [receivedBy, setReceivedBy] = useState("");
   const [notes, setNotes] = useState("");
 
+  /* El centinela "de la fábrica" sólo vive en la interfaz: hacia el servidor
+     viaja como ausencia de dueño, que es como está guardado en la base. */
+  const realClientId =
+    clientId && clientId !== FACTORY_OWNER ? clientId : undefined;
+
   const [lines, setLines] = useState<IssueLine[]>([]);
   const [cutLines, setCutLines] = useState<CutLineDraft[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -126,7 +144,7 @@ export function IssueForm({
 
     const result = await availableLotsAction({
       materialId,
-      clientId: clientId || undefined,
+      clientId: realClientId,
     });
 
     if (!result.success) {
@@ -161,6 +179,20 @@ export function IssueForm({
         quantity: String(lot.available),
       },
     ]);
+  }
+
+  /**
+   * Abre el selector y, si no hay nada que elegir, se salta el paso.
+   *
+   * Con un solo material surtible —lo normal cuando ya se filtró por dueño—
+   * obligar a elegirlo es un toque de más que no aporta información: se carga
+   * su lista de rollos de una vez y el auxiliar ya está marcando.
+   */
+  function openPicker() {
+    setPickerOpen(true);
+
+    const only = visibleMaterials.length === 1 ? visibleMaterials[0] : undefined;
+    if (only && !pickerMaterialId) void handleMaterialChange(only.id);
   }
 
   /** Deja el selector en blanco: al reabrirlo se elige material otra vez. */
@@ -251,7 +283,7 @@ export function IssueForm({
 
     const result = await createDocumentAction({
       type: "ISSUE",
-      clientId: clientId || undefined,
+      clientId: realClientId,
       productionRunId: productionRunId || undefined,
       concept: concept || undefined,
       reference: reference || undefined,
@@ -288,6 +320,13 @@ export function IssueForm({
 
   const usedLotIds = lines.map((line) => line.lotId);
 
+  /* Con dueño elegido sólo se ofrecen SUS materiales. Antes se listaban los
+     seis del catálogo y cuatro de ellos devolvían lista vacía: el auxiliar
+     tenía que probar uno por uno para descubrir cuál tenía tela suya. */
+  const visibleMaterials = clientId
+    ? materials.filter((material) => material.clientIds.includes(clientId))
+    : materials;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flat-surface flex flex-col gap-4 p-4">
@@ -301,6 +340,7 @@ export function IssueForm({
             options={clients.map((client) => ({
               value: client.id,
               label: client.name,
+              hint: `${client.lotCount} ${client.lotCount === 1 ? "rollo" : "rollos"}`,
             }))}
             value={clientId}
             onChange={handleClientChange}
@@ -314,13 +354,13 @@ export function IssueForm({
           <IssueFromCalculation
             products={products}
             sizes={sizes}
-            clientId={clientId || undefined}
+            clientId={realClientId}
             onExplode={handleExplode}
           />
 
           <ResponsiveFormDialog
             open={pickerOpen}
-            onOpenChange={(next) => (next ? setPickerOpen(true) : closePicker())}
+            onOpenChange={(next) => (next ? openPicker() : closePicker())}
             title="Agregar rollos"
             description="Marca todos los que se lleven. Retazos primero, luego los más viejos."
             trigger={
@@ -334,16 +374,17 @@ export function IssueForm({
               <FormSelectField id="picker-material" label="Material">
                 <SearchSelect
                   id="picker-material"
-                  options={materials.map((material) => ({
+                  options={visibleMaterials.map((material) => ({
                     value: material.id,
                     label: material.name,
-                    hint: material.code,
+                    hint: `${material.code} · ${material.lotCount} ${material.lotCount === 1 ? "rollo" : "rollos"}`,
                     keywords: material.code,
                   }))}
                   value={pickerMaterialId}
                   onChange={handleMaterialChange}
                   placeholder="Elige el material"
                   searchPlaceholder="Buscar por código o nombre…"
+                  emptyMessage="Este cliente no tiene material en bodega."
                 />
               </FormSelectField>
 

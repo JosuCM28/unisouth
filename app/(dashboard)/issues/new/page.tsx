@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { ClientRepository } from "@/lib/repositories/client.repository";
+import { LotRepository } from "@/lib/repositories/lot.repository";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { IssueForm } from "@/components/issues/issue-form";
@@ -11,14 +12,19 @@ import type { IssueProductOption } from "@/components/issues/issue-from-calculat
 
 export const metadata: Metadata = { title: "Nueva salida" };
 
+/** Centinela del material propio: en la base es `clientId = null`. */
+const FACTORY_OWNER = "__factory__";
+
 export default async function NewIssuePage() {
   // Ocultar el enlace es comodidad visual, no seguridad: el registro de
   // salidas lo ven los roles de sólo lectura y desde ahí se alcanza esta
   // ruta escribiéndola. La barrera real es ésta.
   await requirePermission("inventory:write");
 
-  const [materials, products, sizes, clients, productionRuns] =
+  const [issuable, materials, products, sizes, clients, productionRuns] =
     await Promise.all([
+      // Qué hay REALMENTE surtible hoy, por dueño y material.
+      new LotRepository().findIssuableOptions(),
       new MaterialRepository().findOptions(),
       prisma.finishedProduct.findMany({
         where: { active: true, deletedAt: null },
@@ -59,6 +65,60 @@ export default async function NewIssuePage() {
     activeBomId: product.billsOfMaterials[0]?.id ?? null,
   }));
 
+  /* Sólo se ofrecen dueños y materiales CON existencia, y cada uno dice
+     cuántos rollos tiene. Ofrecer el catálogo completo obligaba a adivinar:
+     de 26 clientes, 23 devolvían una lista vacía sin decir por qué. */
+  const stockByClient = new Map<string, number>();
+  const stockByMaterial = new Map<string, number>();
+  // Qué materiales tiene cada dueño, para filtrar en cascada sin ir al servidor.
+  const materialsByClient = new Map<string, Set<string>>();
+
+  for (const row of issuable) {
+    // `null` = material de la propia fábrica, sin cliente dueño.
+    const clientKey = row.clientId ?? FACTORY_OWNER;
+    stockByClient.set(clientKey, (stockByClient.get(clientKey) ?? 0) + row.count);
+    stockByMaterial.set(
+      row.materialId,
+      (stockByMaterial.get(row.materialId) ?? 0) + row.count,
+    );
+
+    const set = materialsByClient.get(clientKey) ?? new Set<string>();
+    set.add(row.materialId);
+    materialsByClient.set(clientKey, set);
+  }
+
+  const clientsWithStock = [
+    ...(stockByClient.has(FACTORY_OWNER)
+      ? [
+          {
+            id: FACTORY_OWNER,
+            name: "De la fábrica",
+            lotCount: stockByClient.get(FACTORY_OWNER) ?? 0,
+          },
+        ]
+      : []),
+    ...clients
+      .filter((client) => stockByClient.has(client.id))
+      .map((client) => ({
+        id: client.id,
+        name: client.name,
+        lotCount: stockByClient.get(client.id) ?? 0,
+      })),
+  ];
+
+  const materialsWithStock = materials
+    .filter((material) => stockByMaterial.has(material.id))
+    .map((material) => ({
+      id: material.id,
+      code: material.code,
+      name: material.name,
+      lotCount: stockByMaterial.get(material.id) ?? 0,
+      // Se serializa el Set: un Map/Set no cruza al Client Component.
+      clientIds: [...materialsByClient.entries()]
+        .filter(([, materialIds]) => materialIds.has(material.id))
+        .map(([clientId]) => clientId),
+    }));
+
   return (
     <div className="flex flex-col gap-4">
       <Link
@@ -75,11 +135,11 @@ export default async function NewIssuePage() {
       />
 
       <IssueForm
-        materials={materials}
+        materials={materialsWithStock}
         products={productOptions}
         sizes={sizes}
         cutSizes={sizes}
-        clients={clients}
+        clients={clientsWithStock}
         productionRuns={productionRuns}
       />
     </div>

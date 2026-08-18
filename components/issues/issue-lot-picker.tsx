@@ -48,7 +48,7 @@ export function IssueLotPicker({
   if (state.kind === "idle") {
     return (
       <p className="text-sm text-muted-foreground">
-        Elige primero el material.
+        Elige el material para ver sus rollos.
       </p>
     );
   }
@@ -71,11 +71,25 @@ export function IssueLotPicker({
   );
 
   if (selectable.length === 0) {
+    /* Se distingue "ya los tomaste todos" de "no hay": son dos situaciones
+       distintas y el mismo mensaje para ambas hacía pensar que el sistema
+       no encontraba material que sí estaba en la bodega. */
+    const allTaken = state.lots.length > 0;
+
     return (
-      <p className="text-sm text-muted-foreground">
-        No hay rollos disponibles de este material
-        {hasClientFilter && " para este cliente"}.
-      </p>
+      <div className="flex flex-col gap-2 border border-border bg-muted p-3">
+        <p className="text-sm">
+          {allTaken
+            ? "Ya agregaste todos los rollos de este material."
+            : "No hay rollos de este material en bodega."}
+        </p>
+        {!allTaken && hasClientFilter && (
+          <p className="text-xs text-muted-foreground">
+            Estás filtrando por cliente: sólo se ofrecen rollos de su
+            propiedad. Quita el filtro para ver el resto.
+          </p>
+        )}
+      </div>
     );
   }
 
