@@ -104,7 +104,9 @@ export default async function PrintDocumentPage({ params }: PageProps) {
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 border-b border-black py-3 text-sm">
         {document.concept && <Row label="Concepto" value={document.concept} />}
-        {document.reference && <Row label="Referencia" value={document.reference} />}
+        {document.reference && (
+          <Row label="Orden de corte" value={document.reference} />
+        )}
         {document.productionRun && (
           <Row
             label="Producción"
@@ -217,20 +219,24 @@ export default async function PrintDocumentPage({ params }: PageProps) {
       <table className="mt-1 w-full border-collapse text-sm">
         <thead>
           <tr className="border-b-2 border-black text-left">
+            {/* La casilla va primero: se palomea con el dedo mientras se
+                cargan los rollos, y en el margen izquierdo cae natural. */}
+            <th className="w-8 py-1 pr-2 text-center">✓</th>
             <th className="py-1 pr-2">Folio</th>
             <th className="py-1 pr-2">Material</th>
             <th className="py-1 pr-2">Tono</th>
-            <th className="py-1 pr-2">Ubic.</th>
             <th className="py-1 text-right">Cantidad</th>
           </tr>
         </thead>
         <tbody>
           {document.lines.map((line) => (
             <tr key={line.id} className="border-b border-neutral-300">
+              <td className="py-1 pr-2 text-center">
+                <span className="inline-block size-4 border border-black align-middle" />
+              </td>
               <td className="tabular py-1 pr-2">{line.lot.code}</td>
               <td className="py-1 pr-2">{line.lot.material.name}</td>
               <td className="tabular py-1 pr-2">{line.lot.shade ?? "—"}</td>
-              <td className="tabular py-1 pr-2">{line.lot.location?.code ?? "—"}</td>
               <td className="tabular py-1 text-right">
                 {formatQuantity(line.quantity, {
                   unit: UNIT_SHORT_LABELS[line.unit],

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Check, Printer } from "lucide-react";
+import { Ban, Check, Pencil, Printer } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentStatus } from "@prisma/client";
 import { applyDocumentAction, cancelDocumentAction } from "@/app/actions/document.actions";
@@ -16,6 +17,8 @@ interface Props {
   documentCode: string;
   status: DocumentStatus;
   lineCount: number;
+  /** Sólo las salidas tienen pantalla de corrección. */
+  isIssue?: boolean;
 }
 
 /**
@@ -29,6 +32,7 @@ export function DocumentActions({
   documentCode,
   status,
   lineCount,
+  isIssue,
 }: Props) {
   const router = useRouter();
   const [isApplying, setIsApplying] = useState(false);
@@ -79,6 +83,18 @@ export function DocumentActions({
           Imprimir vale
         </a>
       </Button>
+
+      {/* Editar SÓLO en borrador: una salida aplicada ya movió inventario y
+          corregirla dejaría el kárdex sin explicación. Ahí quedan imprimir y
+          cancelar, que genera los movimientos inversos. */}
+      {status === "DRAFT" && isIssue && (
+        <Button asChild variant="outline" className="touch-target">
+          <Link href={`/issues/${documentId}/edit`}>
+            <Pencil className="size-4" aria-hidden />
+            Editar
+          </Link>
+        </Button>
+      )}
 
       {status === "DRAFT" && (
         <Button

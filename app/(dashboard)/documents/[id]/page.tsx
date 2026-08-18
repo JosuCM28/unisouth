@@ -94,6 +94,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         documentCode={document.code}
         status={document.status}
         lineCount={document.lines.length}
+        isIssue={document.type === "ISSUE"}
       />
 
       {document.cutLines.length > 0 && (

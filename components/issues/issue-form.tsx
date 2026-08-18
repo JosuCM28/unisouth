@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Unit } from "@prisma/client";
-import { createDocumentAction } from "@/app/actions/document.actions";
+import {
+  createDocumentAction,
+  updateDocumentAction,
+} from "@/app/actions/document.actions";
 import {
   availableLotsAction,
   type IssueLotOption,
@@ -44,6 +47,34 @@ interface MaterialOption {
   clientIds: string[];
 }
 
+/**
+ * Una salida en BORRADOR que se vuelve a abrir para corregir.
+ *
+ * Sólo los borradores: una salida aplicada ya movió inventario y editarla
+ * dejaría el kárdex sin explicación. Eso lo rechaza el servicio, y aquí ni
+ * siquiera se ofrece.
+ */
+export interface EditableIssue {
+  id: string;
+  clientId: string | null;
+  productionRunId: string | null;
+  concept: string | null;
+  reference: string | null;
+  receivedBy: string | null;
+  notes: string | null;
+  lines: {
+    lotId: string;
+    lotCode: string;
+    materialName: string;
+    shade: string | null;
+    isRemnant: boolean;
+    available: number;
+    unit: Unit;
+    quantity: string;
+  }[];
+  cutLines: CutLineDraft[];
+}
+
 interface ClientOption {
   id: string;
   name: string;
@@ -63,6 +94,8 @@ interface Props {
   cutTags: CutTagOption[];
   clients: ClientOption[];
   productionRuns: { id: string; code: string; name: string | null }[];
+  /** Presente = se está corrigiendo un borrador, no creando uno nuevo. */
+  document?: EditableIssue;
 }
 
 /** Un renglón ya armado: el rollo concreto y cuánto se le quita. */
@@ -94,23 +127,31 @@ export function IssueForm({
   cutTags,
   clients,
   productionRuns,
+  document,
 }: Props) {
   const router = useRouter();
+  const isEditing = Boolean(document);
 
-  const [clientId, setClientId] = useState("");
-  const [productionRunId, setProductionRunId] = useState("");
-  const [concept, setConcept] = useState("");
-  const [reference, setReference] = useState("");
-  const [receivedBy, setReceivedBy] = useState("");
-  const [notes, setNotes] = useState("");
+  const [clientId, setClientId] = useState(
+    document?.clientId ?? (document ? FACTORY_OWNER : ""),
+  );
+  const [productionRunId, setProductionRunId] = useState(
+    document?.productionRunId ?? "",
+  );
+  const [concept, setConcept] = useState(document?.concept ?? "");
+  const [reference, setReference] = useState(document?.reference ?? "");
+  const [receivedBy, setReceivedBy] = useState(document?.receivedBy ?? "");
+  const [notes, setNotes] = useState(document?.notes ?? "");
 
   /* El centinela "de la fábrica" sólo vive en la interfaz: hacia el servidor
      viaja como ausencia de dueño, que es como está guardado en la base. */
   const realClientId =
     clientId && clientId !== FACTORY_OWNER ? clientId : undefined;
 
-  const [lines, setLines] = useState<IssueLine[]>([]);
-  const [cutLines, setCutLines] = useState<CutLineDraft[]>([]);
+  const [lines, setLines] = useState<IssueLine[]>(document?.lines ?? []);
+  const [cutLines, setCutLines] = useState<CutLineDraft[]>(
+    document?.cutLines ?? [],
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMaterialId, setPickerMaterialId] = useState("");
   const [pickerState, setPickerState] = useState<PickerState>({ kind: "idle" });
@@ -285,8 +326,8 @@ export function IssueForm({
 
     setIsSubmitting(true);
 
-    const result = await createDocumentAction({
-      type: "ISSUE",
+    const payload = {
+      type: "ISSUE" as const,
       clientId: realClientId,
       productionRunId: productionRunId || undefined,
       concept: concept || undefined,
@@ -309,12 +350,25 @@ export function IssueForm({
           tagId: line.tag || undefined,
           notes: line.notes || undefined,
         })),
-    });
+    };
+
+    /* Editar sólo aplica a borradores. El servicio lo vuelve a comprobar: si
+       alguien deja la pestaña abierta y el vale se aplica desde otro lado, el
+       guardado se rechaza en vez de reescribir un documento ya aplicado. */
+    const result = document
+      ? await updateDocumentAction({ id: document.id, data: payload })
+      : await createDocumentAction(payload);
 
     setIsSubmitting(false);
 
     if (!result.success) {
       toast.error(result.error);
+      return;
+    }
+
+    if (isEditing) {
+      toast.success("Borrador actualizado");
+      router.push(`/documents/${document!.id}`);
       return;
     }
 
@@ -510,7 +564,7 @@ export function IssueForm({
           disabled={lines.length === 0}
           className="h-12 w-full"
         >
-          Guardar salida en borrador
+          {isEditing ? "Guardar cambios" : "Guardar salida en borrador"}
         </SubmitButton>
 
         <p className="text-center text-xs text-muted-foreground">
