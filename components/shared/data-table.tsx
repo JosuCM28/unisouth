@@ -75,7 +75,11 @@ interface DataTableProps<TData> {
   /** Cómo se pinta cada fila en celular. Sin esto, no se muestra nada ahí. */
   renderMobileRow: (row: TData) => ReactNode;
   emptyState: ReactNode;
-  /** Filas por página. 0 desactiva la paginación. */
+  /**
+   * Filas por página en el navegador.
+   *
+   * 0 = desactivada, para listas que ya llegan paginadas desde el servidor.
+   */
   pageSize?: number;
   getRowId?: (row: TData) => string;
 }
@@ -99,10 +103,16 @@ export function DataTable<TData>({
   getRowId,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize: pageSize > 0 ? pageSize : data.length || 1,
-  });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 1 });
+
+  /**
+   * ¿Pagina esta tabla en el navegador?
+   *
+   * Con `pageSize = 0` NO: las filas que llegaron son la página completa y ya
+   * la eligió el servidor. Se pinta todo tal cual, sin dejar que TanStack
+   * vuelva a recortar un bloque que ya viene recortado.
+   */
+  const paginatesInMemory = pageSize > 0;
 
   /**
    * ÚNICO `any` de la capa de tablas.
@@ -118,7 +128,10 @@ export function DataTable<TData>({
     features: tableFeaturesConfig,
     columns,
     data,
-    state: { sorting, pagination },
+    // Sin paginación en memoria no se le pasa estado de página: si se le
+    // diera un `pageSize` fijo calculado al montar, quedaría congelado y al
+    // navegar a una página del servidor con más filas cortaría las últimas.
+    state: { sorting, ...(paginatesInMemory ? { pagination } : {}) },
     // Sin esto, v9 arranca en descendente para columnas numéricas: el
     // usuario pica "Cantidad" esperando ver lo más chico primero y ve lo
     // más grande, con la flecha diciendo "ascendente".
@@ -128,7 +141,9 @@ export function DataTable<TData>({
     ...(getRowId ? { getRowId } : {}),
   });
 
-  const rows = table.getPaginatedRowModel().rows;
+  const rows = paginatesInMemory
+    ? table.getPaginatedRowModel().rows
+    : table.getSortedRowModel().rows;
 
   if (data.length === 0) return <>{emptyState}</>;
 
@@ -193,7 +208,7 @@ export function DataTable<TData>({
         </div>
       </div>
 
-      {pageSize > 0 && table.getPageCount() > 1 && (
+      {paginatesInMemory && table.getPageCount() > 1 && (
         <Pagination
           page={pagination.pageIndex + 1}
           pageCount={table.getPageCount()}

@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { MovementDirection, MovementType } from "@prisma/client";
 import { MovementRepository } from "@/lib/repositories/movement.repository";
@@ -9,7 +8,7 @@ import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { MovementFilters } from "@/components/movements/movement-filters";
 import { MovementList } from "@/components/movements/movement-list";
-import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/shared/pager";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = { title: "Movimientos" };
@@ -102,6 +101,7 @@ async function ListSection({
       <Pager
         page={result.page}
         totalPages={result.totalPages}
+        basePath="/movements"
         params={params}
       />
     </div>
@@ -135,59 +135,6 @@ function TotalCard({
       <span className={`tabular text-lg font-semibold ${className}`}>
         {amount.toLocaleString("es-MX", { maximumFractionDigits: 2 })}
       </span>
-    </div>
-  );
-}
-
-function Pager({
-  page,
-  totalPages,
-  params,
-}: {
-  page: number;
-  totalPages: number;
-  params: Awaited<PageProps["searchParams"]>;
-}) {
-  if (totalPages <= 1) return null;
-
-  function hrefFor(target: number): string {
-    const next = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value && key !== "page") next.set(key, value);
-    }
-
-    next.set("page", String(target));
-    return `/movements?${next}`;
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <Button
-        asChild={page > 1}
-        variant="outline"
-        disabled={page <= 1}
-        className="touch-target"
-      >
-        {page > 1 ? <Link href={hrefFor(page - 1)}>Anteriores</Link> : <span>Anteriores</span>}
-      </Button>
-
-      <span className="tabular text-xs text-muted-foreground">
-        {page} / {totalPages}
-      </span>
-
-      <Button
-        asChild={page < totalPages}
-        variant="outline"
-        disabled={page >= totalPages}
-        className="touch-target"
-      >
-        {page < totalPages ? (
-          <Link href={hrefFor(page + 1)}>Siguientes</Link>
-        ) : (
-          <span>Siguientes</span>
-        )}
-      </Button>
     </div>
   );
 }

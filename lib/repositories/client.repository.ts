@@ -16,6 +16,9 @@ export interface ClientWithLotCount extends Client {
   lotCount: number;
 }
 
+/** Fila cruda de Prisma: el `_count` antes de aplanarlo a `lotCount`. */
+type ClientWithCountRow = Client & { _count: { lots: number } };
+
 export class ClientRepository extends BaseRepository<
   Client,
   Prisma.ClientCreateInput,
@@ -45,20 +48,46 @@ export class ClientRepository extends BaseRepository<
     return this.paginate<Client>(where, { name: "asc" }, filters);
   }
 
-  /** Con cuántos rollos suyos hay en bodega ahora mismo. */
-  async findAllWithLotCount(): Promise<ClientWithLotCount[]> {
-    const clients = await this.db.client.findMany({
-      where: this.notDeleted,
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { lots: { where: { status: PHYSICALLY_PRESENT_FILTER } } } },
-      },
-    });
+  /**
+   * Página de clientes ya con su conteo de rollos.
+   *
+   * Reemplaza al par "traer todo + filtrar en memoria": la búsqueda y el
+   * recorte los hace Postgres, así que la pantalla se comporta igual con 20
+   * clientes que con 20 000 y no se cae al crecer el catálogo.
+   */
+  async searchWithLotCount(
+    filters: ClientFilters = {},
+  ): Promise<PaginatedResult<ClientWithLotCount>> {
+    const where: Prisma.ClientWhereInput = {};
 
-    return clients.map(({ _count, ...client }) => ({
-      ...client,
-      lotCount: _count.lots,
-    }));
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { code: { contains: filters.search, mode: "insensitive" } },
+        { legalName: { contains: filters.search, mode: "insensitive" } },
+      ];
+    }
+
+    if (filters.active !== undefined) where.active = filters.active;
+
+    const result = await this.paginate<ClientWithCountRow>(
+      where,
+      { name: "asc" },
+      filters,
+      {
+        _count: {
+          select: { lots: { where: { status: PHYSICALLY_PRESENT_FILTER } } },
+        },
+      },
+    );
+
+    return {
+      ...result,
+      items: result.items.map(({ _count, ...client }) => ({
+        ...client,
+        lotCount: _count.lots,
+      })),
+    };
   }
 
   async countLots(clientId: string): Promise<number> {

@@ -10,11 +10,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { ReceiptFilters } from "@/components/receipts/receipt-filters";
 import { ReceiptList } from "@/components/receipts/receipt-list";
+import { Pager } from "@/components/shared/pager";
 import type { ReceiptCardData } from "@/lib/repositories/receipt.repository";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = { title: "Recepciones" };
+
+const PAGE_SIZE = 50;
 
 interface PageProps {
   searchParams: Promise<{
@@ -23,6 +26,7 @@ interface PageProps {
     supplierId?: string;
     carrierId?: string;
     arrivedWithin?: string;
+    page?: string;
   }>;
 }
 
@@ -81,25 +85,42 @@ async function ListSection({
 }: {
   params: Awaited<PageProps["searchParams"]>;
 }) {
+  const page = parsePositiveInt(params.page) ?? 1;
+
   const result = await new ReceiptRepository().search({
     search: params.q,
     clientId: params.clientId,
     supplierId: params.supplierId,
     carrierId: params.carrierId,
     arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
-    pageSize: 50,
+    page,
+    pageSize: PAGE_SIZE,
   });
 
   // Los Decimal de Prisma no cruzan al cliente sin convertirse.
   const receipts = toPlainObject(result.items) as unknown as ReceiptCardData[];
-  const isFiltered = Object.values(params).some(Boolean);
+  // La página no cuenta como filtro: estar en la 3 no significa que el
+  // usuario haya buscado algo, y el mensaje de lista vacía cambia según eso.
+  const isFiltered = Object.entries(params).some(
+    ([key, value]) => key !== "page" && Boolean(value),
+  );
 
   return (
-    <ReceiptList
-      receipts={receipts}
-      total={result.total}
-      isFiltered={isFiltered}
-    />
+    <>
+      <ReceiptList
+        receipts={receipts}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        isFiltered={isFiltered}
+      />
+      <Pager
+        page={result.page}
+        totalPages={result.totalPages}
+        basePath="/receipts"
+        params={params}
+      />
+    </>
   );
 }
 

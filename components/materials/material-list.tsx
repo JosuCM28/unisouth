@@ -23,12 +23,19 @@ interface MaterialListProps {
   materials: PlainMaterial[];
   /** Existencia disponible por material, resuelta con groupBy en la base. */
   stock: Map<string, number>;
+  /** Total que cumple el filtro, no los que llegaron a esta página. */
+  total: number;
+  page: number;
+  totalPages: number;
   isFiltered?: boolean;
 }
 
 export function MaterialList({
   materials,
   stock,
+  total,
+  page,
+  totalPages,
   isFiltered,
 }: MaterialListProps) {
   const columns: DataTableColumn<PlainMaterial>[] = [
@@ -111,62 +118,70 @@ export function MaterialList({
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={materials}
-      pageSize={25}
-      getRowId={(material) => material.id}
-      emptyState={
-        <div className="flat-surface">
-          <EmptyState
-            icon={Package}
-            title={isFiltered ? "Sin resultados" : "Aún no hay materiales"}
-            description={
-              isFiltered
-                ? "Prueba con otro código, nombre o color."
-                : "Da de alta la primera tela o insumo."
-            }
-          />
-        </div>
-      }
-      renderMobileRow={(material) => {
-        const available = stock.get(material.id) ?? 0;
-        const isLow = isBelowReorder(material, available);
+    <div className="flex flex-col gap-3">
+      <p className="tabular text-xs text-muted-foreground">
+        {total} {total === 1 ? "material" : "materiales"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+      </p>
 
-        return (
-          <div className="flat-surface flex items-start gap-3 p-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="tabular text-sm font-medium">
-                  {material.code}
-                </span>
-                {!material.active && (
-                  <Badge variant="secondary" className="text-xs">
-                    Inactivo
-                  </Badge>
-                )}
+      <DataTable
+        columns={columns}
+        data={materials}
+        // 0 = sin paginar en memoria: la página la sirve el servidor.
+        pageSize={0}
+        getRowId={(material) => material.id}
+        emptyState={
+          <div className="flat-surface">
+            <EmptyState
+              icon={Package}
+              title={isFiltered ? "Sin resultados" : "Aún no hay materiales"}
+              description={
+                isFiltered
+                  ? "Prueba con otro código, nombre o color."
+                  : "Da de alta la primera tela o insumo."
+              }
+            />
+          </div>
+        }
+        renderMobileRow={(material) => {
+          const available = stock.get(material.id) ?? 0;
+          const isLow = isBelowReorder(material, available);
+
+          return (
+            <div className="flat-surface flex items-start gap-3 p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="tabular text-sm font-medium">
+                    {material.code}
+                  </span>
+                  {!material.active && (
+                    <Badge variant="secondary" className="text-xs">
+                      Inactivo
+                    </Badge>
+                  )}
+                </div>
+
+                <p className="truncate text-sm">{material.name}</p>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {MATERIAL_TYPE_LABELS[material.type]}
+                  <MaterialSpec material={material} />
+                </p>
+
+                <StockLine
+                  available={available}
+                  unit={UNIT_SHORT_LABELS[material.baseUnit]}
+                  isLow={isLow}
+                  reorderPoint={Number(material.reorderPoint)}
+                />
               </div>
 
-              <p className="truncate text-sm">{material.name}</p>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                {MATERIAL_TYPE_LABELS[material.type]}
-                <MaterialSpec material={material} />
-              </p>
-
-              <StockLine
-                available={available}
-                unit={UNIT_SHORT_LABELS[material.baseUnit]}
-                isLow={isLow}
-                reorderPoint={Number(material.reorderPoint)}
-              />
+              <MaterialActions material={material} />
             </div>
-
-            <MaterialActions material={material} />
-          </div>
-        );
-      }}
-    />
+          );
+        }}
+        />
+    </div>
   );
 }
 

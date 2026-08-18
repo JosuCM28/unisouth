@@ -192,12 +192,27 @@ export abstract class BaseRepository<TEntity, TCreate, TUpdate> {
 
     const fullWhere = { ...where, ...this.notDeleted };
 
+    /**
+     * Desempate obligatorio por `id`.
+     *
+     * Sin esto la paginación PIERDE registros. Los criterios del dominio
+     * —`receivedAt`, `createdAt`— no son únicos: en una recepción entran 120
+     * rollos con la misma fecha. Ante un empate Postgres no garantiza ningún
+     * orden, y como cada página es una consulta aparte, puede devolver la
+     * misma fila en la página 1 y en la 2 mientras otra no sale en ninguna.
+     * El `id` es único, así que fija un orden total y estable entre páginas.
+     */
+    const stableOrderBy = [
+      ...(Array.isArray(orderBy) ? orderBy : [orderBy]),
+      { id: "asc" },
+    ];
+
     // En paralelo: son dos consultas independientes.
     const [total, items] = await Promise.all([
       this.delegate.count({ where: fullWhere }),
       this.delegate.findMany({
         where: fullWhere,
-        orderBy,
+        orderBy: stableOrderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
         ...(include ? { include } : {}),

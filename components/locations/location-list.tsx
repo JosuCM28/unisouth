@@ -16,6 +16,10 @@ interface LocationListProps {
   locations: LocationWithLotCount[];
   parents: Pick<Location, "id" | "code" | "name">[];
   warehouses: { id: string; code: string; name: string }[];
+  /** Total que cumple el filtro, no las que llegaron a esta página. */
+  total: number;
+  page: number;
+  totalPages: number;
   /** Para distinguir "no hay nada" de "la búsqueda no encontró nada". */
   isFiltered?: boolean;
 }
@@ -24,6 +28,9 @@ export function LocationList({
   locations,
   parents,
   warehouses,
+  total,
+  page,
+  totalPages,
   isFiltered,
 }: LocationListProps) {
   const columns: DataTableColumn<LocationWithLotCount>[] = [
@@ -75,54 +82,62 @@ export function LocationList({
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={locations}
-      pageSize={25}
-      getRowId={(location) => location.id}
-      emptyState={
-        <div className="flat-surface">
-          <EmptyState
-            icon={MapPin}
-            title={isFiltered ? "Sin resultados" : "Aún no hay ubicaciones"}
-            description={
-              isFiltered
-                ? "Prueba con otro código o nombre."
-                : "Da de alta la primera fila o rack de la bodega."
-            }
-          />
-        </div>
-      }
-      // En celular, tarjetas: una tabla obligaría a barrer de lado para leer
-      // una fila, con el teléfono en una mano.
-      renderMobileRow={(location) => (
-        <div className="flat-surface flex items-start gap-3 p-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="tabular font-medium">{location.code}</span>
-              {!location.active && (
-                <Badge variant="secondary" className="text-xs">
-                  Inactiva
-                </Badge>
-              )}
-            </div>
-            <p className="truncate text-sm text-muted-foreground">
-              {location.name}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {LOCATION_TYPE_LABELS[location.type]} ·{" "}
-              <span className="tabular">{location.lotCount}</span>{" "}
-              {location.lotCount === 1 ? "rollo" : "rollos"}
-            </p>
-          </div>
+    <div className="flex flex-col gap-3">
+      <p className="tabular text-xs text-muted-foreground">
+        {total} {total === 1 ? "ubicación" : "ubicaciones"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+      </p>
 
-          <LocationActions
-            location={location}
-            parents={parents}
-            warehouses={warehouses}
-          />
-        </div>
-      )}
-    />
+      <DataTable
+        columns={columns}
+        data={locations}
+        // 0 = sin paginar en memoria: la página la sirve el servidor.
+        pageSize={0}
+        getRowId={(location) => location.id}
+        emptyState={
+          <div className="flat-surface">
+            <EmptyState
+              icon={MapPin}
+              title={isFiltered ? "Sin resultados" : "Aún no hay ubicaciones"}
+              description={
+                isFiltered
+                  ? "Prueba con otro código o nombre."
+                  : "Da de alta la primera fila o rack de la bodega."
+              }
+            />
+          </div>
+        }
+        // En celular, tarjetas: una tabla obligaría a barrer de lado para leer
+        // una fila, con el teléfono en una mano.
+        renderMobileRow={(location) => (
+          <div className="flat-surface flex items-start gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="tabular font-medium">{location.code}</span>
+                {!location.active && (
+                  <Badge variant="secondary" className="text-xs">
+                    Inactiva
+                  </Badge>
+                )}
+              </div>
+              <p className="truncate text-sm text-muted-foreground">
+                {location.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {LOCATION_TYPE_LABELS[location.type]} ·{" "}
+                <span className="tabular">{location.lotCount}</span>{" "}
+                {location.lotCount === 1 ? "rollo" : "rollos"}
+              </p>
+            </div>
+
+            <LocationActions
+              location={location}
+              parents={parents}
+              warehouses={warehouses}
+            />
+          </div>
+        )}
+      />
+    </div>
   );
 }

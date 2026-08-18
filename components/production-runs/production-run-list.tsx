@@ -17,10 +17,21 @@ import { ProductionRunActions } from "./production-run-actions";
 interface Props {
   runs: ProductionRunWithDetail[];
   clients: { id: string; name: string }[];
+  /** Total que cumple el filtro, no las que llegaron a esta página. */
+  total: number;
+  page: number;
+  totalPages: number;
   isFiltered?: boolean;
 }
 
-export function ProductionRunList({ runs, clients, isFiltered }: Props) {
+export function ProductionRunList({
+  runs,
+  clients,
+  total,
+  page,
+  totalPages,
+  isFiltered,
+}: Props) {
   const columns: DataTableColumn<ProductionRunWithDetail>[] = [
     {
       accessorKey: "code",
@@ -80,48 +91,56 @@ export function ProductionRunList({ runs, clients, isFiltered }: Props) {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={runs}
-      pageSize={25}
-      getRowId={(run) => run.id}
-      emptyState={
-        <div className="flat-surface">
-          <EmptyState
-            icon={Factory}
-            title={isFiltered ? "Sin resultados" : "Aún no hay producciones"}
-            description={
-              isFiltered
-                ? "Prueba con otro código, nombre o cliente."
-                : "Crea la primera corrida de producción."
-            }
-          />
-        </div>
-      }
-      renderMobileRow={(run) => (
-        <div className="flat-surface flex items-start gap-3 p-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="tabular text-sm font-medium">{run.code}</span>
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-xs",
-                  PRODUCTION_RUN_STATUS_STYLES[run.status],
-                )}
-              >
-                {PRODUCTION_RUN_STATUS_LABELS[run.status]}
-              </span>
-            </div>
-            <p className="truncate text-sm">{run.name}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {run.clientName} · <span className="tabular">{run.lotCount}</span>{" "}
-              {run.lotCount === 1 ? "rollo" : "rollos"}
-            </p>
-          </div>
+    <div className="flex flex-col gap-3">
+      <p className="tabular text-xs text-muted-foreground">
+        {total} {total === 1 ? "producción" : "producciones"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+      </p>
 
-          <ProductionRunActions run={run} clients={clients} />
-        </div>
-      )}
-    />
+      <DataTable
+        columns={columns}
+        data={runs}
+        // 0 = sin paginar en memoria: la página la sirve el servidor.
+        pageSize={0}
+        getRowId={(run) => run.id}
+        emptyState={
+          <div className="flat-surface">
+            <EmptyState
+              icon={Factory}
+              title={isFiltered ? "Sin resultados" : "Aún no hay producciones"}
+              description={
+                isFiltered
+                  ? "Prueba con otro código, nombre o cliente."
+                  : "Crea la primera corrida de producción."
+              }
+            />
+          </div>
+        }
+        renderMobileRow={(run) => (
+          <div className="flat-surface flex items-start gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="tabular text-sm font-medium">{run.code}</span>
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-xs",
+                    PRODUCTION_RUN_STATUS_STYLES[run.status],
+                  )}
+                >
+                  {PRODUCTION_RUN_STATUS_LABELS[run.status]}
+                </span>
+              </div>
+              <p className="truncate text-sm">{run.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {run.clientName} · <span className="tabular">{run.lotCount}</span>{" "}
+                {run.lotCount === 1 ? "rollo" : "rollos"}
+              </p>
+            </div>
+
+            <ProductionRunActions run={run} clients={clients} />
+          </div>
+        )}
+      />
+    </div>
   );
 }

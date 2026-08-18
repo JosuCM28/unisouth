@@ -18,6 +18,12 @@ export interface ProductionRunWithDetail extends ProductionRun {
   lotCount: number;
 }
 
+/** Fila cruda de Prisma: el join y el `_count` antes de aplanarlos. */
+type ProductionRunDetailRow = ProductionRun & {
+  client: { name: string };
+  _count: { lots: number };
+};
+
 export class ProductionRunRepository extends BaseRepository<
   ProductionRun,
   Prisma.ProductionRunCreateInput,
@@ -57,20 +63,52 @@ export class ProductionRunRepository extends BaseRepository<
     return this.paginate<ProductionRun>(where, { createdAt: "desc" }, filters);
   }
 
-  async findAllWithDetail(): Promise<ProductionRunWithDetail[]> {
-    const runs = await this.db.productionRun.findMany({
-      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-      include: {
-        client: { select: { name: true } },
-        _count: { select: { lots: { where: { status: PHYSICALLY_PRESENT_FILTER } } } },
-      },
-    });
+  /**
+   * Página de producciones ya con cliente y conteo de rollos.
+   *
+   * Reemplaza al par "traer todo + filtrar en memoria": la búsqueda y el
+   * recorte los hace Postgres, así que la pantalla no se degrada conforme se
+   * acumulan temporadas cerradas —que nunca se borran.
+   */
+  async searchWithDetail(
+    filters: ProductionRunFilters = {},
+  ): Promise<PaginatedResult<ProductionRunWithDetail>> {
+    const where: Prisma.ProductionRunWhereInput = {};
 
-    return runs.map(({ client, _count, ...run }) => ({
-      ...run,
-      clientName: client.name,
-      lotCount: _count.lots,
-    }));
+    if (filters.search) {
+      where.OR = [
+        { code: { contains: filters.search, mode: "insensitive" } },
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { season: { contains: filters.search, mode: "insensitive" } },
+        { client: { name: { contains: filters.search, mode: "insensitive" } } },
+      ];
+    }
+
+    if (filters.clientId) where.clientId = filters.clientId;
+    if (filters.status) where.status = filters.status;
+
+    const result = await this.paginate<ProductionRunDetailRow>(
+      where,
+      // Las activas primero y dentro de cada estado lo más reciente arriba:
+      // es el orden en que se consultan desde el piso.
+      [{ status: "asc" }, { createdAt: "desc" }],
+      filters,
+      {
+        client: { select: { name: true } },
+        _count: {
+          select: { lots: { where: { status: PHYSICALLY_PRESENT_FILTER } } },
+        },
+      },
+    );
+
+    return {
+      ...result,
+      items: result.items.map(({ client, _count, ...run }) => ({
+        ...run,
+        clientName: client.name,
+        lotCount: _count.lots,
+      })),
+    };
   }
 
   async countLots(productionRunId: string): Promise<number> {

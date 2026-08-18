@@ -18,6 +18,9 @@ export interface LocationWithLotCount extends Location {
   lotCount: number;
 }
 
+/** Fila cruda de Prisma: el `_count` antes de aplanarlo a `lotCount`. */
+type LocationWithCountRow = Location & { _count: { lots: number } };
+
 export class LocationRepository extends BaseRepository<
   Location,
   Prisma.LocationCreateInput,
@@ -53,6 +56,50 @@ export class LocationRepository extends BaseRepository<
       [{ order: "asc" }, { code: "asc" }],
       filters,
     );
+  }
+
+  /**
+   * Página de ubicaciones ya con su conteo de rollos.
+   *
+   * Reemplaza al par "traer todo + filtrar en memoria": la búsqueda y el
+   * recorte los hace Postgres, así que la pantalla aguanta una bodega con
+   * miles de ubicaciones sin traérselas todas a la vez.
+   */
+  async searchWithLotCount(
+    filters: LocationFilters = {},
+  ): Promise<PaginatedResult<LocationWithLotCount>> {
+    const where: Prisma.LocationWhereInput = {};
+
+    if (filters.search) {
+      where.OR = [
+        { code: { contains: filters.search, mode: "insensitive" } },
+        { name: { contains: filters.search, mode: "insensitive" } },
+      ];
+    }
+
+    if (filters.type) where.type = filters.type;
+    if (filters.active !== undefined) where.active = filters.active;
+    if (filters.warehouseId) where.warehouseId = filters.warehouseId;
+
+    const result = await this.paginate<LocationWithCountRow>(
+      where,
+      // Por `order` y no alfabético: refleja el recorrido físico de la bodega.
+      [{ order: "asc" }, { code: "asc" }],
+      filters,
+      {
+        _count: {
+          select: { lots: { where: { status: PHYSICALLY_PRESENT_FILTER } } },
+        },
+      },
+    );
+
+    return {
+      ...result,
+      items: result.items.map(({ _count, ...location }) => ({
+        ...location,
+        lotCount: _count.lots,
+      })),
+    };
   }
 
   /**

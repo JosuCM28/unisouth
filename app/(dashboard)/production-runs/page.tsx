@@ -7,17 +7,20 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { ProductionRunFormDialog } from "@/components/production-runs/production-run-form-dialog";
 import { ProductionRunList } from "@/components/production-runs/production-run-list";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = { title: "Producciones" };
 
+const PAGE_SIZE = 50;
+
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 export default async function ProductionRunsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const params = await searchParams;
   const clients = await new ClientRepository().findOptions();
 
   return (
@@ -40,34 +43,58 @@ export default async function ProductionRunsPage({ searchParams }: PageProps) {
 
       <SearchInput placeholder="Buscar por código, nombre o cliente…" className="max-w-sm" />
 
-      <Suspense key={q} fallback={<ListSkeleton />}>
-        <ListSection search={q} clients={clients} />
+      <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
+        <ListSection params={params} clients={clients} />
       </Suspense>
     </div>
   );
 }
 
 async function ListSection({
-  search,
+  params,
   clients,
 }: {
-  search?: string;
+  params: Awaited<PageProps["searchParams"]>;
   clients: { id: string; name: string }[];
 }) {
-  const repository = new ProductionRunRepository();
-  const term = search?.trim();
+  const term = params.q?.trim();
+  const page = parsePositiveInt(params.page) ?? 1;
 
-  const [withDetail, filtered] = await Promise.all([
-    repository.findAllWithDetail(),
-    term ? repository.search({ search: term, pageSize: 100 }) : null,
-  ]);
+  // Una sola consulta trae la página con cliente y conteo. Antes se traían
+  // TODAS las corridas y se cruzaban en memoria: como una producción nunca se
+  // borra —sólo se cierra—, esa lista sólo crece temporada tras temporada.
+  const result = await new ProductionRunRepository().searchWithDetail({
+    search: term,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  const matched = filtered ? new Set(filtered.items.map((r) => r.id)) : null;
-  const runs = matched
-    ? withDetail.filter((run) => matched.has(run.id))
-    : withDetail;
+  return (
+    <>
+      <ProductionRunList
+        runs={result.items}
+        clients={clients}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        isFiltered={Boolean(term)}
+      />
+      <Pager
+        page={result.page}
+        totalPages={result.totalPages}
+        basePath="/production-runs"
+        params={params}
+      />
+    </>
+  );
+}
 
-  return <ProductionRunList runs={runs} clients={clients} isFiltered={Boolean(term)} />;
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 function ListSkeleton() {

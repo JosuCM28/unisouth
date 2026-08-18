@@ -8,6 +8,7 @@ import { WarehouseRepository } from "@/lib/repositories/warehouse.repository";
 import { LocationFormDialog } from "@/components/locations/location-form-dialog";
 import { LocationList } from "@/components/locations/location-list";
 import { WarehouseMap } from "@/components/locations/warehouse-map";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,12 +16,14 @@ export const metadata: Metadata = {
   title: "Ubicaciones",
 };
 
+const PAGE_SIZE = 50;
+
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 export default async function LocationsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const params = await searchParams;
   const warehouses = await new WarehouseRepository().findOptions();
 
   return (
@@ -50,8 +53,8 @@ export default async function LocationsPage({ searchParams }: PageProps) {
         <MapSection />
       </Suspense>
 
-      <Suspense key={q} fallback={<ListSkeleton />}>
-        <ListSection search={q} />
+      <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
+        <ListSection params={params} />
       </Suspense>
     </div>
   );
@@ -63,35 +66,51 @@ async function MapSection() {
   return <WarehouseMap locations={locations} />;
 }
 
-async function ListSection({ search }: { search?: string }) {
+async function ListSection({
+  params,
+}: {
+  params: Awaited<PageProps["searchParams"]>;
+}) {
   const repository = new LocationRepository();
-  const term = search?.trim();
+  const term = params.q?.trim();
+  const page = parsePositiveInt(params.page) ?? 1;
 
-  // El conteo de rollos viene de findAllWithLotCount; la búsqueda, de search().
-  // Se cruzan por id para no repetir el _count en dos consultas distintas.
-  const [withCount, filtered, parents, warehouses] = await Promise.all([
-    repository.findAllWithLotCount(),
-    term ? repository.search({ search: term, pageSize: 100 }) : null,
+  // Una sola consulta trae la página con su conteo de rollos. Antes se traía
+  // la bodega COMPLETA y se cruzaba en memoria con la búsqueda: con miles de
+  // ubicaciones eso significa bajarlas todas en cada visita.
+  const [result, parents, warehouses] = await Promise.all([
+    repository.searchWithLotCount({ search: term, page, pageSize: PAGE_SIZE }),
     repository.findOptions(),
     new WarehouseRepository().findOptions(),
   ]);
 
-  const matchedIds = filtered
-    ? new Set(filtered.items.map((location) => location.id))
-    : null;
-
-  const locations = matchedIds
-    ? withCount.filter((location) => matchedIds.has(location.id))
-    : withCount;
-
   return (
-    <LocationList
-      locations={locations}
-      parents={parents}
-      warehouses={warehouses}
-      isFiltered={Boolean(term)}
-    />
+    <>
+      <LocationList
+        locations={result.items}
+        parents={parents}
+        warehouses={warehouses}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        isFiltered={Boolean(term)}
+      />
+      <Pager
+        page={result.page}
+        totalPages={result.totalPages}
+        basePath="/locations"
+        params={params}
+      />
+    </>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 function ListSkeleton() {

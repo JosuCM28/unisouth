@@ -8,17 +8,20 @@ import { ExportButton } from "@/components/shared/export-button";
 import { SearchInput } from "@/components/shared/search-input";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
 import { MaterialList } from "@/components/materials/material-list";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = { title: "Materiales" };
 
+const PAGE_SIZE = 50;
+
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 export default async function MaterialsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const params = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,28 +48,56 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
         <ExportButton href="/api/export/materials" label="Excel" />
       </div>
 
-      <Suspense key={q} fallback={<ListSkeleton />}>
-        <ListSection search={q} />
+      <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
+        <ListSection params={params} />
       </Suspense>
     </div>
   );
 }
 
-async function ListSection({ search }: { search?: string }) {
+async function ListSection({
+  params,
+}: {
+  params: Awaited<PageProps["searchParams"]>;
+}) {
   const repository = new MaterialRepository();
-  const { items } = await repository.search({ search, pageSize: 100 });
+  const search = params.q;
+  const page = parsePositiveInt(params.page) ?? 1;
+
+  const result = await repository.search({ search, page, pageSize: PAGE_SIZE });
 
   // La existencia se resuelve con groupBy en la base, no trayendo los lotes.
-  const stock = await repository.getStockByMaterial(items.map((m) => m.id));
+  const stock = await repository.getStockByMaterial(
+    result.items.map((m) => m.id),
+  );
 
   return (
-    <MaterialList
-      // Material trae 9 columnas Decimal y el menú de acciones es cliente.
-      materials={toPlainObject(items)}
-      stock={stock}
-      isFiltered={Boolean(search?.trim())}
-    />
+    <>
+      <MaterialList
+        // Material trae 9 columnas Decimal y el menú de acciones es cliente.
+        materials={toPlainObject(result.items)}
+        stock={stock}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        isFiltered={Boolean(search?.trim())}
+      />
+      <Pager
+        page={result.page}
+        totalPages={result.totalPages}
+        basePath="/materials"
+        params={params}
+      />
+    </>
   );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 function ListSkeleton() {

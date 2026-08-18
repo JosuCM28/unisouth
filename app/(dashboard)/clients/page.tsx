@@ -6,17 +6,20 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { ClientList } from "@/components/clients/client-list";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = { title: "Clientes" };
 
+const PAGE_SIZE = 50;
+
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const params = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,28 +40,55 @@ export default async function ClientsPage({ searchParams }: PageProps) {
 
       <SearchInput placeholder="Buscar por nombre o código…" className="max-w-sm" />
 
-      <Suspense key={q} fallback={<ListSkeleton />}>
-        <ListSection search={q} />
+      <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
+        <ListSection params={params} />
       </Suspense>
     </div>
   );
 }
 
-async function ListSection({ search }: { search?: string }) {
-  const repository = new ClientRepository();
-  const term = search?.trim();
+async function ListSection({
+  params,
+}: {
+  params: Awaited<PageProps["searchParams"]>;
+}) {
+  const term = params.q?.trim();
+  const page = parsePositiveInt(params.page) ?? 1;
 
-  const [withCount, filtered] = await Promise.all([
-    repository.findAllWithLotCount(),
-    term ? repository.search({ search: term, pageSize: 100 }) : null,
-  ]);
+  // Una sola consulta: la búsqueda, el conteo de rollos y el recorte de la
+  // página los resuelve Postgres. Antes se traía el catálogo COMPLETO y se
+  // filtraba en memoria, que aguanta 20 clientes pero no 20 000.
+  const result = await new ClientRepository().searchWithLotCount({
+    search: term,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  const matched = filtered ? new Set(filtered.items.map((c) => c.id)) : null;
-  const clients = matched
-    ? withCount.filter((client) => matched.has(client.id))
-    : withCount;
+  return (
+    <>
+      <ClientList
+        clients={result.items}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        isFiltered={Boolean(term)}
+      />
+      <Pager
+        page={result.page}
+        totalPages={result.totalPages}
+        basePath="/clients"
+        params={params}
+      />
+    </>
+  );
+}
 
-  return <ClientList clients={clients} isFiltered={Boolean(term)} />;
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 function ListSkeleton() {

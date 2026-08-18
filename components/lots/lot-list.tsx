@@ -10,11 +10,20 @@ import { LotCard, StatusChip, type LotCardData } from "./lot-card";
 
 interface LotListProps {
   lots: LotCardData[];
+  /** Total de rollos que cumplen el filtro, no los que llegaron a esta página. */
   total: number;
+  page: number;
+  totalPages: number;
   isFiltered?: boolean;
 }
 
-export function LotList({ lots, total, isFiltered }: LotListProps) {
+export function LotList({
+  lots,
+  total,
+  page,
+  totalPages,
+  isFiltered,
+}: LotListProps) {
   const columns: DataTableColumn<LotCardData>[] = [
     {
       accessorKey: "code",
@@ -98,12 +107,16 @@ export function LotList({ lots, total, isFiltered }: LotListProps) {
     <div className="flex flex-col gap-3">
       <p className="tabular text-xs text-muted-foreground">
         {total} {total === 1 ? "rollo" : "rollos"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
       </p>
 
       <DataTable
         columns={columns}
         data={lots}
-        pageSize={25}
+        // 0 = sin paginar en memoria. La página la sirve el servidor: partir
+        // aquí otra vez el bloque que ya llegó haría que las flechas sólo
+        // recorrieran esos rollos y el resto del inventario quedara oculto.
+        pageSize={0}
         getRowId={(lot) => lot.id}
         emptyState={
           <div className="flat-surface">

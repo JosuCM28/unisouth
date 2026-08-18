@@ -10,11 +10,20 @@ import { ReceiptCard } from "./receipt-card";
 
 interface ReceiptListProps {
   receipts: ReceiptCardData[];
+  /** Total que cumple el filtro, no las que llegaron a esta página. */
   total: number;
+  page: number;
+  totalPages: number;
   isFiltered?: boolean;
 }
 
-export function ReceiptList({ receipts, total, isFiltered }: ReceiptListProps) {
+export function ReceiptList({
+  receipts,
+  total,
+  page,
+  totalPages,
+  isFiltered,
+}: ReceiptListProps) {
   const columns: DataTableColumn<ReceiptCardData>[] = [
     {
       accessorKey: "date",
@@ -90,12 +99,14 @@ export function ReceiptList({ receipts, total, isFiltered }: ReceiptListProps) {
     <div className="flex flex-col gap-3">
       <p className="tabular text-xs text-muted-foreground">
         {total} {total === 1 ? "recepción" : "recepciones"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
       </p>
 
       <DataTable
         columns={columns}
         data={receipts}
-        pageSize={25}
+        // 0 = sin paginar en memoria: la página la sirve el servidor.
+        pageSize={0}
         getRowId={(receipt) => receipt.id}
         emptyState={
           <div className="flat-surface">

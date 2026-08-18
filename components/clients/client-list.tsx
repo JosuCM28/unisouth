@@ -12,10 +12,20 @@ import { ClientActions } from "./client-actions";
 
 interface Props {
   clients: ClientWithLotCount[];
+  /** Total que cumple el filtro, no los que llegaron a esta página. */
+  total: number;
+  page: number;
+  totalPages: number;
   isFiltered?: boolean;
 }
 
-export function ClientList({ clients, isFiltered }: Props) {
+export function ClientList({
+  clients,
+  total,
+  page,
+  totalPages,
+  isFiltered,
+}: Props) {
   const columns: DataTableColumn<ClientWithLotCount>[] = [
     {
       accessorKey: "name",
@@ -69,49 +79,57 @@ export function ClientList({ clients, isFiltered }: Props) {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={clients}
-      pageSize={25}
-      getRowId={(client) => client.id}
-      emptyState={
-        <div className="flat-surface">
-          <EmptyState
-            icon={Users}
-            title={isFiltered ? "Sin resultados" : "Aún no hay clientes"}
-            description={
-              isFiltered
-                ? "Prueba con otro nombre o código."
-                : "Da de alta al primer cliente dueño de material."
-            }
-          />
-        </div>
-      }
-      renderMobileRow={(client) => (
-        <div className="flat-surface flex items-start gap-3 p-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{client.name}</span>
-              {!client.active && (
-                <Badge variant="secondary" className="text-xs">
-                  Inactivo
-                </Badge>
-              )}
-            </div>
-            {client.contact && (
-              <p className="truncate text-sm text-muted-foreground">
-                {client.contact}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              <span className="tabular">{client.lotCount}</span>{" "}
-              {client.lotCount === 1 ? "rollo" : "rollos"} en bodega
-            </p>
-          </div>
+    <div className="flex flex-col gap-3">
+      <p className="tabular text-xs text-muted-foreground">
+        {total} {total === 1 ? "cliente" : "clientes"}
+        {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+      </p>
 
-          <ClientActions client={client} />
-        </div>
-      )}
-    />
+      <DataTable
+        columns={columns}
+        data={clients}
+        // 0 = sin paginar en memoria: la página la sirve el servidor.
+        pageSize={0}
+        getRowId={(client) => client.id}
+        emptyState={
+          <div className="flat-surface">
+            <EmptyState
+              icon={Users}
+              title={isFiltered ? "Sin resultados" : "Aún no hay clientes"}
+              description={
+                isFiltered
+                  ? "Prueba con otro nombre o código."
+                  : "Da de alta al primer cliente dueño de material."
+              }
+            />
+          </div>
+        }
+        renderMobileRow={(client) => (
+          <div className="flat-surface flex items-start gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate font-medium">{client.name}</span>
+                {!client.active && (
+                  <Badge variant="secondary" className="text-xs">
+                    Inactivo
+                  </Badge>
+                )}
+              </div>
+              {client.contact && (
+                <p className="truncate text-sm text-muted-foreground">
+                  {client.contact}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="tabular">{client.lotCount}</span>{" "}
+                {client.lotCount === 1 ? "rollo" : "rollos"} en bodega
+              </p>
+            </div>
+
+            <ClientActions client={client} />
+          </div>
+        )}
+      />
+    </div>
   );
 }
