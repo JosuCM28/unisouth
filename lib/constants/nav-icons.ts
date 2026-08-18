@@ -39,6 +39,7 @@ export const NAV_ICONS = {
   products: Package2,
   sizes: Ruler,
   cutTags: Tag,
+  orders: ClipboardList,
   locations: MapPin,
   clients: Users,
   productionRuns: Factory,

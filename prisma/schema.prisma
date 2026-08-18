@@ -75,6 +75,8 @@ model User {
 
   @@index([active, role])
   @@map("user")
+  cuttingOrders    CuttingOrder[]    @relation("CuttingOrderCreatedBy")
+  cuttingProgress  CuttingProgress[] @relation("CuttingProgressBy")
 }
 
 model Session {
@@ -303,6 +305,7 @@ model Client {
 
   @@index([active])
   @@map("clients")
+  cuttingOrders CuttingOrder[]
 }
 
 model ProductionRun {
@@ -328,6 +331,7 @@ model ProductionRun {
 
   @@index([clientId, status])
   @@map("production_runs")
+  cuttingOrders CuttingOrder[]
 }
 
 enum ProductionRunStatus {
@@ -435,6 +439,7 @@ model Material {
   @@index([name])
   @@index([colorName])
   @@map("materials")
+  cuttingOrders CuttingOrder[]
 }
 
 enum MaterialType {
@@ -835,6 +840,7 @@ model CutTagOption {
 
   @@index([active, order])
   @@map("cut_tag_options")
+  cuttingOrderLines CuttingOrderLine[]
 }
 
 /// LEGACY. Superseded by CutTagOption; kept so existing rows still read.
@@ -1106,6 +1112,7 @@ model Size {
 
   @@index([group, order])
   @@map("sizes")
+  cuttingOrderLines CuttingOrderLine[]
 }
 
 model Variant {
@@ -1409,6 +1416,113 @@ model ProductionOrderLine {
 
   @@index([productionOrderId])
   @@map("production_order_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  7b. CUTTING ORDERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// WHAT THE CLIENT ORDERED and how the cutting is going.
+///
+/// Separate from ProductionOrder —which is planned around finished products
+/// and bills of materials— because this one mirrors the paper the shop floor
+/// actually uses: a client, a fabric, and how many garments per size. The
+/// workshop cuts over days and the remaining count is the live question.
+model CuttingOrder {
+  id     String             @id @default(cuid())
+  code   String             @unique
+  status CuttingOrderStatus @default(OPEN)
+
+  /// Who ordered it. Their fabric never gets cut for someone else.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  /// The fabric it is cut from. Optional: sometimes it is decided later.
+  materialId String?
+  material   Material? @relation(fields: [materialId], references: [id])
+
+  productionRunId String?
+  productionRun   ProductionRun? @relation(fields: [productionRunId], references: [id])
+
+  /// Free text ("Blusa manga larga"): the catalogue of finished products is
+  /// not always filled in, and the order must not wait for it.
+  description String?
+  /// The client's own order number, written on the paper.
+  reference   String?
+
+  orderedAt DateTime  @default(now())
+  dueDate   DateTime?
+  closedAt  DateTime?
+
+  notes String?
+
+  createdById String?
+  createdBy   User?    @relation("CuttingOrderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines CuttingOrderLine[]
+
+  @@index([status, orderedAt])
+  @@index([clientId])
+  @@map("cutting_orders")
+}
+
+enum CuttingOrderStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// One size of an order: how many were asked for and how many are cut.
+model CuttingOrderLine {
+  id      String       @id @default(cuid())
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  sizeId String
+  size   Size   @relation(fields: [sizeId], references: [id])
+
+  /// What the client asked for. The starting value, never touched by progress.
+  orderedQuantity Int
+  /// Sum of its progress entries. Denormalised so the list does not need to
+  /// aggregate the log on every read; only CuttingOrderService writes it.
+  cutQuantity     Int  @default(0)
+
+  tagId  String?
+  cutTag CutTagOption? @relation(fields: [tagId], references: [id])
+
+  notes    String?
+  position Int     @default(0)
+
+  progress CuttingProgress[]
+
+  @@index([orderId])
+  @@index([sizeId])
+  @@map("cutting_order_lines")
+}
+
+/// LOG. Append-only: each entry is a batch finished on a given day.
+///
+/// The history is the point: "how many are left" is answered by a number, but
+/// "when did this order stall" needs the entries.
+model CuttingProgress {
+  id     String           @id @default(cuid())
+  lineId String
+  line   CuttingOrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  /// Garments cut in this batch. Negative corrects an earlier overcount.
+  quantity Int
+  notes    String?
+
+  userId String?
+  user   User?   @relation("CuttingProgressBy", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([lineId])
+  @@map("cutting_progress")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

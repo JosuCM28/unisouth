@@ -1,0 +1,159 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ClipboardList, Plus } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/core/session";
+import {
+  CUTTING_ORDER_STATUS_LABELS,
+  CUTTING_ORDER_STATUS_STYLES,
+} from "@/lib/constants/labels";
+import { cn, formatDate } from "@/lib/utils";
+import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Pager } from "@/components/shared/pager";
+import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = { title: "Órdenes" };
+
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; all?: string }>;
+}
+
+/**
+ * Órdenes de corte: qué pidió cada cliente y cómo va.
+ *
+ * La lista responde de un vistazo lo único que importa a diario: cuánto falta
+ * por cortar de cada orden.
+ */
+export default async function OrdersPage({ searchParams }: PageProps) {
+  await requirePermission("inventory:read");
+
+  const params = await searchParams;
+  const page = parsePositiveInt(params.page) ?? 1;
+  const accumulate = params.all === "1";
+  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
+  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+
+  const [total, orders] = await Promise.all([
+    prisma.cuttingOrder.count(),
+    prisma.cuttingOrder.findMany({
+      // El id desempata: `orderedAt` no es único y sin criterio estable las
+      // filas se barajan entre páginas.
+      orderBy: [{ orderedAt: "desc" }, { id: "asc" }],
+      skip,
+      take,
+      include: {
+        client: { select: { name: true } },
+        material: { select: { name: true } },
+        lines: { select: { orderedQuantity: true, cutQuantity: true } },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Órdenes"
+        description="Qué pidieron y cuánto falta por cortar"
+        action={
+          <Button asChild className="touch-target">
+            <Link href="/orders/new">
+              <Plus className="size-4" aria-hidden />
+              Nueva
+            </Link>
+          </Button>
+        }
+      />
+
+      {orders.length === 0 ? (
+        <div className="flat-surface">
+          <EmptyState
+            icon={ClipboardList}
+            title="Aún no hay órdenes"
+            description="Da de alta lo que pidió el cliente y ve descontando conforme se corta."
+          />
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {orders.map((order) => {
+            const ordered = order.lines.reduce(
+              (sum, line) => sum + line.orderedQuantity,
+              0,
+            );
+            const cut = order.lines.reduce(
+              (sum, line) => sum + line.cutQuantity,
+              0,
+            );
+            const pending = Math.max(0, ordered - cut);
+
+            return (
+              <li key={order.id}>
+                <Link
+                  href={`/orders/${order.id}`}
+                  className="flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="tabular text-sm font-medium">
+                        {order.code}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-xs",
+                          CUTTING_ORDER_STATUS_STYLES[order.status],
+                        )}
+                      >
+                        {CUTTING_ORDER_STATUS_LABELS[order.status]}
+                      </span>
+                    </div>
+
+                    <p className="truncate text-sm">
+                      {order.description ?? "Sin descripción"}
+                    </p>
+
+                    <p className="truncate text-xs text-muted-foreground">
+                      {order.client?.name ?? "Sin cliente"}
+                      {order.material && ` · ${order.material.name}`}
+                      {` · ${formatDate(order.orderedAt)}`}
+                    </p>
+                  </div>
+
+                  {/* Lo que falta es el número que se busca al abrir la lista. */}
+                  <div className="shrink-0 text-right">
+                    <p className="tabular text-lg font-bold leading-none">
+                      {pending}
+                    </p>
+                    <p className="tabular text-xs text-muted-foreground">
+                      de {ordered}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <Pager
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        itemLabel={{ one: "orden", many: "órdenes" }}
+        basePath="/orders"
+        params={params}
+      />
+    </div>
+  );
+}
+
+/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}

@@ -138,6 +138,12 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:read",
       },
       {
+        href: "/orders",
+        label: "Órdenes",
+        icon: "orders",
+        permission: "inventory:read",
+      },
+      {
         // El kárdex, no los vales: aquí sólo aparece lo que YA afectó
         // existencias. Un vale en borrador no movió nada todavía, así que
         // vive en Salidas y no aquí.

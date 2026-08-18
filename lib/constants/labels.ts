@@ -1,5 +1,6 @@
 import type {
   CutTag,
+  CuttingOrderStatus,
   DocumentStatus,
   DocumentType,
   LocationType,
@@ -268,4 +269,18 @@ export const CUT_TAG_COLORS: Record<CutTag, { background: string; text: string }
   BROWN: { background: "#78350f", text: "#ffffff" },
   BLACK: { background: "#1c1917", text: "#ffffff" },
   WHITE: { background: "#ffffff", text: "#1c1917" },
+};
+
+export const CUTTING_ORDER_STATUS_LABELS: Record<CuttingOrderStatus, string> = {
+  OPEN: "Abierta",
+  IN_PROGRESS: "En corte",
+  COMPLETED: "Terminada",
+  CANCELLED: "Cancelada",
+};
+
+export const CUTTING_ORDER_STATUS_STYLES: Record<CuttingOrderStatus, string> = {
+  OPEN: "bg-state-reserved text-state-reserved-foreground",
+  IN_PROGRESS: "bg-state-remnant text-state-remnant-foreground",
+  COMPLETED: "bg-state-available text-state-available-foreground",
+  CANCELLED: "bg-muted text-muted-foreground border border-border line-through",
 };
