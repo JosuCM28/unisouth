@@ -7,9 +7,7 @@ import { LOT_STATUS_LABELS } from "@/lib/constants/labels";
 import type { LotStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SearchSelect } from "@/components/shared/search-select";
 
 interface Option { id: string; label: string }
 
@@ -282,6 +280,12 @@ function MobileFilter({
   );
 }
 
+/**
+ * Filtro desplegable CON buscador.
+ *
+ * Con 200 materiales o 60 ubicaciones, recorrer la lista con el dedo es más
+ * lento que preguntarle al de junto: aquí se teclean tres letras y ya.
+ */
 function FilterSelect({
   placeholder, value, options, onChange, full,
 }: {
@@ -293,21 +297,17 @@ function FilterSelect({
   full?: boolean;
 }) {
   return (
-    <Select
-      value={value ?? "all"}
-      onValueChange={(next) => onChange(next === "all" ? null : next)}
-    >
-      <SelectTrigger className={cn("touch-target", full ? "w-full" : "w-44")}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">{placeholder}: todos</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.id} value={option.id}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <SearchSelect
+      options={options.map((option) => ({
+        value: option.id,
+        label: option.label,
+      }))}
+      value={value ?? ""}
+      onChange={(next) => onChange(next || null)}
+      placeholder={placeholder}
+      searchPlaceholder={`Buscar ${placeholder.toLowerCase()}…`}
+      clearLabel={`${placeholder}: todos`}
+      className={full ? "w-full" : "w-44"}
+    />
   );
 }

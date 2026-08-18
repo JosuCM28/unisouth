@@ -95,6 +95,18 @@ export class DocumentService extends BaseService {
               order: index,
             })),
           },
+          // La tabla de corte: prendas por talla. No mueve inventario, es el
+          // desglose que firma el taller junto al vale.
+          cutLines: {
+            create: (input.cutLines ?? []).map((line, index) => ({
+              sizeId: line.sizeId,
+              quantity: line.quantity,
+              bundles: line.bundles,
+              tag: line.tag,
+              notes: line.notes,
+              order: index,
+            })),
+          },
         },
       });
 
@@ -124,6 +136,7 @@ export class DocumentService extends BaseService {
       }
 
       await tx.documentLine.deleteMany({ where: { documentId: id } });
+      await tx.documentCutLine.deleteMany({ where: { documentId: id } });
 
       const document = await tx.inventoryDocument.update({
         where: { id },
@@ -143,6 +156,16 @@ export class DocumentService extends BaseService {
               unit: line.unit,
               fromLocationId: line.fromLocationId,
               toLocationId: line.toLocationId,
+              notes: line.notes,
+              order: index,
+            })),
+          },
+          cutLines: {
+            create: (input.cutLines ?? []).map((line, index) => ({
+              sizeId: line.sizeId,
+              quantity: line.quantity,
+              bundles: line.bundles,
+              tag: line.tag,
               notes: line.notes,
               order: index,
             })),

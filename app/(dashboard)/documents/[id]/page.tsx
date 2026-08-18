@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import {
+  CUT_TAG_COLORS, CUT_TAG_LABELS,
   DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES,
   DOCUMENT_TYPE_LABELS, UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
@@ -35,9 +36,14 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             include: {
               material: { select: { name: true } },
               location: { select: { code: true } },
+              client: { select: { name: true } },
             },
           },
         },
+      },
+      cutLines: {
+        orderBy: { order: "asc" },
+        include: { size: { select: { code: true, name: true } } },
       },
     },
   });
@@ -86,9 +92,77 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         lineCount={document.lines.length}
       />
 
+      {document.cutLines.length > 0 && (
+        <section className="flat-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold">Desglose de corte</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Talla
+                  </th>
+                  <th className="p-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Cantidad
+                  </th>
+                  <th className="p-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Bultos
+                  </th>
+                  <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Foleo
+                  </th>
+                  <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Anotaciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {document.cutLines.map((line) => (
+                  <tr key={line.id} className="border-b border-border">
+                    <td className="tabular p-2 font-medium">{line.size.code}</td>
+                    <td className="tabular p-2 text-right">{line.quantity}</td>
+                    <td className="tabular p-2 text-right">{line.bundles}</td>
+                    <td className="p-2">
+                      {line.tag ? (
+                        <span
+                          className="inline-block px-2 py-0.5 text-xs"
+                          style={{
+                            backgroundColor: CUT_TAG_COLORS[line.tag].background,
+                            color: CUT_TAG_COLORS[line.tag].text,
+                          }}
+                        >
+                          {CUT_TAG_LABELS[line.tag]}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="p-2 text-muted-foreground">
+                      {line.notes ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-medium">
+                  <td className="p-2">Total</td>
+                  <td className="tabular p-2 text-right">
+                    {document.cutLines.reduce((sum, l) => sum + l.quantity, 0)}
+                  </td>
+                  <td className="tabular p-2 text-right">
+                    {document.cutLines.reduce((sum, l) => sum + l.bundles, 0)}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">
-          Renglones ({document.lines.length})
+          Rollos ({document.lines.length})
         </h2>
         <ul className="divide-y divide-border">
           {document.lines.map((line) => (

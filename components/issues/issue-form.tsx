@@ -21,14 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchSelect } from "@/components/shared/search-select";
 import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
+import {
+  IssueCutTable,
+  type CutLineDraft,
+  type SizeOption,
+} from "./issue-cut-table";
 import {
   IssueFromCalculation,
   type IssueProductOption,
@@ -44,6 +43,8 @@ interface Props {
   materials: MaterialOption[];
   products: IssueProductOption[];
   sizes: { id: string; code: string; name: string }[];
+  /** Catálogo completo para la tabla de corte, con su grupo de escala. */
+  cutSizes: SizeOption[];
   clients: { id: string; name: string }[];
   productionRuns: { id: string; code: string; name: string | null }[];
 }
@@ -73,6 +74,7 @@ export function IssueForm({
   materials,
   products,
   sizes,
+  cutSizes,
   clients,
   productionRuns,
 }: Props) {
@@ -86,6 +88,7 @@ export function IssueForm({
   const [notes, setNotes] = useState("");
 
   const [lines, setLines] = useState<IssueLine[]>([]);
+  const [cutLines, setCutLines] = useState<CutLineDraft[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMaterialId, setPickerMaterialId] = useState("");
   const [pickerState, setPickerState] = useState<PickerState>({ kind: "idle" });
@@ -134,6 +137,16 @@ export function IssueForm({
     setPickerState({ kind: "ready", lots: result.data });
   }
 
+  /**
+   * Agrega el rollo y DEJA el selector abierto.
+   *
+   * Una salida normal se lleva ocho o diez rollos del mismo material. Cerrar
+   * el diálogo en cada uno obligaba a reabrirlo y volver a elegir material
+   * diez veces; ahora se van marcando de corrido y se cierra al terminar.
+   *
+   * La cantidad se propone en el disponible completo: lo habitual es sacar el
+   * rollo entero, y el que sale a medias se corrige tecleando encima.
+   */
   function handlePick(lot: IssueLotOption) {
     setLines((current) => [
       ...current,
@@ -145,11 +158,9 @@ export function IssueForm({
         isRemnant: lot.isRemnant,
         available: lot.available,
         unit: lot.unit as Unit,
-        quantity: "",
+        quantity: String(lot.available),
       },
     ]);
-
-    closePicker();
   }
 
   /** Deja el selector en blanco: al reabrirlo se elige material otra vez. */
@@ -251,6 +262,17 @@ export function IssueForm({
         quantity: Number(line.quantity),
         unit: line.unit,
       })),
+      // Sólo los renglones completos: uno a medio teclear no es un error del
+      // usuario, es un renglón que todavía no termina de llenar.
+      cutLines: cutLines
+        .filter((line) => line.sizeId && Number(line.quantity) > 0)
+        .map((line) => ({
+          sizeId: line.sizeId,
+          quantity: Number(line.quantity),
+          bundles: Number(line.bundles) || 1,
+          tag: line.tag || undefined,
+          notes: line.notes || undefined,
+        })),
     });
 
     setIsSubmitting(false);
@@ -274,18 +296,18 @@ export function IssueForm({
           label="Cliente dueño del material"
           hint="Al elegirlo sólo se ofrecen sus rollos: su tela no surte la producción de otro."
         >
-          <Select value={clientId} onValueChange={handleClientChange}>
-            <SelectTrigger id="issue-client" className="touch-target">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchSelect
+            id="issue-client"
+            options={clients.map((client) => ({
+              value: client.id,
+              label: client.name,
+            }))}
+            value={clientId}
+            onChange={handleClientChange}
+            placeholder="Todos"
+            searchPlaceholder="Buscar cliente…"
+            clearLabel="Todos"
+          />
         </FormSelectField>
 
         <div className="flex flex-wrap gap-2">
@@ -299,32 +321,30 @@ export function IssueForm({
           <ResponsiveFormDialog
             open={pickerOpen}
             onOpenChange={(next) => (next ? setPickerOpen(true) : closePicker())}
-            title="Agregar rollo"
-            description="Se ofrecen primero los retazos y luego los más viejos."
+            title="Agregar rollos"
+            description="Marca todos los que se lleven. Retazos primero, luego los más viejos."
             trigger={
               <Button type="button" variant="outline" className="touch-target">
                 <Plus className="size-4" aria-hidden />
-                Agregar rollo
+                Agregar rollos
               </Button>
             }
           >
             <div className="flex flex-col gap-4">
               <FormSelectField id="picker-material" label="Material">
-                <Select
+                <SearchSelect
+                  id="picker-material"
+                  options={materials.map((material) => ({
+                    value: material.id,
+                    label: material.name,
+                    hint: material.code,
+                    keywords: material.code,
+                  }))}
                   value={pickerMaterialId}
-                  onValueChange={handleMaterialChange}
-                >
-                  <SelectTrigger id="picker-material" className="touch-target">
-                    <SelectValue placeholder="Elige el material" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem key={material.id} value={material.id}>
-                        {material.code} · {material.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={handleMaterialChange}
+                  placeholder="Elige el material"
+                  searchPlaceholder="Buscar por código o nombre…"
+                />
               </FormSelectField>
 
               <IssueLotPicker
@@ -333,6 +353,17 @@ export function IssueForm({
                 hasClientFilter={Boolean(clientId)}
                 onPick={handlePick}
               />
+
+              {/* Cerrar es explícito: el selector se queda abierto para poder
+                  marcar varios rollos seguidos sin reabrirlo cada vez. */}
+              <Button
+                type="button"
+                className="touch-target"
+                onClick={closePicker}
+              >
+                Listo
+                {lines.length > 0 && ` · ${lines.length} rollo(s)`}
+              </Button>
             </div>
           </ResponsiveFormDialog>
         </div>
@@ -345,6 +376,16 @@ export function IssueForm({
       />
 
       <div className="flat-surface p-4">
+        <FormSection title="Desglose de corte" description="Prendas por talla que se van a cortar con esta tela.">
+          <IssueCutTable
+            sizes={cutSizes}
+            lines={cutLines}
+            onChange={setCutLines}
+          />
+        </FormSection>
+      </div>
+
+      <div className="flat-surface p-4">
         <FormSection title="Detalles del vale">
           <div className="flex flex-col gap-4">
             <FormSelectField
@@ -352,22 +393,20 @@ export function IssueForm({
               label="Producción"
               hint="Para qué corrida sale el material."
             >
-              <Select
+              <SearchSelect
+                id="issue-run"
+                options={productionRuns.map((run) => ({
+                  value: run.id,
+                  label: run.name ?? run.code,
+                  hint: run.name ? run.code : undefined,
+                  keywords: run.code,
+                }))}
                 value={productionRunId}
-                onValueChange={setProductionRunId}
-              >
-                <SelectTrigger id="issue-run" className="touch-target">
-                  <SelectValue placeholder="Sin producción" />
-                </SelectTrigger>
-                <SelectContent>
-                  {productionRuns.map((run) => (
-                    <SelectItem key={run.id} value={run.id}>
-                      {run.code}
-                      {run.name && ` · ${run.name}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setProductionRunId}
+                placeholder="Sin producción"
+                searchPlaceholder="Buscar producción…"
+                clearLabel="Sin producción"
+              />
             </FormSelectField>
 
             <div className="flex flex-col gap-2">

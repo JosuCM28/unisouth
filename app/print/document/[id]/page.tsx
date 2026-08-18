@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
+  CUT_TAG_COLORS,
+  CUT_TAG_LABELS,
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   UNIT_SHORT_LABELS,
@@ -33,6 +35,10 @@ export default async function PrintDocumentPage({ params }: PageProps) {
       createdBy: { select: { name: true } },
       appliedBy: { select: { name: true } },
       productionRun: { select: { code: true, name: true } },
+      cutLines: {
+        orderBy: { order: "asc" },
+        include: { size: { select: { code: true, name: true } } },
+      },
       lines: {
         orderBy: { order: "asc" },
         include: {
@@ -49,6 +55,25 @@ export default async function PrintDocumentPage({ params }: PageProps) {
   });
 
   if (!document) notFound();
+
+  /* La empresa y la tela se leen de los rollos y no del encabezado: el
+     documento sólo guarda `clientId` sin relación, y de todos modos el dato
+     que importa en el taller es de qué cliente es la tela que va en la caja.
+     Si la salida mezcla materiales se listan todos, separados por coma. */
+  const companyName =
+    unique(document.lines.map((line) => line.lot.client?.name)).join(", ") ||
+    "De la fábrica";
+  const fabricNames = unique(
+    document.lines.map((line) => line.lot.material.name),
+  ).join(", ");
+
+  const cutTotals = document.cutLines.reduce(
+    (acc, line) => ({
+      pieces: acc.pieces + line.quantity,
+      bundles: acc.bundles + line.bundles,
+    }),
+    { pieces: 0, bundles: 0 },
+  );
 
   return (
     <main className="mx-auto max-w-3xl bg-white p-8 text-black">
@@ -80,7 +105,88 @@ export default async function PrintDocumentPage({ params }: PageProps) {
         {document.createdBy && <Row label="Elaboró" value={document.createdBy.name} />}
       </dl>
 
-      <table className="mt-4 w-full border-collapse text-sm">
+      {/* ── Desglose de corte: lo que se va a cortar con esta tela ── */}
+      {document.cutLines.length > 0 && (
+        <section className="mt-4">
+          <dl className="grid grid-cols-2 gap-x-6 border border-black p-2 text-sm">
+            <Row label="Empresa" value={companyName} />
+            <Row label="Tela" value={fabricNames} />
+          </dl>
+
+          <table className="mt-2 w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-neutral-200 text-left">
+                <th className="border border-black px-2 py-1">Talla</th>
+                <th className="border border-black px-2 py-1 text-right">
+                  Cantidad
+                </th>
+                <th className="border border-black px-2 py-1 text-right">
+                  Bultos
+                </th>
+                <th className="border border-black px-2 py-1">Foleo</th>
+                <th className="border border-black px-2 py-1">Anotaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {document.cutLines.map((line) => {
+                const colors = line.tag ? CUT_TAG_COLORS[line.tag] : null;
+
+                return (
+                  <tr key={line.id}>
+                    <td className="tabular border border-black px-2 py-1 font-medium">
+                      {line.size.code}
+                    </td>
+                    <td className="tabular border border-black px-2 py-1 text-right">
+                      {line.quantity}
+                    </td>
+                    <td className="tabular border border-black px-2 py-1 text-right">
+                      {line.bundles}
+                    </td>
+                    {/* La celda se pinta del color del papelito: así la hoja
+                        impresa se puede cotejar de un vistazo con el bulto. */}
+                    <td
+                      className="border border-black px-2 py-1 text-center"
+                      style={
+                        colors
+                          ? {
+                              backgroundColor: colors.background,
+                              color: colors.text,
+                              // Sin esto el navegador descarta los fondos al
+                              // imprimir y el foleo sale en blanco.
+                              printColorAdjust: "exact",
+                              WebkitPrintColorAdjust: "exact",
+                            }
+                          : undefined
+                      }
+                    >
+                      {line.tag ? CUT_TAG_LABELS[line.tag] : "—"}
+                    </td>
+                    <td className="border border-black px-2 py-1">
+                      {line.notes ?? ""}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="font-bold">
+                <td className="border border-black px-2 py-1">TOTAL</td>
+                <td className="tabular border border-black px-2 py-1 text-right">
+                  {cutTotals.pieces}
+                </td>
+                <td className="tabular border border-black px-2 py-1 text-right">
+                  {cutTotals.bundles}
+                </td>
+                <td className="border border-black" colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+      )}
+
+      {/* ── Rollos que salieron y con cuántos metros cada uno ── */}
+      <h2 className="mt-6 text-sm font-bold uppercase">Rollos entregados</h2>
+      <table className="mt-1 w-full border-collapse text-sm">
         <thead>
           <tr className="border-b-2 border-black text-left">
             <th className="py-1 pr-2">Folio</th>
@@ -107,9 +213,15 @@ export default async function PrintDocumentPage({ params }: PageProps) {
         </tbody>
       </table>
 
+      {/* El total de rollos Y de metros: en el andén se cuentan los bultos
+          físicos, y el metraje es lo que se factura. */}
       <p className="tabular mt-2 text-right text-sm font-bold">
         {document.lines.length}{" "}
-        {document.lines.length === 1 ? "renglón" : "renglones"}
+        {document.lines.length === 1 ? "rollo" : "rollos"} ·{" "}
+        {formatQuantity(
+          document.lines.reduce((sum, line) => sum + Number(line.quantity), 0),
+        )}{" "}
+        en total
       </p>
 
       {document.notes && (
@@ -119,7 +231,9 @@ export default async function PrintDocumentPage({ params }: PageProps) {
       )}
 
       {/* Las firmas son el punto de todo esto: el vale existe para que quede
-          constancia en papel de quién entregó y quién recibió. */}
+          constancia en papel de quién entregó y quién recibió. Se deja el
+          renglón de "nombre" aparte de la firma porque una firma sola no se
+          lee, y meses después nadie sabe de quién era. */}
       <div className="mt-16 grid grid-cols-2 gap-8 text-center text-sm">
         <Signature label="Entrega" name={document.handedOverBy} />
         <Signature label="Recibe" name={document.receivedBy} />
@@ -142,7 +256,21 @@ function Signature({ label, name }: { label: string; name: string | null }) {
     <div>
       <div className="border-b border-black" />
       <p className="mt-1 font-medium">{label}</p>
-      {name && <p className="text-xs">{name}</p>}
+      {/* Si el vale ya trae el nombre capturado se imprime; si no, se deja el
+          renglón en blanco para que lo escriba a mano quien recibe. */}
+      {name ? (
+        <p className="text-xs">{name}</p>
+      ) : (
+        <>
+          <div className="mt-6 border-b border-black" />
+          <p className="mt-1 text-xs">Nombre</p>
+        </>
+      )}
     </div>
   );
+}
+
+/** Valores distintos y sin vacíos, conservando el orden en que aparecieron. */
+function unique(values: (string | null | undefined)[]): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }

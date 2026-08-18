@@ -6,13 +6,7 @@ import { MOVEMENT_TYPE_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchSelect } from "@/components/shared/search-select";
 
 interface Props {
   materials: { id: string; code: string; name: string }[];
@@ -82,46 +76,33 @@ export function MovementFilters({ materials }: Props) {
       <div className="grid gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="movement-material">Material</Label>
-          <Select
-            value={searchParams.get("materialId") ?? "all"}
-            onValueChange={(next) =>
-              setParam("materialId", next === "all" ? null : next)
-            }
-          >
-            <SelectTrigger id="movement-material" className="touch-target w-full">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {materials.map((material) => (
-                <SelectItem key={material.id} value={material.id}>
-                  {material.code} · {material.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchSelect
+            id="movement-material"
+            options={materials.map((material) => ({
+              value: material.id,
+              label: material.name,
+              hint: material.code,
+              keywords: material.code,
+            }))}
+            value={searchParams.get("materialId") ?? ""}
+            onChange={(next) => setParam("materialId", next || null)}
+            placeholder="Todos"
+            searchPlaceholder="Buscar por código o nombre…"
+            clearLabel="Todos"
+          />
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="movement-type">Tipo de movimiento</Label>
-          <Select
-            value={searchParams.get("type") ?? "all"}
-            onValueChange={(next) =>
-              setParam("type", next === "all" ? null : next)
-            }
-          >
-            <SelectTrigger id="movement-type" className="touch-target w-full">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {toSelectOptions(MOVEMENT_TYPE_LABELS).map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchSelect
+            id="movement-type"
+            options={toSelectOptions(MOVEMENT_TYPE_LABELS)}
+            value={searchParams.get("type") ?? ""}
+            onChange={(next) => setParam("type", next || null)}
+            placeholder="Todos"
+            searchPlaceholder="Buscar tipo…"
+            clearLabel="Todos"
+          />
         </div>
       </div>
 

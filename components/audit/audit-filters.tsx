@@ -7,13 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchSelect } from "@/components/shared/search-select";
 
 const ACTIONS: { value: AuditAction; label: string }[] = [
   { value: "CREATE", label: "Creación" },
@@ -181,22 +175,14 @@ function Filter({
   return (
     <div className="flex flex-col gap-2">
       <Label>{label}</Label>
-      <Select
-        value={value ?? "all"}
-        onValueChange={(next) => onChange(next === "all" ? null : next)}
-      >
-        <SelectTrigger className="touch-target w-full">
-          <SelectValue placeholder={label} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchSelect
+        options={options}
+        value={value ?? ""}
+        onChange={(next) => onChange(next || null)}
+        placeholder={label}
+        searchPlaceholder={`Buscar ${label.toLowerCase()}…`}
+        clearLabel="Todos"
+      />
     </div>
   );
 }

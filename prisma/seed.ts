@@ -12,12 +12,45 @@ const prisma = new PrismaClient();
 
 /** Las tallas escalan el consumo en vez de duplicar la ficha técnica. */
 const SIZES = [
-  { code: "CH", name: "Chica", order: 1, consumptionFactor: "0.92" },
-  { code: "M", name: "Mediana", order: 2, consumptionFactor: "1.00" },
-  { code: "G", name: "Grande", order: 3, consumptionFactor: "1.08" },
-  { code: "XG", name: "Extra grande", order: 4, consumptionFactor: "1.16" },
-  { code: "2XG", name: "Doble extra grande", order: 5, consumptionFactor: "1.24" },
+  { code: "CH", name: "Chica", order: 1, consumptionFactor: "0.92", group: "letra" },
+  { code: "M", name: "Mediana", order: 2, consumptionFactor: "1.00", group: "letra" },
+  { code: "G", name: "Grande", order: 3, consumptionFactor: "1.08", group: "letra" },
+  { code: "XG", name: "Extra grande", order: 4, consumptionFactor: "1.16", group: "letra" },
+  { code: "2XG", name: "Doble extra grande", order: 5, consumptionFactor: "1.24", group: "letra" },
+
+  /**
+   * Tallas numéricas de pantalón y blusa industrial (26 a 50).
+   *
+   * Conviven con las de letra en vez de sustituirlas: una misma bodega surte
+   * overoles por talla numérica y playeras por CH/M/G. El `group` las separa
+   * para que un desplegable no mezcle las dos escalas.
+   *
+   * El factor de consumo escala desde la 34, que es la talla media de la
+   * escala: cada dos números suma ~4% de tela, la misma progresión que ya
+   * usan las de letra.
+   */
+  ...NUMERIC_SIZES(),
 ] as const;
+
+/** Genera 26, 28, 30 … 50 con su factor de consumo escalado desde la 34. */
+function NUMERIC_SIZES() {
+  const BASE = 34;
+  const STEP_PCT = 0.04;
+
+  return Array.from({ length: 13 }, (_, index) => {
+    const number = 26 + index * 2;
+    const factor = 1 + ((number - BASE) / 2) * STEP_PCT;
+
+    return {
+      code: String(number),
+      name: `Talla ${number}`,
+      // Después de las de letra, en el orden natural de la escala.
+      order: 100 + index,
+      consumptionFactor: factor.toFixed(4),
+      group: "numerica",
+    };
+  });
+}
 
 /**
  * Almacenes.
@@ -95,14 +128,14 @@ async function seedSizes() {
         name: size.name,
         order: size.order,
         consumptionFactor: size.consumptionFactor,
-        group: "letra",
+        group: size.group,
       },
       create: {
         code: size.code,
         name: size.name,
         order: size.order,
         consumptionFactor: size.consumptionFactor,
-        group: "letra",
+        group: size.group,
       },
     });
   }

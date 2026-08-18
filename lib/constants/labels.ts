@@ -1,4 +1,5 @@
 import type {
+  CutTag,
   DocumentStatus,
   DocumentType,
   LocationType,
@@ -232,4 +233,39 @@ export const PURCHASE_STATUS_STYLES: Record<PurchaseRequestStatus, string> = {
   PARTIALLY_RECEIVED: "bg-state-reserved-muted text-foreground border border-border",
   RECEIVED: "bg-state-available text-state-available-foreground",
   CANCELLED: "bg-muted text-muted-foreground border border-border line-through",
+};
+
+/**
+ * FOLEO: el color del papelito que se engrapa al bulto.
+ *
+ * En el piso los bultos se distinguen por ese color a un metro de distancia,
+ * así que en pantalla y en papel tiene que verse el color REAL —azul es azul—,
+ * no un color del tema. Por eso estos valores son hex fijos y no tokens: un
+ * ámbar del sistema no es el amarillo del papelito.
+ */
+export const CUT_TAG_LABELS: Record<CutTag, string> = {
+  BLUE: "Azul",
+  GREEN: "Verde",
+  ORANGE: "Naranja",
+  YELLOW: "Amarillo",
+  RED: "Rojo",
+  PURPLE: "Morado",
+  PINK: "Rosa",
+  BROWN: "Café",
+  BLACK: "Negro",
+  WHITE: "Blanco",
+};
+
+/** Fondo y texto de cada foleo. El texto se elige por contraste, no por gusto. */
+export const CUT_TAG_COLORS: Record<CutTag, { background: string; text: string }> = {
+  BLUE: { background: "#1d4ed8", text: "#ffffff" },
+  GREEN: { background: "#15803d", text: "#ffffff" },
+  ORANGE: { background: "#ea580c", text: "#ffffff" },
+  YELLOW: { background: "#facc15", text: "#1c1917" },
+  RED: { background: "#b91c1c", text: "#ffffff" },
+  PURPLE: { background: "#7e22ce", text: "#ffffff" },
+  PINK: { background: "#ec4899", text: "#ffffff" },
+  BROWN: { background: "#78350f", text: "#ffffff" },
+  BLACK: { background: "#1c1917", text: "#ffffff" },
+  WHITE: { background: "#ffffff", text: "#1c1917" },
 };

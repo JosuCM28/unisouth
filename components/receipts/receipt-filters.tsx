@@ -5,9 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SearchSelect } from "@/components/shared/search-select";
 
 interface Option { id: string; label: string }
 
@@ -152,21 +150,17 @@ function FilterSelect({
   onChange: (value: string | null) => void;
 }) {
   return (
-    <Select
-      value={value ?? "all"}
-      onValueChange={(next) => onChange(next === "all" ? null : next)}
-    >
-      <SelectTrigger className="touch-target w-full md:w-48">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">{placeholder}: todos</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.id} value={option.id}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <SearchSelect
+      options={options.map((option) => ({
+        value: option.id,
+        label: option.label,
+      }))}
+      value={value ?? ""}
+      onChange={(next) => onChange(next || null)}
+      placeholder={placeholder}
+      searchPlaceholder={`Buscar ${placeholder.toLowerCase()}…`}
+      clearLabel={`${placeholder}: todos`}
+      className="w-full md:w-48"
+    />
   );
 }

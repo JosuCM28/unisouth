@@ -719,6 +719,7 @@ model InventoryDocument {
   updatedAt DateTime @updatedAt
 
   lines       DocumentLine[]
+  cutLines    DocumentCutLine[]
   movements   Movement[]
   attachments Attachment[]
 
@@ -769,6 +770,53 @@ model DocumentLine {
   @@index([documentId])
   @@index([lotId])
   @@map("document_lines")
+}
+
+/// THE CUTTING TABLE of an issue: how many garments per size leave the door.
+///
+/// Deliberately SEPARATE from DocumentLine: they are two different axes of the
+/// same issue. DocumentLine answers "which rolls came out and how many meters"
+/// —that is what moves stock—, while this one answers "how many garments per
+/// size were cut and in how many bundles", which is what the workshop signs
+/// for. Merging them would force a fake roll on every size row.
+model DocumentCutLine {
+  id         String            @id @default(cuid())
+  documentId String
+  document   InventoryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  order      Int               @default(0)
+
+  sizeId String
+  size   Size   @relation(fields: [sizeId], references: [id])
+
+  /// Garments to cut for this size.
+  quantity Int
+  /// Physical bundles they are tied into. Sometimes 20 garments travel as one
+  /// bundle, sometimes as three.
+  bundles  Int  @default(1)
+
+  /// The colour tag the shop floor uses to tell batches apart on the table.
+  tag   CutTag?
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+  @@index([sizeId])
+  @@map("document_cut_lines")
+}
+
+/// Colour of the paper tag ("foleo") stapled to a bundle.
+enum CutTag {
+  BLUE
+  GREEN
+  ORANGE
+  YELLOW
+  RED
+  PURPLE
+  PINK
+  BROWN
+  BLACK
+  WHITE
 }
 
 /// LEDGER. Append-only: never UPDATE, never DELETE.
@@ -1022,6 +1070,7 @@ model Size {
   bomLines             BomLine[]
   calculationLines     CalculationLine[]
   productionOrderLines ProductionOrderLine[]
+  documentCutLines     DocumentCutLine[]
 
   @@index([group, order])
   @@map("sizes")

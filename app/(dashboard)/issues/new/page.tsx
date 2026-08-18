@@ -36,7 +36,10 @@ export default async function NewIssuePage() {
       }),
       prisma.size.findMany({
         where: { active: true },
-        select: { id: true, code: true, name: true },
+        // El `group` separa la escala de letra (CH/M/G) de la numérica
+        // (26–50): son dos sistemas distintos y mezclarlos en un desplegable
+        // hace que alguien elija "G" para un pantalón que se pide por número.
+        select: { id: true, code: true, name: true, group: true },
         orderBy: { order: "asc" },
       }),
       new ClientRepository().findOptions(),
@@ -75,6 +78,7 @@ export default async function NewIssuePage() {
         materials={materials}
         products={productOptions}
         sizes={sizes}
+        cutSizes={sizes}
         clients={clients}
         productionRuns={productionRuns}
       />
