@@ -15,6 +15,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 export function usePageParam(): {
   onPageChange: (page: number) => void;
   onLoadMore: (currentPage: number) => void;
+  onPageSizeChange: (size: number) => void;
 } {
   const router = useRouter();
   const pathname = usePathname();
@@ -37,9 +38,20 @@ export function usePageParam(): {
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
+  function setPageSize(size: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("filas", String(size));
+    /* Se vuelve a la primera página: con 100 filas por página, seguir en la 7
+       mostraría una lista vacía porque ya no existen tantas páginas. */
+    params.delete("page");
+    params.delete("all");
+    router.push(`${pathname}?${params}`, { scroll: false });
+  }
+
   return {
     onPageChange: (page) => go(page, false),
     // Al cargar más NO se sube al inicio: el pulgar se queda donde estaba.
     onLoadMore: (currentPage) => go(currentPage + 1, true),
+    onPageSizeChange: setPageSize,
   };
 }

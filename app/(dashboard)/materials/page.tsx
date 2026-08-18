@@ -14,9 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const metadata: Metadata = { title: "Materiales" };
 
 const PAGE_SIZE = 50;
+/** Los mismos que ofrece el selector de la tabla. */
+const PAGE_SIZES = [10, 25, 50, 100];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string; filas?: string }>;
 }
 
 export default async function MaterialsPage({ searchParams }: PageProps) {
@@ -62,8 +64,13 @@ async function ListSection({
   const repository = new MaterialRepository();
   const search = params.q;
   const page = parsePositiveInt(params.page) ?? 1;
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
 
-  const result = await repository.search({ search, page, pageSize: PAGE_SIZE, accumulate: params.all === "1" });
+  const result = await repository.search({ search, page, pageSize, accumulate: params.all === "1" });
 
   // La existencia se resuelve con groupBy en la base, no trayendo los lotes.
   const stock = await repository.getStockByMaterial(

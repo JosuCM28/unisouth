@@ -40,7 +40,15 @@ export default function RootLayout({
       lang="es-MX"
       className={`${inter.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">
+      {/* En escritorio el documento NO scrollea: mide exactamente la ventana y
+          el desbordamiento lo resuelve cada columna por dentro. Con `min-h-full`
+          el body crecía con la lista y se llevaba la barra lateral hacia arriba,
+          que es justo lo que se quiere evitar.
+
+          En celular sí scrollea el documento (`min-h-dvh` y sin overflow): ahí
+          no hay barra lateral que perder y el scroll natural es el correcto,
+          además de que oculta la barra de direcciones del navegador. */}
+      <body className="flex min-h-dvh flex-col font-sans md:h-dvh md:min-h-0 md:overflow-hidden">
         {children}
         {/* Arriba y al centro: abajo lo taparía la barra de navegación móvil. */}
         <Toaster position="top-center" richColors />

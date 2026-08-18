@@ -35,7 +35,7 @@ export function ProductionRunList({
   pageSize,
   isFiltered,
 }: Props) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<ProductionRunWithDetail>[] = [
     {
@@ -107,6 +107,7 @@ export function ProductionRunList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "producción", many: "producciones" }}
         getRowId={(run) => run.id}

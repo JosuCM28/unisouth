@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const metadata: Metadata = { title: "Recepciones" };
 
 const PAGE_SIZE = 50;
+/** Los mismos que ofrece el selector de la tabla. */
+const PAGE_SIZES = [10, 25, 50, 100];
 
 interface PageProps {
   searchParams: Promise<{
@@ -27,6 +29,7 @@ interface PageProps {
     arrivedWithin?: string;
     page?: string;
     all?: string;
+    filas?: string;
   }>;
 }
 
@@ -86,6 +89,11 @@ async function ListSection({
   params: Awaited<PageProps["searchParams"]>;
 }) {
   const page = parsePositiveInt(params.page) ?? 1;
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
 
   const result = await new ReceiptRepository().search({
     search: params.q,
@@ -94,7 +102,7 @@ async function ListSection({
     carrierId: params.carrierId,
     arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     // "Cargar más" del celular: trae desde la primera fila hasta ésta.
     accumulate: params.all === "1",
   });
@@ -104,7 +112,7 @@ async function ListSection({
   // La página no cuenta como filtro: estar en la 3 no significa que el
   // usuario haya buscado algo, y el mensaje de lista vacía cambia según eso.
   const isFiltered = Object.entries(params).some(
-    ([key, value]) => !["page", "all"].includes(key) && Boolean(value),
+    ([key, value]) => !["page", "all", "filas"].includes(key) && Boolean(value),
   );
 
   return (

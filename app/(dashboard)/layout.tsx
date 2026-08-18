@@ -14,10 +14,10 @@ export default async function DashboardLayout({
   if (!user) redirect("/login");
 
   return (
-    /* md:h-screen + overflow-hidden: fija el alto a la ventana para que
-       scrollee cada columna por dentro y no la página entera. En celular se
-       mantiene min-h-screen, ahí el scroll natural del documento es correcto. */
-    <div className="flex min-h-screen flex-1 md:h-screen md:min-h-0 md:overflow-hidden">
+    /* Alto exacto de la ventana en escritorio: cada columna scrollea por
+       dentro y la barra lateral queda fija. `dvh` y no `vh` porque en celular
+       la barra del navegador se esconde al scrollear y `vh` deja un salto. */
+    <div className="flex min-h-dvh flex-1 md:h-dvh md:min-h-0 md:overflow-hidden">
       <AppSidebar user={user} />
 
       <div className="flex min-w-0 flex-1 flex-col md:min-h-0">

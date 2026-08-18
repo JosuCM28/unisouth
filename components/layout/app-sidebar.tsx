@@ -23,7 +23,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   return (
     // En celular no existe: ahí manda la barra inferior.
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex md:h-screen">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex md:h-dvh">
       <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-4">
         <span className="text-sm font-semibold tracking-tight">UNISOUTH</span>
       </div>

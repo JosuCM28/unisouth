@@ -36,7 +36,7 @@ export function LocationList({
   pageSize,
   isFiltered,
 }: LocationListProps) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<LocationWithLotCount>[] = [
     {
@@ -98,6 +98,7 @@ export function LocationList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "ubicación", many: "ubicaciones" }}
         getRowId={(location) => location.id}

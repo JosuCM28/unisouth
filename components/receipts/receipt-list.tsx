@@ -27,7 +27,7 @@ export function ReceiptList({
   pageSize,
   isFiltered,
 }: ReceiptListProps) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<ReceiptCardData>[] = [
     {
@@ -112,6 +112,7 @@ export function ReceiptList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "recepción", many: "recepciones" }}
         getRowId={(receipt) => receipt.id}

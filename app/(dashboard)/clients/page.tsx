@@ -12,9 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const metadata: Metadata = { title: "Clientes" };
 
 const PAGE_SIZE = 50;
+/** Los mismos que ofrece el selector de la tabla. */
+const PAGE_SIZES = [10, 25, 50, 100];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; page?: string; all?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; all?: string; filas?: string }>;
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
@@ -53,6 +55,11 @@ async function ListSection({
 }) {
   const term = params.q?.trim();
   const page = parsePositiveInt(params.page) ?? 1;
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
 
   // Una sola consulta: la búsqueda, el conteo de rollos y el recorte de la
   // página los resuelve Postgres. Antes se traía el catálogo COMPLETO y se
@@ -60,7 +67,7 @@ async function ListSection({
   const result = await new ClientRepository().searchWithLotCount({
     search: term,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     // "Cargar más" del celular: trae desde la primera fila hasta ésta.
     accumulate: params.all === "1",
   });

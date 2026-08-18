@@ -27,7 +27,7 @@ export function LotList({
   pageSize,
   isFiltered,
 }: LotListProps) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<LotCardData>[] = [
     {
@@ -120,6 +120,7 @@ export function LotList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "rollo", many: "rollos" }}
         getRowId={(lot) => lot.id}

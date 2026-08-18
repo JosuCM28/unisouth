@@ -29,7 +29,7 @@ export function ClientList({
   pageSize,
   isFiltered,
 }: Props) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<ClientWithLotCount>[] = [
     {
@@ -95,6 +95,7 @@ export function ClientList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "cliente", many: "clientes" }}
         getRowId={(client) => client.id}

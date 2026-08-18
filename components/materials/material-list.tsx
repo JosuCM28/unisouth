@@ -42,7 +42,7 @@ export function MaterialList({
   pageSize,
   isFiltered,
 }: MaterialListProps) {
-  const { onPageChange, onLoadMore } = usePageParam();
+  const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
 
   const columns: DataTableColumn<PlainMaterial>[] = [
     {
@@ -143,6 +143,7 @@ export function MaterialList({
           pageSize,
           onPageChange,
           onLoadMore: () => onLoadMore(page),
+          onPageSizeChange,
         }}
         itemLabel={{ one: "material", many: "materiales" }}
         getRowId={(material) => material.id}

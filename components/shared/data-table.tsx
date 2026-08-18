@@ -27,6 +27,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TablePagination } from "@/components/shared/table-pagination";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -84,6 +85,8 @@ export interface ServerPagination {
   pageSize: number;
   /** Navega a la página pedida. En la práctica, cambia la URL. */
   onPageChange: (page: number) => void;
+  /** Cambia las filas por página. Sin esto no se ofrece el selector. */
+  onPageSizeChange?: (size: number) => void;
   /**
    * "Cargar más" del celular: pide la siguiente página ACUMULANDO.
    *
@@ -295,22 +298,18 @@ export function DataTable<TData>({
         </div>
       </div>
 
-      {/* Escritorio: el paginador completo, con "primera" y "última". En
-          celular se esconde porque ahí manda el botón de "cargar más". */}
-      {server && server.totalPages > 1 && (
+      {/* Escritorio: el paginador completo, con números de página y filas por
+          página. En celular se esconde porque ahí manda "cargar más". */}
+      {server && (
         <div className="hidden md:block">
-          <Pagination
+          <TablePagination
             page={server.page}
-            pageCount={server.totalPages}
+            totalPages={server.totalPages}
             total={server.total}
-            from={(server.page - 1) * server.pageSize + 1}
-            to={Math.min(server.page * server.pageSize, server.total)}
-            canPrevious={server.page > 1}
-            canNext={server.page < server.totalPages}
-            onFirst={() => server.onPageChange(1)}
-            onPrevious={() => server.onPageChange(server.page - 1)}
-            onNext={() => server.onPageChange(server.page + 1)}
-            onLast={() => server.onPageChange(server.totalPages)}
+            pageSize={server.pageSize}
+            itemLabel={itemLabel}
+            onPageChange={server.onPageChange}
+            onPageSizeChange={server.onPageSizeChange}
           />
         </div>
       )}
