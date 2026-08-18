@@ -33,9 +33,27 @@ export const receiptLotSchema = z.object({
   comment: optionalText,
 });
 
+/**
+ * Edición del encabezado de una recepción YA guardada.
+ *
+ * Se reusa `receiptHeaderSchema` para que el alta y la corrección validen con
+ * las mismas reglas: si mañana la guía se vuelve obligatoria, se vuelve
+ * obligatoria en los dos lados sin que nadie se acuerde de tocar el otro.
+ *
+ * Los rollos NO viajan aquí: esta pantalla corrige los datos de la carga
+ * —guía, paquetería, origen, factura, bultos—, no el material recibido.
+ */
+export const updateReceiptSchema = receiptHeaderSchema.extend({
+  id: cuidSchema,
+  /// Obligatorio cuando cambia el dueño: reasignar material de un cliente a
+  /// otro es de las correcciones que alguien va a tener que justificar.
+  reason: optionalText,
+});
+
 export const receiptSchema = receiptHeaderSchema.extend({
   lots: z.array(receiptLotSchema).min(1, "Captura al menos un rollo"),
 });
 
 export type ReceiptInput = z.infer<typeof receiptSchema>;
+export type UpdateReceiptInput = z.infer<typeof updateReceiptSchema>;
 export type ReceiptLotInput = z.infer<typeof receiptLotSchema>;

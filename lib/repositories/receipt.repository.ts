@@ -147,6 +147,35 @@ export class ReceiptRepository extends BaseRepository<
   }
 
   /** Opciones para los <Select> de filtros: sólo lo que ya se usó. */
+  /**
+   * Catálogos para EDITAR una recepción.
+   *
+   * A diferencia de `findFilterOptions`, aquí van todos los activos y no sólo
+   * los que ya tienen recepciones: al corregir una guía justamente puede
+   * hacer falta asignarle una paquetería que nunca se había usado.
+   */
+  async findEditOptions() {
+    const [clients, suppliers, carriers] = await Promise.all([
+      this.db.client.findMany({
+        where: { deletedAt: null, active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      this.db.supplier.findMany({
+        where: { deletedAt: null, active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      this.db.carrier.findMany({
+        where: { deletedAt: null, active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return { clients, suppliers, carriers };
+  }
+
   async findFilterOptions() {
     const [clients, suppliers, carriers] = await Promise.all([
       this.db.client.findMany({

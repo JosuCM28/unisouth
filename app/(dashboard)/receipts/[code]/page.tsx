@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Printer } from "lucide-react";
-import { requirePermission } from "@/lib/core/session";
+import { ArrowLeft, Pencil, Printer } from "lucide-react";
+import { getCurrentUser, requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { ReceiptRepository } from "@/lib/repositories/receipt.repository";
 import { cn, formatDate, formatDateTime, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
 import { ReceiptLots } from "@/components/receipts/receipt-lots";
+import { ReceiptEditSheet } from "@/components/receipts/receipt-edit-sheet";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -31,13 +33,23 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
   await requirePermission("inventory:read");
 
   const { code } = await params;
-  const receipt = await new ReceiptRepository().findByCodeWithLots(
-    decodeURIComponent(code),
-  );
+  const repository = new ReceiptRepository();
+
+  const [receipt, user] = await Promise.all([
+    repository.findByCodeWithLots(decodeURIComponent(code)),
+    getCurrentUser(),
+  ]);
 
   if (!receipt) notFound();
 
   const plain = toPlainObject(receipt);
+
+  // Sin permiso de escritura no se ofrece corregir: el botón abriría un
+  // formulario que el servidor va a rechazar de todos modos.
+  const canEdit = user
+    ? roleHasPermission(user.role, "inventory:write")
+    : false;
+  const options = canEdit ? await repository.findEditOptions() : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -54,6 +66,33 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
         description={receipt.code}
         action={
           <div className="flex flex-wrap gap-2">
+            {options && (
+              <ReceiptEditSheet
+                receipt={{
+                  id: receipt.id,
+                  code: receipt.code,
+                  date: receipt.date.toISOString(),
+                  guideNumber: receipt.guideNumber,
+                  carrierId: receipt.carrierId,
+                  origin: receipt.origin,
+                  supplierId: receipt.supplierId,
+                  clientId: receipt.clientId,
+                  invoiceRef: receipt.invoiceRef,
+                  orderRef: receipt.orderRef,
+                  packageCount: receipt.packageCount,
+                  notes: receipt.notes,
+                }}
+                clients={options.clients}
+                suppliers={options.suppliers}
+                carriers={options.carriers}
+                trigger={
+                  <Button variant="outline" className="touch-target">
+                    <Pencil className="size-4" aria-hidden />
+                    Editar
+                  </Button>
+                }
+              />
+            )}
             <ExportButton
               href={`/api/export/receipts/${receipt.code}`}
               label="Excel"
