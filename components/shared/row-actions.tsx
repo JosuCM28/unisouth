@@ -27,6 +27,8 @@ interface RowActionsProps {
   label: string;
   /** El diálogo de edición, que aporta su propio DropdownMenuItem. */
   editItem: ReactNode;
+  /** Acciones propias del dominio, antes de "dar de baja". */
+  extraItems?: ReactNode;
   onRemove: () => Promise<ActionResult<unknown>>;
   removeTitle?: string;
   removeDescription: string;
@@ -42,6 +44,7 @@ interface RowActionsProps {
 export function RowActions({
   label,
   editItem,
+  extraItems,
   onRemove,
   removeTitle,
   removeDescription,
@@ -79,6 +82,7 @@ export function RowActions({
 
         <DropdownMenuContent align="end">
           {editItem}
+          {extraItems}
 
           <DropdownMenuItem
             variant="destructive"

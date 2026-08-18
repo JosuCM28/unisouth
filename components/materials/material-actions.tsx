@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import Link from "next/link";
+import { Boxes, Pencil, Printer } from "lucide-react";
 import type { Material } from "@prisma/client";
 import type { PlainObject } from "@/lib/utils";
 import { removeMaterialAction } from "@/app/actions/material.actions";
@@ -22,6 +23,25 @@ export function MaterialActions({ material }: { material: PlainObject<Material> 
             </DropdownMenuItem>
           }
         />
+      }
+      extraItems={
+        <>
+          {/* Ver la pila en pantalla: el inventario ya filtrado por esta clave. */}
+          <DropdownMenuItem asChild>
+            <Link href={`/lots?materialId=${material.id}`}>
+              <Boxes className="size-4" aria-hidden />
+              Ver sus rollos
+            </Link>
+          </DropdownMenuItem>
+
+          {/* Y la hoja para pegar en la estiba, con el desglose de la pila. */}
+          <DropdownMenuItem asChild>
+            <Link href={`/print/pile?materialId=${material.id}`} target="_blank">
+              <Printer className="size-4" aria-hidden />
+              Hoja de pila
+            </Link>
+          </DropdownMenuItem>
+        </>
       }
       removeDescription="El material dejará de aparecer en los catálogos. El historial de los rollos que lo usaron se conserva. Si todavía tiene existencia, no se podrá dar de baja."
       onRemove={() =>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Printer, QrCode } from "lucide-react";
+import { Layers, Printer, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,6 +38,20 @@ export function PrintLotsButton() {
     return query ? `/print/lots?${query}` : "/print/lots";
   }
 
+  /* La hoja de pila necesita UNA clave: agrupa un material y su desglose. Sin
+     material elegido no hay pila que describir, así que se ofrece deshabilitada
+     con la razón, en vez de esconderla y dejar al usuario buscándola. */
+  const materialId = searchParams.get("materialId");
+
+  function buildPileHref() {
+    const params = new URLSearchParams({ materialId: materialId ?? "" });
+    for (const key of ["locationId", "clientId"]) {
+      const value = searchParams.get(key);
+      if (value) params.set(key, value);
+    }
+    return `/print/pile?${params}`;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -64,6 +78,22 @@ export function PrintLotsButton() {
             Hoja por rollo
           </a>
         </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        {materialId ? (
+          <DropdownMenuItem asChild>
+            <a href={buildPileHref()} target="_blank" rel="noopener">
+              <Layers className="size-4" aria-hidden />
+              Hoja de pila
+            </a>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem disabled>
+            <Layers className="size-4" aria-hidden />
+            Hoja de pila · filtra por material
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

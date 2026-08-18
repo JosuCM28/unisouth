@@ -36,3 +36,31 @@ export async function generateLotQrs(
 
   return new Map(entries);
 }
+
+/**
+ * QR de una PILA: apunta al inventario ya filtrado por ese material.
+ *
+ * No lleva a un rollo concreto —una pila no es una pieza— sino a la lista de
+ * todo lo que hay de esa clave, con su existencia y sus ubicaciones. Es lo
+ * que se quiere ver con el teléfono parado frente a la estiba.
+ */
+export async function generatePileQr(params: {
+  materialId: string;
+  clientId?: string;
+  locationId?: string;
+}): Promise<string> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const query = new URLSearchParams({ materialId: params.materialId });
+
+  // Se conserva el mismo recorte con el que se imprimió: si la hoja es de la
+  // tela de un cliente, el QR no debe abrir la de todos.
+  if (params.clientId) query.set("clientId", params.clientId);
+  if (params.locationId) query.set("locationId", params.locationId);
+
+  return QRCode.toString(`${baseUrl}/lots?${query}`, {
+    type: "svg",
+    errorCorrectionLevel: "M",
+    margin: 1,
+    color: { dark: "#000000", light: "#ffffff" },
+  });
+}

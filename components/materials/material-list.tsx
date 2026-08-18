@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AlertTriangle, Package } from "lucide-react";
 import type { Material } from "@prisma/client";
 import {
@@ -47,9 +48,17 @@ export function MaterialList({
     {
       accessorKey: "code",
       header: "Código",
+      /* El código lleva al inventario filtrado por este material: ver la pila
+         es lo que más se hace desde el catálogo, y obligaba a ir a Inventario
+         y volver a elegir la clave en el filtro. */
       cell: ({ row }) => (
         <div className="tabular flex items-center gap-2 font-medium">
-          {row.original.code}
+          <Link
+            href={`/lots?materialId=${row.original.id}`}
+            className="hover:underline"
+          >
+            {row.original.code}
+          </Link>
           {!row.original.active && (
             <Badge variant="secondary" className="text-xs">
               Inactivo
@@ -156,7 +165,13 @@ export function MaterialList({
 
           return (
             <div className="flat-surface flex items-start gap-3 p-3">
-              <div className="min-w-0 flex-1">
+              {/* Toda la tarjeta lleva a la pila: en el piso se toca con el
+                  pulgar, y obligar a atinarle al menú de tres puntos para ver
+                  los rollos de una clave es un toque de más cada vez. */}
+              <Link
+                href={`/lots?materialId=${material.id}`}
+                className="min-w-0 flex-1"
+              >
                 <div className="flex items-center gap-2">
                   <span className="tabular text-sm font-medium">
                     {material.code}
@@ -181,7 +196,7 @@ export function MaterialList({
                   isLow={isLow}
                   reorderPoint={Number(material.reorderPoint)}
                 />
-              </div>
+              </Link>
 
               <MaterialActions material={material} />
             </div>
