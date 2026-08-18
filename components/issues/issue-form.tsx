@@ -304,9 +304,15 @@ export function IssueForm({
 
   async function handleSubmit() {
     const validLines = lines.filter((line) => Number(line.quantity) > 0);
+    const validCutLines = cutLines.filter(
+      (line) => line.sizeId && Number(line.quantity) > 0,
+    );
 
-    if (validLines.length === 0) {
-      toast.error("Agrega al menos un rollo con cantidad.");
+    /* Se acepta una salida SÓLO con desglose de cortes: a veces lo que se
+       manda al taller son prendas ya cortadas y no hay tela que descontar.
+       Lo que no tiene sentido es un vale vacío por completo. */
+    if (validLines.length === 0 && validCutLines.length === 0) {
+      toast.error("Agrega al menos un rollo o una talla al desglose.");
       return;
     }
 
@@ -341,8 +347,7 @@ export function IssueForm({
       })),
       // Sólo los renglones completos: uno a medio teclear no es un error del
       // usuario, es un renglón que todavía no termina de llenar.
-      cutLines: cutLines
-        .filter((line) => line.sizeId && Number(line.quantity) > 0)
+      cutLines: validCutLines
         .map((line) => ({
           sizeId: line.sizeId,
           quantity: Number(line.quantity),
@@ -569,7 +574,7 @@ export function IssueForm({
 
         <p className="text-center text-xs text-muted-foreground">
           Guardar no descuenta existencias. El stock se mueve al aplicar el
-          vale.
+          vale, y sólo por los rollos que lleve.
         </p>
       </div>
     </div>
@@ -588,8 +593,13 @@ function IssueLines({ lines, onChangeQuantity, onRemove }: LinesProps) {
     return (
       <div className="flat-surface p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Aún no hay renglones. Agrega un rollo o trae los insumos de un
-          cálculo.
+          Aún no hay rollos. Agrega uno o trae los insumos de un cálculo.
+        </p>
+        {/* Se dice explícitamente que son opcionales: si no, el auxiliar que
+            sólo quiere mandar el desglose de cortes cree que le falta algo. */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          Son opcionales: puedes generar la salida sólo con el desglose de
+          cortes.
         </p>
       </div>
     );

@@ -210,10 +210,24 @@ export class DocumentService extends BaseService {
         );
       }
 
+      /* Una SALIDA puede no tener rollos: cuando lleva sólo el desglose de
+         cortes no hay tela que descontar, y aplicarla sirve para marcarla como
+         entregada —con su fecha y quién la aplicó— en vez de dejarla en
+         borrador para siempre. Genera cero movimientos, que es lo correcto:
+         el kárdex sólo registra lo que de verdad se movió.
+
+         Los demás tipos existen para mover rollos, así que sin renglones no
+         significan nada y se siguen rechazando. */
       if (document.lines.length === 0) {
-        throw new BusinessRuleError(
-          "El documento no tiene renglones. Agrega al menos uno antes de aplicarlo.",
-        );
+        const cutCount = await tx.documentCutLine.count({
+          where: { documentId: id },
+        });
+
+        if (document.type !== "ISSUE" || cutCount === 0) {
+          throw new BusinessRuleError(
+            "El documento no tiene renglones. Agrega al menos uno antes de aplicarlo.",
+          );
+        }
       }
 
       const movementType = MOVEMENT_BY_DOCUMENT[document.type];

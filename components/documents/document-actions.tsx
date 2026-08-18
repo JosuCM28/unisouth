@@ -17,6 +17,8 @@ interface Props {
   documentCode: string;
   status: DocumentStatus;
   lineCount: number;
+  /** Renglones del desglose de corte. Una salida puede llevar sólo éstos. */
+  cutLineCount?: number;
   /** Sólo las salidas tienen pantalla de corrección. */
   isIssue?: boolean;
 }
@@ -32,9 +34,15 @@ export function DocumentActions({
   documentCode,
   status,
   lineCount,
+  cutLineCount = 0,
   isIssue,
 }: Props) {
   const router = useRouter();
+
+  /* Una salida sólo con desglose de cortes SÍ se puede aplicar: no mueve
+     inventario, pero la marca como entregada en vez de dejarla en borrador. */
+  const canApply = lineCount > 0 || (isIssue === true && cutLineCount > 0);
+
   const [isApplying, setIsApplying] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -100,7 +108,7 @@ export function DocumentActions({
         <Button
           type="button"
           onClick={handleApply}
-          disabled={isApplying || lineCount === 0}
+          disabled={isApplying || !canApply}
           className="touch-target"
         >
           <Check className="size-4" aria-hidden />

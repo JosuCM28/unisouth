@@ -214,7 +214,12 @@ export default async function PrintDocumentPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* ── Rollos que salieron y con cuántos metros cada uno ── */}
+      {/* ── Rollos que salieron y con cuántos metros cada uno ──
+          Se omite por completo si el vale sólo lleva desglose de cortes: una
+          tabla con encabezados y nada debajo hace dudar de si falta imprimir
+          algo. */}
+      {document.lines.length > 0 && (
+        <>
       <h2 className="mt-6 text-sm font-bold uppercase">Rollos entregados</h2>
       <table className="mt-1 w-full border-collapse text-sm">
         <thead>
@@ -257,6 +262,8 @@ export default async function PrintDocumentPage({ params }: PageProps) {
         )}{" "}
         en total
       </p>
+        </>
+      )}
 
       {document.notes && (
         <p className="mt-4 border border-neutral-400 p-2 text-sm">

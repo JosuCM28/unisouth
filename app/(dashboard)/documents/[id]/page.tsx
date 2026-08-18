@@ -94,6 +94,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         documentCode={document.code}
         status={document.status}
         lineCount={document.lines.length}
+        cutLineCount={document.cutLines.length}
         isIssue={document.type === "ISSUE"}
       />
 
@@ -187,6 +188,16 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         <h2 className="mb-3 text-sm font-semibold">
           Rollos ({document.lines.length})
         </h2>
+
+        {/* Sin rollos se explica por qué: un vale de sólo cortes es válido,
+            y una lista vacía sin más haría pensar que algo se perdió. */}
+        {document.lines.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Esta salida no lleva rollos: sólo el desglose de cortes. No mueve
+            existencias.
+          </p>
+        )}
+
         <ul className="divide-y divide-border">
           {document.lines.map((line) => (
             <li key={line.id} className="flex items-center justify-between gap-3 py-2">

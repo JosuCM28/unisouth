@@ -49,13 +49,33 @@ export const documentSchema = z.object({
   handedOverBy: optionalText,
   receivedBy: optionalText,
   notes: optionalText,
-  lines: z.array(documentLineSchema).min(1, "Agrega al menos un renglón"),
+  lines: z.array(documentLineSchema),
   /**
    * La tabla de corte es OPCIONAL: una salida de insumos —cierres, hilo— no
    * corta prendas y no tiene por qué llenarla. Sólo las salidas de tela hacia
    * el taller la traen.
    */
   cutLines: z.array(documentCutLineSchema).optional(),
+}).superRefine((input, ctx) => {
+  /* Una SALIDA puede llevar sólo el desglose de cortes: a veces lo que se
+     manda al taller son prendas ya cortadas y no hay tela que descontar. Los
+     demás tipos —recepciones, ajustes, traspasos— existen precisamente para
+     mover rollos, así que sin renglones no significan nada. */
+  if (input.lines.length > 0) return;
+
+  const isIssueWithCuts =
+    input.type === "ISSUE" && (input.cutLines?.length ?? 0) > 0;
+
+  if (isIssueWithCuts) return;
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["lines"],
+    message:
+      input.type === "ISSUE"
+        ? "Agrega al menos un rollo o un renglón de corte."
+        : "Agrega al menos un renglón.",
+  });
 });
 
 export type DocumentInput = z.infer<typeof documentSchema>;
