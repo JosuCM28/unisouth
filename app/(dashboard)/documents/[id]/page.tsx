@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { CutTag } from "@prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -8,7 +9,7 @@ import {
   DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES,
   DOCUMENT_TYPE_LABELS, UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
-import { cn, formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
+import { cn, contrastText, formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { DocumentActions } from "@/components/documents/document-actions";
 
@@ -43,7 +44,10 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       },
       cutLines: {
         orderBy: { order: "asc" },
-        include: { size: { select: { code: true, name: true } } },
+        include: {
+          size: { select: { code: true, name: true } },
+          cutTag: { select: { name: true, color: true } },
+        },
       },
     },
   });
@@ -130,15 +134,20 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                       {line.quantity * line.bundles}
                     </td>
                     <td className="p-2">
-                      {line.tag ? (
+                      {/* Del catálogo; el enum viejo queda de respaldo para
+                          los vales capturados antes de que existiera. */}
+                      {resolveTag(line.cutTag, line.tag) ? (
                         <span
                           className="inline-block px-2 py-0.5 text-xs"
                           style={{
-                            backgroundColor: CUT_TAG_COLORS[line.tag].background,
-                            color: CUT_TAG_COLORS[line.tag].text,
+                            backgroundColor: resolveTag(line.cutTag, line.tag)!
+                              .color,
+                            color: contrastText(
+                              resolveTag(line.cutTag, line.tag)!.color,
+                            ),
                           }}
                         >
-                          {CUT_TAG_LABELS[line.tag]}
+                          {resolveTag(line.cutTag, line.tag)!.name}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -197,4 +206,18 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </section>
     </div>
   );
+}
+
+/** El foleo de un renglón: primero el catálogo, luego el enum viejo. */
+function resolveTag(
+  option: { name: string; color: string } | null,
+  legacy: CutTag | null,
+): { name: string; color: string } | null {
+  if (option) return option;
+  if (!legacy) return null;
+
+  return {
+    name: CUT_TAG_LABELS[legacy],
+    color: CUT_TAG_COLORS[legacy].background,
+  };
 }

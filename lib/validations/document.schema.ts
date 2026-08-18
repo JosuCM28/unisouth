@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CutTag, DocumentType, Unit } from "@prisma/client";
+import { DocumentType, Unit } from "@prisma/client";
 import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText, localDate } from "./common";
 
 export const documentLineSchema = z.object({
@@ -31,7 +31,8 @@ export const documentCutLineSchema = z.object({
     .int("Los bultos se cuentan enteros")
     .positive("Debe ser al menos un bulto")
     .default(1),
-  tag: z.nativeEnum(CutTag).optional(),
+  /** Id del foleo del catálogo. Vacío = sin foleo. */
+  tagId: optionalCuid,
   notes: optionalText,
 });
 

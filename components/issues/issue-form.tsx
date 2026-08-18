@@ -26,6 +26,7 @@ import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
 import {
   IssueCutTable,
   type CutLineDraft,
+  type CutTagOption,
   type SizeOption,
 } from "./issue-cut-table";
 import {
@@ -58,6 +59,8 @@ interface Props {
   sizes: { id: string; code: string; name: string }[];
   /** Catálogo completo para la tabla de corte, con su grupo de escala. */
   cutSizes: SizeOption[];
+  /** Foleos disponibles, administrados en /cut-tags. */
+  cutTags: CutTagOption[];
   clients: ClientOption[];
   productionRuns: { id: string; code: string; name: string | null }[];
 }
@@ -88,6 +91,7 @@ export function IssueForm({
   products,
   sizes,
   cutSizes,
+  cutTags,
   clients,
   productionRuns,
 }: Props) {
@@ -302,7 +306,7 @@ export function IssueForm({
           sizeId: line.sizeId,
           quantity: Number(line.quantity),
           bundles: Number(line.bundles) || 1,
-          tag: line.tag || undefined,
+          tagId: line.tag || undefined,
           notes: line.notes || undefined,
         })),
     });
@@ -420,6 +424,7 @@ export function IssueForm({
         <FormSection title="Desglose de corte" description="Prendas por talla que se van a cortar con esta tela.">
           <IssueCutTable
             sizes={cutSizes}
+            tags={cutTags}
             lines={cutLines}
             onChange={setCutLines}
           />

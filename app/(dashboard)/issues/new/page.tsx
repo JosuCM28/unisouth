@@ -21,10 +21,16 @@ export default async function NewIssuePage() {
   // ruta escribiéndola. La barrera real es ésta.
   await requirePermission("inventory:write");
 
-  const [issuable, materials, products, sizes, clients, productionRuns] =
+  const [issuable, cutTags, materials, products, sizes, clients, productionRuns] =
     await Promise.all([
       // Qué hay REALMENTE surtible hoy, por dueño y material.
       new LotRepository().findIssuableOptions(),
+      // Los foleos vigentes; se administran en /cut-tags.
+      prisma.cutTagOption.findMany({
+        where: { deletedAt: null, active: true },
+        select: { id: true, name: true, color: true },
+        orderBy: [{ order: "asc" }, { name: "asc" }],
+      }),
       new MaterialRepository().findOptions(),
       prisma.finishedProduct.findMany({
         where: { active: true, deletedAt: null },
@@ -139,6 +145,7 @@ export default async function NewIssuePage() {
         products={productOptions}
         sizes={sizes}
         cutSizes={sizes}
+        cutTags={cutTags}
         clients={clientsWithStock}
         productionRuns={productionRuns}
       />

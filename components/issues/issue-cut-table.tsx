@@ -1,12 +1,17 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import type { CutTag } from "@prisma/client";
-import { CUT_TAG_COLORS, CUT_TAG_LABELS } from "@/lib/constants/labels";
 import { cn } from "@/lib/utils";
 import { SearchSelect } from "@/components/shared/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+/** Un foleo del catálogo, tal como lo ofrece la pantalla de salida. */
+export interface CutTagOption {
+  id: string;
+  name: string;
+  color: string;
+}
 
 export interface SizeOption {
   id: string;
@@ -23,20 +28,18 @@ export interface CutLineDraft {
   /** Texto, no número: el input vive a medio teclear. */
   quantity: string;
   bundles: string;
-  tag: CutTag | "";
+  /** Id del foleo elegido. Vacío = sin foleo. */
+  tag: string;
   notes: string;
 }
 
 interface Props {
   sizes: SizeOption[];
+  /** Se administran en /cut-tags; aquí sólo se ofrecen. */
+  tags: CutTagOption[];
   lines: CutLineDraft[];
   onChange: (lines: CutLineDraft[]) => void;
 }
-
-const TAG_OPTIONS = (Object.keys(CUT_TAG_LABELS) as CutTag[]).map((tag) => ({
-  value: tag,
-  label: CUT_TAG_LABELS[tag],
-}));
 
 /**
  * La tabla de corte: cuántas prendas de cada talla salen y en cuántos bultos.
@@ -49,7 +52,7 @@ const TAG_OPTIONS = (Object.keys(CUT_TAG_LABELS) as CutTag[]).map((tag) => ({
  * NO mueve inventario: eso lo hacen los rollos del vale. Aquí sólo se declara
  * qué se va a cortar con esa tela.
  */
-export function IssueCutTable({ sizes, lines, onChange }: Props) {
+export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
   function addLine() {
     onChange([
       ...lines,
@@ -156,6 +159,7 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
             </div>
 
             <TagPicker
+              tags={tags}
               value={line.tag}
               onChange={(tag) => updateLine(line.key, { tag })}
             />
@@ -230,6 +234,7 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
                     </td>
                     <td className="p-2">
                       <TagPicker
+                        tags={tags}
                         value={line.tag}
                         onChange={(tag) => updateLine(line.key, { tag })}
                       />
@@ -305,30 +310,33 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
  * clara, oscura y en la hoja impresa.
  */
 function TagPicker({
+  tags,
   value,
   onChange,
 }: {
-  value: CutTag | "";
-  onChange: (tag: CutTag | "") => void;
+  tags: CutTagOption[];
+  value: string;
+  onChange: (tag: string) => void;
 }) {
-  const colors = value ? CUT_TAG_COLORS[value] : null;
+  const selected = tags.find((tag) => tag.id === value);
 
   return (
     <div className="flex items-center gap-2">
       <div className="min-w-0 flex-1">
         <SearchSelect
-          options={TAG_OPTIONS}
+          options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
           value={value}
-          onChange={(next) => onChange(next as CutTag | "")}
+          onChange={onChange}
           placeholder="Foleo"
           searchPlaceholder="Buscar color…"
           clearLabel="Sin foleo"
+          emptyMessage="No hay foleos dados de alta."
         />
       </div>
-      {colors && (
+      {selected && (
         <span
           className="size-6 shrink-0 border border-border"
-          style={{ backgroundColor: colors.background }}
+          style={{ backgroundColor: selected.color }}
           aria-hidden
         />
       )}

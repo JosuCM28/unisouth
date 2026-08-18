@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import type { CutTag } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
@@ -9,7 +10,7 @@ import {
   DOCUMENT_TYPE_LABELS,
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
-import { formatDate, formatQuantity } from "@/lib/utils";
+import { contrastText, formatDate, formatQuantity } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
 
 interface PageProps {
@@ -37,7 +38,10 @@ export default async function PrintDocumentPage({ params }: PageProps) {
       productionRun: { select: { code: true, name: true } },
       cutLines: {
         orderBy: { order: "asc" },
-        include: { size: { select: { code: true, name: true } } },
+        include: {
+          size: { select: { code: true, name: true } },
+          cutTag: { select: { name: true, color: true } },
+        },
       },
       lines: {
         orderBy: { order: "asc" },
@@ -137,7 +141,9 @@ export default async function PrintDocumentPage({ params }: PageProps) {
             </thead>
             <tbody>
               {document.cutLines.map((line) => {
-                const colors = line.tag ? CUT_TAG_COLORS[line.tag] : null;
+                /* Se lee del catálogo; el enum viejo queda de respaldo para
+                   los vales capturados antes de que el catálogo existiera. */
+                const tag = resolveTag(line.cutTag, line.tag);
 
                 return (
                   <tr key={line.id}>
@@ -158,10 +164,10 @@ export default async function PrintDocumentPage({ params }: PageProps) {
                     <td
                       className="border border-black px-2 py-1 text-center"
                       style={
-                        colors
+                        tag
                           ? {
-                              backgroundColor: colors.background,
-                              color: colors.text,
+                              backgroundColor: tag.color,
+                              color: contrastText(tag.color),
                               // Sin esto el navegador descarta los fondos al
                               // imprimir y el foleo sale en blanco.
                               printColorAdjust: "exact",
@@ -170,7 +176,7 @@ export default async function PrintDocumentPage({ params }: PageProps) {
                           : undefined
                       }
                     >
-                      {line.tag ? CUT_TAG_LABELS[line.tag] : "—"}
+                      {tag?.name ?? "—"}
                     </td>
                     <td className="border border-black px-2 py-1">
                       {line.notes ?? ""}
@@ -295,4 +301,24 @@ function Signature({ label, name }: { label: string; name: string | null }) {
 /** Valores distintos y sin vacíos, conservando el orden en que aparecieron. */
 function unique(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+/**
+ * El foleo de un renglón: primero el catálogo, luego el enum viejo.
+ *
+ * Los vales capturados antes de que los foleos fueran administrables sólo
+ * tienen el enum. Se traducen aquí para que una hoja reimpresa años después
+ * siga saliendo del color correcto.
+ */
+function resolveTag(
+  option: { name: string; color: string } | null,
+  legacy: CutTag | null,
+): { name: string; color: string } | null {
+  if (option) return option;
+  if (!legacy) return null;
+
+  return {
+    name: CUT_TAG_LABELS[legacy],
+    color: CUT_TAG_COLORS[legacy].background,
+  };
 }

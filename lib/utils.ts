@@ -216,3 +216,30 @@ function timezoneOffset(isoUtc: string): string {
 
   return match?.[1] ?? "+00:00";
 }
+
+/**
+ * Texto legible sobre un fondo de color.
+ *
+ * Los foleos ahora los define el usuario, así que el color del texto no se
+ * puede tener escrito de antemano: se calcula por luminancia para que un
+ * amarillo lleve texto negro y un azul marino lo lleve blanco. La fórmula es
+ * la de luminancia relativa de WCAG.
+ */
+export function contrastText(background: string): string {
+  const hex = background.replace("#", "");
+  if (hex.length !== 6) return "#000000";
+
+  const channel = (start: number) => {
+    const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : Math.pow((value + 0.055) / 1.055, 2.4);
+  };
+
+  const luminance =
+    0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+
+  // El umbral 0.4 —y no 0.5— porque en papel impreso el blanco sobre un tono
+  // medio se lee peor que el negro.
+  return luminance > 0.4 ? "#000000" : "#ffffff";
+}

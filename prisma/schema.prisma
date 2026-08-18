@@ -795,17 +795,49 @@ model DocumentCutLine {
   bundles  Int  @default(1)
 
   /// The colour tag the shop floor uses to tell batches apart on the table.
-  tag   CutTag?
-  notes String?
+  ///
+  /// `tag` is the legacy enum column, kept only so the rows captured before
+  /// the catalogue existed keep rendering. New rows write `tagId`.
+  tag     CutTag?
+  tagId   String?
+  cutTag  CutTagOption? @relation(fields: [tagId], references: [id])
+  notes   String?
 
   createdAt DateTime @default(now())
 
   @@index([documentId])
   @@index([sizeId])
+  @@index([tagId])
   @@map("document_cut_lines")
 }
 
 /// Colour of the paper tag ("foleo") stapled to a bundle.
+///
+/// A TABLE and not an enum: the shop floor runs out of one colour and buys
+/// another, and adding it should not need a migration. The hex value lives
+/// here because it is the physical colour of the paper — the printed sheet
+/// has to match what is stapled to the bundle.
+model CutTagOption {
+  id    String @id @default(cuid())
+  /// Stable key. Uppercase, no spaces: BLUE, LIGHT_BLUE.
+  code  String @unique
+  name  String
+  /// Background as hex ("#1d4ed8"). The text colour is derived by contrast.
+  color String
+  order Int     @default(0)
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  cutLines DocumentCutLine[]
+
+  @@index([active, order])
+  @@map("cut_tag_options")
+}
+
+/// LEGACY. Superseded by CutTagOption; kept so existing rows still read.
 enum CutTag {
   BLUE
   GREEN
