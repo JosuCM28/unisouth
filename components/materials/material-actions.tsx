@@ -26,11 +26,11 @@ export function MaterialActions({ material }: { material: PlainObject<Material> 
       }
       extraItems={
         <>
-          {/* Ver la pila en pantalla: el inventario ya filtrado por esta clave. */}
+          {/* La ficha del material: especificaciones, tonos y su pila. */}
           <DropdownMenuItem asChild>
-            <Link href={`/lots?materialId=${material.id}`}>
+            <Link href={`/materials/${material.code}`}>
               <Boxes className="size-4" aria-hidden />
-              Ver sus rollos
+              Ver ficha
             </Link>
           </DropdownMenuItem>
 

@@ -48,13 +48,14 @@ export function MaterialList({
     {
       accessorKey: "code",
       header: "Código",
-      /* El código lleva al inventario filtrado por este material: ver la pila
-         es lo que más se hace desde el catálogo, y obligaba a ir a Inventario
-         y volver a elegir la clave en el filtro. */
+      /* El código lleva a la ficha del material: sus especificaciones, la pila
+         que hay en bodega y el desglose por tono. Es el mismo destino al que
+         apunta el QR de la hoja, así que la app se comporta igual se llegue
+         escaneando o tocando. */
       cell: ({ row }) => (
         <div className="tabular flex items-center gap-2 font-medium">
           <Link
-            href={`/lots?materialId=${row.original.id}`}
+            href={`/materials/${row.original.code}`}
             className="hover:underline"
           >
             {row.original.code}
@@ -166,11 +167,11 @@ export function MaterialList({
 
           return (
             <div className="flat-surface flex items-start gap-3 p-3">
-              {/* Toda la tarjeta lleva a la pila: en el piso se toca con el
+              {/* Toda la tarjeta lleva a la ficha: en el piso se toca con el
                   pulgar, y obligar a atinarle al menú de tres puntos para ver
-                  los rollos de una clave es un toque de más cada vez. */}
+                  el material es un toque de más cada vez. */}
               <Link
-                href={`/lots?materialId=${material.id}`}
+                href={`/materials/${material.code}`}
                 className="min-w-0 flex-1"
               >
                 <div className="flex items-center gap-2">

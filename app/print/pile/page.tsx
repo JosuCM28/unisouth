@@ -55,11 +55,10 @@ export default async function PrintPilePage({ searchParams }: PageProps) {
     );
   }
 
-  const qrSvg = await generatePileQr({
-    materialId: params.materialId,
-    clientId: params.clientId,
-    locationId: params.locationId,
-  });
+  /* El QR lleva al material, no al recorte con el que se imprimió: la hoja ya
+     dice de qué cliente y ubicación es, y la ficha responde la pregunta que se
+     hace frente a la estiba —qué tela es y cuánta queda. */
+  const qrSvg = await generatePileQr({ materialCode: data.material.code });
 
   return (
     <main className="mx-auto w-full max-w-3xl">
