@@ -1,13 +1,11 @@
 import { z } from "zod";
 import { LotStatus, MeasurementSource, Unit } from "@prisma/client";
-import {
-  cuidSchema,
+import { cuidSchema,
   optionalCuid,
   optionalNumber,
   optionalText,
   positiveQuantity,
-  requiredText,
-} from "./common";
+  requiredText, localDate } from "./common";
 
 /**
  * Alta de rollo: SÓLO material, cantidad y unidad son obligatorios.
@@ -48,7 +46,7 @@ export const createLotSchema = z.object({
 
   unitCost: optionalNumber,
   currency: z.string().default("MXN"),
-  receivedAt: z.coerce.date().optional(),
+  receivedAt: localDate.optional(),
   comment: optionalText,
 });
 
@@ -140,7 +138,7 @@ export const updateLotSchema = z.object({
   weightKg: optionalNumber,
 
   unitCost: optionalNumber,
-  expiresAt: z.coerce.date().optional(),
+  expiresAt: localDate.optional(),
   comment: optionalText,
 
   /**

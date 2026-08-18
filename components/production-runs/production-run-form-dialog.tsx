@@ -10,6 +10,7 @@ import {
   updateProductionRunAction,
 } from "@/app/actions/production-run.actions";
 import { PRODUCTION_RUN_STATUS_LABELS } from "@/lib/constants/labels";
+import { toDateInputValue } from "@/lib/utils";
 import {
   productionRunFormSchema,
   type ProductionRunFormValues,
@@ -184,8 +185,8 @@ function toDefaults(run?: ProductionRun): ProductionRunFormValues {
     name: run?.name ?? "",
     clientId: run?.clientId ?? "",
     season: run?.season ?? "",
-    startDate: run?.startDate ? run.startDate.toISOString().slice(0, 10) : "",
-    endDate: run?.endDate ? run.endDate.toISOString().slice(0, 10) : "",
+    startDate: toDateInputValue(run?.startDate),
+    endDate: toDateInputValue(run?.endDate),
     status: run?.status ?? "ACTIVE",
     notes: run?.notes ?? "",
   };

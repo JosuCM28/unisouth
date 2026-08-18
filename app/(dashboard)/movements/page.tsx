@@ -4,7 +4,7 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { MovementDirection, MovementType } from "@prisma/client";
 import { MovementRepository } from "@/lib/repositories/movement.repository";
 import { requirePermission } from "@/lib/core/session";
-import { toPlainObject } from "@/lib/utils";
+import { fromDateInputValue, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { MovementFilters } from "@/components/movements/movement-filters";
 import { MovementList } from "@/components/movements/movement-list";
@@ -62,9 +62,11 @@ async function ListSection({
     direction: params.direction as MovementDirection | undefined,
     type: params.type as MovementType | undefined,
     materialId: params.materialId,
-    from: params.from ? new Date(params.from) : undefined,
-    // Hasta el final del día: si no, "hasta el 16" excluiría todo el día 16.
-    to: params.to ? new Date(`${params.to}T23:59:59`) : undefined,
+    /* Anclados a la zona de la fábrica: `new Date("2026-08-17")` es medianoche
+       UTC, que aquí son las 6 de la tarde del 16, así que el rango se corría
+       un día. Y "hasta el 16" incluye todo el 16, hasta las 23:59. */
+    from: params.from ? fromDateInputValue(params.from) : undefined,
+    to: params.to ? fromDateInputValue(params.to, "end") : undefined,
   };
 
   const page = Math.max(1, Number(params.page ?? 1) || 1);

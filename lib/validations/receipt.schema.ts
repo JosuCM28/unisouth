@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { MeasurementSource, Unit } from "@prisma/client";
-import { cuidSchema, optionalCuid, optionalNumber, optionalText, positiveQuantity } from "./common";
+import { cuidSchema, optionalCuid, optionalNumber, optionalText, positiveQuantity, localDate } from "./common";
 
 /** Paso 1 del wizard: de dónde viene la carga. Sólo la fecha es obligatoria. */
 export const receiptHeaderSchema = z.object({
-  date: z.coerce.date(),
+  date: localDate,
   guideNumber: optionalText,
   carrierId: optionalCuid,
   origin: optionalText,

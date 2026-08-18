@@ -21,7 +21,7 @@ import type { Unit } from "@prisma/client";
 import { createReceiptAction } from "@/app/actions/receipt.actions";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
-import { cn } from "@/lib/utils";
+import { cn, todayInputValue } from "@/lib/utils";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +85,7 @@ export function ReceiptWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [header, setHeader] = useState<HeaderState>({
-    date: new Date().toISOString().slice(0, 10),
+    date: todayInputValue(),
     guideNumber: "",
     carrierId: "",
     origin: "",

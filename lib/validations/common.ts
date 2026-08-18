@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fromDateInputValue } from "@/lib/utils";
 
 /**
  * Piezas reutilizables de validación.
@@ -92,3 +93,23 @@ export const removeSchema = z.object({
 });
 
 export type RemoveInput = z.infer<typeof removeSchema>;
+
+/**
+ * Fecha de un `<input type="date">`, anclada a la zona de la fábrica.
+ *
+ * `z.coerce.date()` interpreta "2026-08-17" como medianoche UTC, que en
+ * Veracruz son las 6 de la tarde del día 16: una recepción capturada hoy
+ * quedaba guardada con la fecha de ayer. Aquí el día elegido se ancla al
+ * inicio de ESE día en la fábrica.
+ *
+ * Un `Date` que ya viene armado (de otro punto del servidor) pasa tal cual:
+ * sólo se corrige lo que llega como texto del formulario.
+ */
+export const localDate = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+
+  // Sólo el formato del input; un ISO completo ya trae su propio desfase.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return fromDateInputValue(value);
+
+  return value;
+}, z.coerce.date());

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Unit } from "@prisma/client";
-import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText } from "./common";
+import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText, localDate } from "./common";
 
 export const purchaseRequestLineSchema = z.object({
   materialId: cuidSchema,
@@ -12,7 +12,7 @@ export const purchaseRequestLineSchema = z.object({
 export const purchaseRequestSchema = z.object({
   clientId: optionalCuid,
   calculationId: optionalCuid,
-  neededByDate: z.coerce.date().optional(),
+  neededByDate: localDate.optional(),
   justification: optionalText,
   notes: optionalText,
   lines: z.array(purchaseRequestLineSchema).min(1, "Agrega al menos un material"),

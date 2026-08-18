@@ -57,6 +57,19 @@ export type PlainObject<T> = T extends { toNumber: () => number }
 const LOCALE = "es-MX";
 
 /**
+ * La zona horaria de la fábrica. Veracruz, México (UTC-6, sin horario de verano).
+ *
+ * Se fija explícitamente en vez de dejar que cada entorno ponga la suya: el
+ * servidor de producción corre en UTC, así que sin esto un rollo capturado a
+ * las 7 de la noche salía fechado al día siguiente. Las fechas se GUARDAN en
+ * UTC —que es lo correcto— y sólo se traducen a hora local al mostrarlas.
+ *
+ * Se puede sobrescribir con APP_TIMEZONE si la fábrica se mueve de huso.
+ */
+export const APP_TIMEZONE =
+  process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "America/Mexico_City";
+
+/**
  * Cantidades de inventario. Por omisión hasta 2 decimales, pero sin forzar
  * ceros: "12 m" se lee mejor que "12.00 m" en la pantalla del celular.
  * El metraje de tela sí suele traer decimales; las piezas no.
@@ -98,6 +111,7 @@ export function formatDate(value: Date | string | null | undefined): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   }).format(date);
 }
 
@@ -111,6 +125,7 @@ export function formatDateTime(value: Date | string | null | undefined): string 
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   }).format(date);
 }
 
@@ -130,4 +145,74 @@ function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * De una fecha guardada al valor de un `<input type="date">` (YYYY-MM-DD).
+ *
+ * NO se usa `toISOString().slice(0, 10)`: eso convierte a UTC, y un rollo
+ * capturado a las 7 de la noche en Veracruz aparecía fechado al día
+ * siguiente. Aquí se pregunta qué día era en la fábrica, que es lo que el
+ * usuario espera ver en el campo.
+ */
+export function toDateInputValue(
+  value: Date | string | null | undefined,
+): string {
+  const date = toDate(value);
+  if (!date) return "";
+
+  // `en-CA` da exactamente YYYY-MM-DD, que es el formato que exige el input.
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: APP_TIMEZONE,
+  }).format(date);
+}
+
+/** El día de hoy en la fábrica, listo para un `<input type="date">`. */
+export function todayInputValue(): string {
+  return toDateInputValue(new Date());
+}
+
+/**
+ * De un "YYYY-MM-DD" de un input al instante correcto.
+ *
+ * `new Date("2026-08-17")` es medianoche UTC, que en Veracruz son las 6 de la
+ * tarde del día 16: el registro quedaba fechado un día antes. Esto ancla la
+ * fecha al inicio (o al final) del día EN LA FÁBRICA.
+ */
+export function fromDateInputValue(
+  value: string,
+  edge: "start" | "end" = "start",
+): Date | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+
+  const time = edge === "start" ? "00:00:00.000" : "23:59:59.999";
+  // El desfase de la zona en esa fecha concreta, por si algún día aplica
+  // horario de verano: se calcula contra el propio día, no contra hoy.
+  const offset = timezoneOffset(`${value}T${time}Z`);
+
+  return new Date(`${value}T${time}${offset}`);
+}
+
+/**
+ * Desfase de APP_TIMEZONE en un instante dado, como "-06:00".
+ *
+ * Se deriva del propio `Intl` en vez de escribirlo a mano para que siga
+ * siendo correcto si la zona cambia de reglas.
+ */
+function timezoneOffset(isoUtc: string): string {
+  const date = new Date(isoUtc);
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIMEZONE,
+    timeZoneName: "longOffset",
+  }).formatToParts(date);
+
+  const name = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
+  // Llega como "GMT-06:00"; el input necesita sólo "-06:00".
+  const match = name.match(/GMT([+-]\d{2}:\d{2})/);
+
+  return match?.[1] ?? "+00:00";
 }

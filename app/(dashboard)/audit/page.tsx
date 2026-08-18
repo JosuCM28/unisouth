@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { AuditAction, Sensitivity } from "@prisma/client";
 import { AuditRepository } from "@/lib/repositories/audit.repository";
 import { requirePermission } from "@/lib/core/session";
-import { toPlainObject } from "@/lib/utils";
+import { fromDateInputValue, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { AuditFilters } from "@/components/audit/audit-filters";
 import { AuditList } from "@/components/audit/audit-list";
@@ -67,9 +67,11 @@ async function ListSection({
     entity: params.entity,
     action: params.action as AuditAction | undefined,
     sensitivity: params.sensitivity as Sensitivity | undefined,
-    from: params.from ? new Date(params.from) : undefined,
-    // Hasta el final del día: si no, "hasta el 16" excluiría todo el día 16.
-    to: params.to ? new Date(`${params.to}T23:59:59`) : undefined,
+    /* Anclados a la zona de la fábrica: `new Date("2026-08-17")` es medianoche
+       UTC, que aquí son las 6 de la tarde del 16, así que el rango se corría
+       un día. Y "hasta el 16" incluye todo el 16, hasta las 23:59. */
+    from: params.from ? fromDateInputValue(params.from) : undefined,
+    to: params.to ? fromDateInputValue(params.to, "end") : undefined,
     page,
     pageSize: PAGE_SIZE,
     // "Cargar más" del celular: trae desde la primera fila hasta ésta.

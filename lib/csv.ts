@@ -6,6 +6,8 @@
  * parchar. Excel abre un CSV con doble clic.
  */
 
+import { todayInputValue } from "@/lib/utils";
+
 export interface CsvColumn<T> {
   header: string;
   value: (row: T) => string | number | null | undefined;
@@ -39,7 +41,9 @@ export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
 
 /** Respuesta de descarga con el nombre y la fecha del día. */
 export function csvResponse(csv: string, filename: string): Response {
-  const stamp = new Date().toISOString().slice(0, 10);
+  // El día EN LA FÁBRICA: con toISOString, un archivo bajado a las 7 de la
+  // noche salía con la fecha de mañana en el nombre.
+  const stamp = todayInputValue();
 
   return new Response(csv, {
     headers: {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CutTag, DocumentType, Unit } from "@prisma/client";
-import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText } from "./common";
+import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText, localDate } from "./common";
 
 export const documentLineSchema = z.object({
   lotId: cuidSchema,
@@ -39,7 +39,7 @@ export type DocumentCutLineInput = z.infer<typeof documentCutLineSchema>;
 
 export const documentSchema = z.object({
   type: z.nativeEnum(DocumentType, { message: "Elige el tipo de documento" }),
-  date: z.coerce.date().optional(),
+  date: localDate.optional(),
   clientId: optionalCuid,
   productionRunId: optionalCuid,
   concept: optionalText,

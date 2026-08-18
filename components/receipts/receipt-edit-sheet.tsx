@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { toDateInputValue } from "@/lib/utils";
 import { updateReceiptAction } from "@/app/actions/receipt.actions";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
@@ -329,8 +330,9 @@ function OptionSelect({
 /** Del registro guardado a lo que esperan los inputs: todo texto. */
 function toFormValues(receipt: EditableReceipt): EditFormValues {
   return {
-    // El <input type="date"> sólo entiende YYYY-MM-DD.
-    date: receipt.date.slice(0, 10),
+    // La fecha se traduce a la zona de la fábrica: cortar el ISO daría el día
+    // siguiente para todo lo capturado después de las 6 de la tarde.
+    date: toDateInputValue(receipt.date),
     guideNumber: receipt.guideNumber ?? "",
     carrierId: receipt.carrierId ?? "",
     origin: receipt.origin ?? "",

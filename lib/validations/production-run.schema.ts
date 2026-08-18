@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ProductionRunStatus } from "@prisma/client";
-import { cuidSchema, optionalText, requiredText } from "./common";
+import { cuidSchema, optionalText, requiredText, localDate } from "./common";
 
 /**
  * Producción (ProductionRun): la corrida a la que se surte material.
@@ -19,8 +19,8 @@ export const productionRunSchema = z.object({
   clientId: cuidSchema,
 
   season: optionalText,
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
+  startDate: localDate.optional(),
+  endDate: localDate.optional(),
   status: z.nativeEnum(ProductionRunStatus).default(ProductionRunStatus.ACTIVE),
   notes: optionalText,
 });
