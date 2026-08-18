@@ -91,12 +91,20 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
       }));
   }
 
+  /* La cantidad es POR BULTO: 64 en 2 bultos son 128 prendas. Sumar la
+     cantidad sin multiplicar dejaría el total en la mitad de lo que sale. */
   const totals = lines.reduce(
-    (acc, line) => ({
-      pieces: acc.pieces + (Number(line.quantity) || 0),
-      bundles: acc.bundles + (Number(line.bundles) || 0),
-    }),
-    { pieces: 0, bundles: 0 },
+    (acc, line) => {
+      const quantity = Number(line.quantity) || 0;
+      const bundles = Number(line.bundles) || 0;
+
+      return {
+        perBundle: acc.perBundle + quantity,
+        bundles: acc.bundles + bundles,
+        pieces: acc.pieces + quantity * bundles,
+      };
+    },
+    { perBundle: 0, bundles: 0, pieces: 0 },
   );
 
   return (
@@ -136,7 +144,7 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
 
             <div className="grid grid-cols-2 gap-2">
               <NumberInput
-                label="Cantidad"
+                label="Cantidad a cortar"
                 value={line.quantity}
                 onChange={(value) => updateLine(line.key, { quantity: value })}
               />
@@ -172,8 +180,9 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
               <thead>
                 <tr className="border-b border-border text-left">
                   <Th>Talla</Th>
-                  <Th className="w-28">Cantidad</Th>
+                  <Th className="w-32">Cantidad a cortar</Th>
                   <Th className="w-24">Bultos</Th>
+                  <Th className="w-24">Total</Th>
                   <Th className="w-40">Foleo</Th>
                   <Th>Anotaciones</Th>
                   <Th className="w-12" />
@@ -213,6 +222,12 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
                         className="tabular touch-target text-right"
                       />
                     </td>
+                    {/* Calculado, no capturable: es cantidad × bultos y
+                        dejarlo editar permitiría que no cuadre con la hoja. */}
+                    <td className="tabular p-2 text-right font-medium">
+                      {(Number(line.quantity) || 0) *
+                        (Number(line.bundles) || 0)}
+                    </td>
                     <td className="p-2">
                       <TagPicker
                         value={line.tag}
@@ -247,8 +262,12 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
               <tfoot>
                 <tr className="font-medium">
                   <td className="p-2">Total</td>
-                  <td className="tabular p-2 text-right">{totals.pieces}</td>
+                  <td className="tabular p-2 text-right">{totals.perBundle}</td>
                   <td className="tabular p-2 text-right">{totals.bundles}</td>
+                  {/* El total de cortes que se entregan. */}
+                  <td className="tabular p-2 text-right text-base font-bold">
+                    {totals.pieces}
+                  </td>
                   <td colSpan={3} />
                 </tr>
               </tfoot>
@@ -270,7 +289,7 @@ export function IssueCutTable({ sizes, lines, onChange }: Props) {
 
         {lines.length > 0 && (
           <p className="tabular text-sm text-muted-foreground md:hidden">
-            {totals.pieces} prendas · {totals.bundles} bultos
+            {totals.pieces} cortes · {totals.bundles} bultos
           </p>
         )}
       </div>

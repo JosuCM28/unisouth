@@ -103,10 +103,13 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                     Talla
                   </th>
                   <th className="p-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Cantidad
+                    Cantidad a cortar
                   </th>
                   <th className="p-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Bultos
+                  </th>
+                  <th className="p-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Total
                   </th>
                   <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Foleo
@@ -122,6 +125,10 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                     <td className="tabular p-2 font-medium">{line.size.code}</td>
                     <td className="tabular p-2 text-right">{line.quantity}</td>
                     <td className="tabular p-2 text-right">{line.bundles}</td>
+                    {/* Cantidad por bulto × bultos: lo que de verdad sale. */}
+                    <td className="tabular p-2 text-right font-medium">
+                      {line.quantity * line.bundles}
+                    </td>
                     <td className="p-2">
                       {line.tag ? (
                         <span
@@ -151,6 +158,12 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                   </td>
                   <td className="tabular p-2 text-right">
                     {document.cutLines.reduce((sum, l) => sum + l.bundles, 0)}
+                  </td>
+                  <td className="tabular p-2 text-right text-base font-bold">
+                    {document.cutLines.reduce(
+                      (sum, l) => sum + l.quantity * l.bundles,
+                      0,
+                    )}
                   </td>
                   <td colSpan={2} />
                 </tr>

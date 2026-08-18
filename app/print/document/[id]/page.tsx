@@ -67,12 +67,17 @@ export default async function PrintDocumentPage({ params }: PageProps) {
     document.lines.map((line) => line.lot.material.name),
   ).join(", ");
 
+  /* El total de un renglón es cantidad a cortar POR bultos: si de la talla 38
+     van 64 cortes en cada uno de 2 bultos, salen 128 prendas. La "cantidad"
+     es por bulto, no del renglón completo; sumarla sin multiplicar entregaba
+     la mitad de lo que de verdad sale por la puerta. */
   const cutTotals = document.cutLines.reduce(
     (acc, line) => ({
-      pieces: acc.pieces + line.quantity,
+      perBundle: acc.perBundle + line.quantity,
       bundles: acc.bundles + line.bundles,
+      pieces: acc.pieces + line.quantity * line.bundles,
     }),
-    { pieces: 0, bundles: 0 },
+    { perBundle: 0, bundles: 0, pieces: 0 },
   );
 
   return (
@@ -118,10 +123,13 @@ export default async function PrintDocumentPage({ params }: PageProps) {
               <tr className="bg-neutral-200 text-left">
                 <th className="border border-black px-2 py-1">Talla</th>
                 <th className="border border-black px-2 py-1 text-right">
-                  Cantidad
+                  Cantidad a cortar
                 </th>
                 <th className="border border-black px-2 py-1 text-right">
                   Bultos
+                </th>
+                <th className="border border-black px-2 py-1 text-right">
+                  Total
                 </th>
                 <th className="border border-black px-2 py-1">Foleo</th>
                 <th className="border border-black px-2 py-1">Anotaciones</th>
@@ -141,6 +149,9 @@ export default async function PrintDocumentPage({ params }: PageProps) {
                     </td>
                     <td className="tabular border border-black px-2 py-1 text-right">
                       {line.bundles}
+                    </td>
+                    <td className="tabular border border-black px-2 py-1 text-right font-bold">
+                      {line.quantity * line.bundles}
                     </td>
                     {/* La celda se pinta del color del papelito: así la hoja
                         impresa se puede cotejar de un vistazo con el bulto. */}
@@ -172,15 +183,26 @@ export default async function PrintDocumentPage({ params }: PageProps) {
               <tr className="font-bold">
                 <td className="border border-black px-2 py-1">TOTAL</td>
                 <td className="tabular border border-black px-2 py-1 text-right">
-                  {cutTotals.pieces}
+                  {cutTotals.perBundle}
                 </td>
                 <td className="tabular border border-black px-2 py-1 text-right">
                   {cutTotals.bundles}
+                </td>
+                {/* El número que importa: cuántos cortes salen en total. */}
+                <td className="tabular border border-black px-2 py-1 text-right text-base">
+                  {cutTotals.pieces}
                 </td>
                 <td className="border border-black" colSpan={2} />
               </tr>
             </tfoot>
           </table>
+
+          {/* El dato que se coteja al recibir: cuántos cortes entregó el
+              almacén en total. Va fuera de la tabla y grande porque es lo que
+              se verifica contra los bultos físicos antes de firmar. */}
+          <p className="tabular mt-2 text-right text-lg font-bold">
+            Total de cortes entregados: {cutTotals.pieces}
+          </p>
         </section>
       )}
 
