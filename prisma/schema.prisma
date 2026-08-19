@@ -10,7 +10,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   /// The container runs Alpine (musl). Without listing that target here the
   /// engine compiled on the build machine does not load and the app dies at
   /// boot with "Query engine binary could not be found".
@@ -72,11 +72,11 @@ model User {
   productionOrdersCreated   ProductionOrder[]   @relation("ProductionOrderCreatedBy")
   purchaseRequestsRequested PurchaseRequest[]   @relation("PurchaseRequestRequestedBy")
   purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
+  cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
+  cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
 
   @@index([active, role])
   @@map("user")
-  cuttingOrders    CuttingOrder[]    @relation("CuttingOrderCreatedBy")
-  cuttingProgress  CuttingProgress[] @relation("CuttingProgressBy")
 }
 
 model Session {
@@ -302,10 +302,11 @@ model Client {
   finishedProducts FinishedProduct[]
   calculations     Calculation[]
   productionOrders ProductionOrder[]
+  documents        InventoryDocument[]
+  cuttingOrders    CuttingOrder[]
 
   @@index([active])
   @@map("clients")
-  cuttingOrders CuttingOrder[]
 }
 
 model ProductionRun {
@@ -328,10 +329,10 @@ model ProductionRun {
   calculations     Calculation[]
   productionOrders ProductionOrder[]
   documents        InventoryDocument[]
+  cuttingOrders    CuttingOrder[]
 
   @@index([clientId, status])
   @@map("production_runs")
-  cuttingOrders CuttingOrder[]
 }
 
 enum ProductionRunStatus {
@@ -434,12 +435,14 @@ model Material {
   substituteOf         MaterialSubstitute[]     @relation("MainMaterial")
   substitutes          MaterialSubstitute[]     @relation("SubstituteMaterial")
   tags                 MaterialTag[]
+  /// Issues that name this material as the fabric of their cutting breakdown.
+  cutDocuments         InventoryDocument[]      @relation("DocumentCutFabric")
+  cuttingOrders        CuttingOrder[]
 
   @@index([type, active])
   @@index([name])
   @@index([colorName])
   @@map("materials")
-  cuttingOrders CuttingOrder[]
 }
 
 enum MaterialType {
@@ -697,6 +700,13 @@ model InventoryDocument {
   status DocumentStatus @default(DRAFT)
 
   clientId          String?
+  /// The owner of the material, as a REAL relation.
+  ///
+  /// It used to be a loose column, so the printable sheet had to guess the
+  /// company from the rolls it carried. An issue that only carries a cutting
+  /// breakdown has no rolls, and the company came out blank on the very sheet
+  /// the workshop signs.
+  client            Client?          @relation(fields: [clientId], references: [id])
   productionRunId   String?
   productionRun     ProductionRun?   @relation(fields: [productionRunId], references: [id])
   productionOrderId String?
@@ -706,6 +716,30 @@ model InventoryDocument {
   reference    String?
   handedOverBy String?
   receivedBy   String?
+
+  // ── Header of the CUTTING BREAKDOWN ──────────────────────────────────────
+  // Its own fields, not derived from the rolls: an issue can carry only the
+  // breakdown —already-cut garments leave, no fabric is deducted— and back
+  // then the sheet had nothing to print in these boxes. Date and order number
+  // are NOT repeated here: the document's own `date` and `reference` already
+  // cover the whole breakdown, and capturing them twice invites them to
+  // disagree.
+
+  /// What is being cut: "Blusa manga larga".
+  cutDescription  String?
+  /// The fabric off the catalogue, when it is registered.
+  cutFabricId     String?
+  cutFabric       Material?   @relation("DocumentCutFabric", fields: [cutFabricId], references: [id])
+  /// The fabric typed by hand, for cloth that never got a material record.
+  /// Both can coexist; the sheet prints the catalogue one first.
+  cutFabricText   String?
+  cutPattern      String?
+  cutVersion      CutVersion?
+  cutVersionNotes String?
+  /// Free notes as a NUMBERED LIST ("va sin serigrafiar", "va pegado").
+  /// An array and not one text blob because they are printed numbered and the
+  /// workshop ticks them off one by one.
+  cutNotes        String[]    @default([])
 
   notes  String?
   extras Json?
@@ -749,6 +783,20 @@ enum DocumentStatus {
   DRAFT
   APPLIED
   CANCELLED
+}
+
+/// Which version of the pattern this cut follows.
+///
+/// An issue normally carries a SINGLE version; the enum exists so the sheet
+/// prints the same wording every time instead of "v2", "V.2" and "version 2"
+/// depending on who typed it.
+enum CutVersion {
+  UNIQUE
+  V1
+  V2
+  V3
+  V4
+  V5
 }
 
 model DocumentLine {
@@ -797,16 +845,16 @@ model DocumentCutLine {
   quantity Int
   /// Physical bundles they are tied into. Sometimes 20 garments travel as one
   /// bundle, sometimes as three.
-  bundles  Int  @default(1)
+  bundles  Int @default(1)
 
   /// The colour tag the shop floor uses to tell batches apart on the table.
   ///
   /// `tag` is the legacy enum column, kept only so the rows captured before
   /// the catalogue existed keep rendering. New rows write `tagId`.
-  tag     CutTag?
-  tagId   String?
-  cutTag  CutTagOption? @relation(fields: [tagId], references: [id])
-  notes   String?
+  tag    CutTag?
+  tagId  String?
+  cutTag CutTagOption? @relation(fields: [tagId], references: [id])
+  notes  String?
 
   createdAt DateTime @default(now())
 
@@ -829,18 +877,18 @@ model CutTagOption {
   name  String
   /// Background as hex ("#1d4ed8"). The text colour is derived by contrast.
   color String
-  order Int     @default(0)
+  order Int    @default(0)
 
   active    Boolean   @default(true)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  cutLines DocumentCutLine[]
+  cutLines          DocumentCutLine[]
+  cuttingOrderLines CuttingOrderLine[]
 
   @@index([active, order])
   @@map("cut_tag_options")
-  cuttingOrderLines CuttingOrderLine[]
 }
 
 /// LEGACY. Superseded by CutTagOption; kept so existing rows still read.
@@ -1109,10 +1157,10 @@ model Size {
   calculationLines     CalculationLine[]
   productionOrderLines ProductionOrderLine[]
   documentCutLines     DocumentCutLine[]
+  cuttingOrderLines    CuttingOrderLine[]
 
   @@index([group, order])
   @@map("sizes")
-  cuttingOrderLines CuttingOrderLine[]
 }
 
 model Variant {
@@ -1488,7 +1536,7 @@ model CuttingOrderLine {
   orderedQuantity Int
   /// Sum of its progress entries. Denormalised so the list does not need to
   /// aggregate the log on every read; only CuttingOrderService writes it.
-  cutQuantity     Int  @default(0)
+  cutQuantity     Int @default(0)
 
   tagId  String?
   cutTag CutTagOption? @relation(fields: [tagId], references: [id])

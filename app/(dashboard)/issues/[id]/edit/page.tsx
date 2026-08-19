@@ -61,6 +61,15 @@ export default async function EditIssuePage({ params }: PageProps) {
     reference: document.reference,
     receivedBy: document.receivedBy,
     notes: document.notes,
+    cutHeader: {
+      cutDescription: document.cutDescription ?? "",
+      cutFabricId: document.cutFabricId ?? "",
+      cutFabricText: document.cutFabricText ?? "",
+      cutPattern: document.cutPattern ?? "",
+      cutVersion: document.cutVersion ?? "",
+      cutVersionNotes: document.cutVersionNotes ?? "",
+      cutNotes: document.cutNotes,
+    },
     lines: document.lines.map((line) => ({
       lotId: line.lotId,
       lotCode: line.lot.code,

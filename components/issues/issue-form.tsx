@@ -33,6 +33,11 @@ import {
   type SizeOption,
 } from "./issue-cut-table";
 import {
+  IssueCutHeader,
+  EMPTY_CUT_HEADER,
+  type CutHeaderDraft,
+} from "./issue-cut-header";
+import {
   IssueFromCalculation,
   type IssueProductOption,
 } from "./issue-from-calculation";
@@ -62,6 +67,7 @@ export interface EditableIssue {
   reference: string | null;
   receivedBy: string | null;
   notes: string | null;
+  cutHeader: CutHeaderDraft;
   lines: {
     lotId: string;
     lotCode: string;
@@ -151,6 +157,9 @@ export function IssueForm({
   const [lines, setLines] = useState<IssueLine[]>(document?.lines ?? []);
   const [cutLines, setCutLines] = useState<CutLineDraft[]>(
     document?.cutLines ?? [],
+  );
+  const [cutHeader, setCutHeader] = useState<CutHeaderDraft>(
+    document?.cutHeader ?? EMPTY_CUT_HEADER,
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMaterialId, setPickerMaterialId] = useState("");
@@ -340,6 +349,16 @@ export function IssueForm({
       reference: reference || undefined,
       receivedBy: receivedBy || undefined,
       notes: notes || undefined,
+      // El encabezado del desglose: qué prenda, con qué tela y en qué versión.
+      // Va siempre, aunque el vale no lleve tallas: no estorba y evita tener
+      // que decidir aquí si "cuenta" como desglose.
+      cutDescription: cutHeader.cutDescription || undefined,
+      cutFabricId: cutHeader.cutFabricId || undefined,
+      cutFabricText: cutHeader.cutFabricText || undefined,
+      cutPattern: cutHeader.cutPattern || undefined,
+      cutVersion: cutHeader.cutVersion || undefined,
+      cutVersionNotes: cutHeader.cutVersionNotes || undefined,
+      cutNotes: cutHeader.cutNotes,
       lines: validLines.map((line) => ({
         lotId: line.lotId,
         quantity: Number(line.quantity),
@@ -390,27 +409,39 @@ export function IssueForm({
     lines.length > 0 ||
     cutLines.some((line) => line.sizeId && Number(line.quantity) > 0);
 
-  /* Con dueño elegido sólo se ofrecen SUS materiales. Antes se listaban los
-     seis del catálogo y cuatro de ellos devolvían lista vacía: el auxiliar
-     tenía que probar uno por uno para descubrir cuál tenía tela suya. */
-  const visibleMaterials = clientId
-    ? materials.filter((material) => material.clientIds.includes(clientId))
-    : materials;
+  /* Para el SELECTOR DE ROLLOS sólo se ofrecen materiales con existencia, y
+     con dueño elegido sólo los suyos. Antes se listaba el catálogo entero y la
+     mitad devolvía lista vacía: el auxiliar tenía que probar uno por uno para
+     descubrir cuál tenía tela.
+
+     Esto NO aplica al encabezado del corte, que ofrece el catálogo completo:
+     ahí la tela se nombra aunque no haya rollo que descontar. */
+  const visibleMaterials = (
+    clientId
+      ? materials.filter((material) => material.clientIds.includes(clientId))
+      : materials
+  ).filter((material) => material.lotCount > 0);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flat-surface flex flex-col gap-4 p-4">
         <FormSelectField
           id="issue-client"
-          label="Cliente dueño del material"
-          hint="Al elegirlo sólo se ofrecen sus rollos: su tela no surte la producción de otro."
+          label="Empresa dueña del corte"
+          hint="Al elegirla sólo se ofrecen sus rollos: su tela no surte la producción de otro. Se ofrecen todas, tengan rollos o no."
         >
           <SearchSelect
             id="issue-client"
             options={clients.map((client) => ({
               value: client.id,
               label: client.name,
-              hint: `${client.lotCount} ${client.lotCount === 1 ? "rollo" : "rollos"}`,
+              // Se dice "sin rollos" en vez de "0 rollos": el cero se lee como
+              // un dato que falta, y aquí es una empresa perfectamente
+              // elegible para una salida de puros cortes.
+              hint:
+                client.lotCount > 0
+                  ? `${client.lotCount} ${client.lotCount === 1 ? "rollo" : "rollos"}`
+                  : "sin rollos en bodega",
             }))}
             value={clientId}
             onChange={handleClientChange}
@@ -486,8 +517,28 @@ export function IssueForm({
         onRemove={removeLine}
       />
 
-      <div className="flat-surface p-4">
-        <FormSection title="Desglose de corte" description="Prendas por talla que se van a cortar con esta tela.">
+      <div className="flat-surface flex flex-col gap-2 p-4">
+        <h2 className="text-sm font-semibold">Desglose de corte</h2>
+
+        {/* El encabezado va ANTES de las tallas y plegado: es lo que se lee
+            arriba en la hoja impresa, pero en captura casi siempre se llena
+            una vez y no se vuelve a tocar. */}
+        <FormSection
+          title="Encabezado del corte"
+          description="Qué prenda, con qué tela y en qué versión. La empresa dueña y la fecha son las del vale."
+        >
+          <IssueCutHeader
+            fabrics={materials}
+            value={cutHeader}
+            onChange={setCutHeader}
+          />
+        </FormSection>
+
+        <FormSection
+          title="Tallas"
+          description="Prendas por talla que se van a cortar."
+          defaultOpen
+        >
           <IssueCutTable
             sizes={cutSizes}
             tags={cutTags}

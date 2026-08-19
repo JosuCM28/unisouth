@@ -65,9 +65,15 @@ export async function getIssueFormOptions() {
     activeBomId: product.billsOfMaterials[0]?.id ?? null,
   }));
 
-  /* Sólo se ofrecen dueños y materiales CON existencia, y cada uno dice
-     cuántos rollos tiene. Ofrecer el catálogo completo obligaba a adivinar:
-     de 26 clientes, 23 devolvían una lista vacía sin decir por qué. */
+  /* Se ofrece el CATÁLOGO COMPLETO de dueños y materiales, y cada uno dice
+     cuántos rollos surtibles tiene hoy.
+
+     Antes se filtraban por existencia, y eso rompía la salida sin rollos: el
+     encabezado del desglose de corte necesita nombrar a la empresa dueña y la
+     tela aunque no se descuente un solo metro —son prendas ya cortadas—, y el
+     desplegable venía vacío o incompleto porque esos dueños no tenían tela en
+     bodega. El conteo se conserva: dice cuáles sí se pueden surtir sin
+     esconder a los demás. */
   const stockByClient = new Map<string, number>();
   const stockByMaterial = new Map<string, number>();
   // Qué materiales tiene cada dueño, para filtrar en cascada sin ir al servidor.
@@ -90,7 +96,10 @@ export async function getIssueFormOptions() {
     materialsByClient.set(clientKey, set);
   }
 
-  const clientsWithStock = [
+  /* "De la fábrica" sólo aparece si de verdad hay material propio: no es un
+     cliente del catálogo, es la ausencia de dueño, y ofrecerlo sin existencia
+     sería inventar una opción que no corresponde a nada. */
+  const clientOptions = [
     ...(stockByClient.has(FACTORY_OWNER)
       ? [
           {
@@ -100,31 +109,27 @@ export async function getIssueFormOptions() {
           },
         ]
       : []),
-    ...clients
-      .filter((client) => stockByClient.has(client.id))
-      .map((client) => ({
-        id: client.id,
-        name: client.name,
-        lotCount: stockByClient.get(client.id) ?? 0,
-      })),
+    ...clients.map((client) => ({
+      id: client.id,
+      name: client.name,
+      lotCount: stockByClient.get(client.id) ?? 0,
+    })),
   ];
 
-  const materialsWithStock = materials
-    .filter((material) => stockByMaterial.has(material.id))
-    .map((material) => ({
-      id: material.id,
-      code: material.code,
-      name: material.name,
-      lotCount: stockByMaterial.get(material.id) ?? 0,
-      // Se serializa el Set: un Map/Set no cruza al Client Component.
-      clientIds: [...materialsByClient.entries()]
-        .filter(([, materialIds]) => materialIds.has(material.id))
-        .map(([clientId]) => clientId),
-    }));
+  const materialOptions = materials.map((material) => ({
+    id: material.id,
+    code: material.code,
+    name: material.name,
+    lotCount: stockByMaterial.get(material.id) ?? 0,
+    // Se serializa el Set: un Map/Set no cruza al Client Component.
+    clientIds: [...materialsByClient.entries()]
+      .filter(([, materialIds]) => materialIds.has(material.id))
+      .map(([clientId]) => clientId),
+  }));
 
   return {
-    materials: materialsWithStock,
-    clients: clientsWithStock,
+    materials: materialOptions,
+    clients: clientOptions,
     products: productOptions,
     sizes,
     cutTags,

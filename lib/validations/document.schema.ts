@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentType, Unit } from "@prisma/client";
+import { CutVersion, DocumentType, Unit } from "@prisma/client";
 import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText, localDate } from "./common";
 
 export const documentLineSchema = z.object({
@@ -38,6 +38,45 @@ export const documentCutLineSchema = z.object({
 
 export type DocumentCutLineInput = z.infer<typeof documentCutLineSchema>;
 
+/**
+ * El encabezado del desglose de corte.
+ *
+ * Todo opcional: es una hoja que a veces se llena entera y a veces sólo con la
+ * descripción. Exigir campos aquí frenaría la salida de puros rollos, que ni
+ * siquiera tiene desglose.
+ *
+ * NO trae fecha ni número de orden propios: la `date` y la `reference` del
+ * vale ya cubren el desglose completo —una salida engloba todas sus tallas— y
+ * duplicarlos sólo abre la puerta a que se contradigan.
+ */
+export const cutHeaderSchema = z.object({
+  /** Qué se corta: "Blusa manga larga". */
+  cutDescription: optionalText,
+  /** La tela del catálogo, cuando está dada de alta. */
+  cutFabricId: optionalCuid,
+  /** La tela escrita a mano, para lo que no existe como material. */
+  cutFabricText: optionalText,
+  cutPattern: optionalText,
+  cutVersion: z
+    .union([z.nativeEnum(CutVersion), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+  cutVersionNotes: optionalText,
+  /**
+   * Las notas del pie, numeradas en la hoja ("va sin serigrafiar").
+   *
+   * Se limpian aquí y no en el componente: un renglón que quedó en blanco
+   * porque alguien lo agregó y no lo llenó saldría impreso como "Nota 3." sin
+   * texto, y en el taller eso se lee como una instrucción que falta.
+   */
+  cutNotes: z
+    .array(z.string())
+    .optional()
+    .transform((values) =>
+      (values ?? []).map((note) => note.trim()).filter((note) => note.length > 0),
+    ),
+});
+
 export const documentSchema = z.object({
   type: z.nativeEnum(DocumentType, { message: "Elige el tipo de documento" }),
   date: localDate.optional(),
@@ -56,6 +95,7 @@ export const documentSchema = z.object({
    * el taller la traen.
    */
   cutLines: z.array(documentCutLineSchema).optional(),
+  ...cutHeaderSchema.shape,
 }).superRefine((input, ctx) => {
   /* Una SALIDA puede llevar sólo el desglose de cortes: a veces lo que se
      manda al taller son prendas ya cortadas y no hay tela que descontar. Los

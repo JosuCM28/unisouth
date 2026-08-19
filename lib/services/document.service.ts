@@ -83,6 +83,7 @@ export class DocumentService extends BaseService {
           handedOverBy: input.handedOverBy,
           receivedBy: input.receivedBy,
           notes: input.notes,
+          ...cutHeaderData(input),
           createdById: this.context.userId,
           lines: {
             create: input.lines.map((line, index) => ({
@@ -149,6 +150,7 @@ export class DocumentService extends BaseService {
           handedOverBy: input.handedOverBy,
           receivedBy: input.receivedBy,
           notes: input.notes,
+          ...cutHeaderData(input),
           lines: {
             create: input.lines.map((line, index) => ({
               lotId: line.lotId,
@@ -354,4 +356,24 @@ export class DocumentService extends BaseService {
       return cancelled;
     });
   }
+}
+
+/**
+ * El encabezado del desglose de corte, listo para Prisma.
+ *
+ * Se extrae aquí porque `create` y `update` guardan exactamente los mismos
+ * campos: tenerlos escritos dos veces garantizaba que un día alguien agregara
+ * uno en el alta y se le olvidara en la corrección, y el dato desaparecería al
+ * editar el borrador.
+ */
+function cutHeaderData(input: DocumentInput) {
+  return {
+    cutDescription: input.cutDescription,
+    cutFabricId: input.cutFabricId,
+    cutFabricText: input.cutFabricText,
+    cutPattern: input.cutPattern,
+    cutVersion: input.cutVersion,
+    cutVersionNotes: input.cutVersionNotes,
+    cutNotes: input.cutNotes ?? [],
+  };
 }

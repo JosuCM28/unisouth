@@ -1,5 +1,6 @@
 import type {
   CutTag,
+  CutVersion,
   CuttingOrderStatus,
   DocumentStatus,
   DocumentType,
@@ -283,4 +284,20 @@ export const CUTTING_ORDER_STATUS_STYLES: Record<CuttingOrderStatus, string> = {
   IN_PROGRESS: "bg-state-remnant text-state-remnant-foreground",
   COMPLETED: "bg-state-available text-state-available-foreground",
   CANCELLED: "bg-muted text-muted-foreground border border-border line-through",
+};
+
+/**
+ * La versión del molde con la que se corta.
+ *
+ * "Único" no es ausencia de versión: es la declaración de que ese molde no
+ * tiene variantes, y en la hoja impresa se lee distinto a dejar el renglón en
+ * blanco por olvido.
+ */
+export const CUT_VERSION_LABELS: Record<CutVersion, string> = {
+  UNIQUE: "Único",
+  V1: "Versión 1",
+  V2: "Versión 2",
+  V3: "Versión 3",
+  V4: "Versión 4",
+  V5: "Versión 5",
 };

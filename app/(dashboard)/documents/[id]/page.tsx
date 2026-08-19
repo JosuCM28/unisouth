@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import {
-  CUT_TAG_COLORS, CUT_TAG_LABELS,
+  CUT_TAG_COLORS, CUT_TAG_LABELS, CUT_VERSION_LABELS,
   DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES,
   DOCUMENT_TYPE_LABELS, UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
@@ -30,6 +30,10 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       createdBy: { select: { name: true } },
       appliedBy: { select: { name: true } },
       cancelledBy: { select: { name: true } },
+      // Empresa y tela del encabezado del corte: son del vale, no de los
+      // rollos, para que una salida sin rollos también las tenga.
+      client: { select: { name: true } },
+      cutFabric: { select: { name: true } },
       lines: {
         orderBy: { order: "asc" },
         include: {
@@ -101,6 +105,31 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       {document.cutLines.length > 0 && (
         <section className="flat-surface p-4">
           <h2 className="mb-3 text-sm font-semibold">Desglose de corte</h2>
+
+          {/* El encabezado: lo mismo que se lee arriba en la hoja impresa. */}
+          <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 border border-border p-3 text-sm md:grid-cols-3">
+            <HeaderItem label="Empresa" value={document.client?.name} />
+            <HeaderItem label="Descripción" value={document.cutDescription} />
+            <HeaderItem label="Fecha" value={formatDate(document.date)} />
+            <HeaderItem label="Orden" value={document.reference} />
+            <HeaderItem
+              label="Tela"
+              value={document.cutFabric?.name ?? document.cutFabricText}
+            />
+            <HeaderItem label="Molde" value={document.cutPattern} />
+            <HeaderItem
+              label="Versión"
+              value={
+                document.cutVersion
+                  ? CUT_VERSION_LABELS[document.cutVersion]
+                  : null
+              }
+            />
+            <HeaderItem
+              label="De la versión"
+              value={document.cutVersionNotes}
+            />
+          </dl>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -181,6 +210,22 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               </tfoot>
             </table>
           </div>
+
+          {/* Las notas del corte, numeradas igual que en la hoja: en el taller
+              se citan por número, así que la pantalla y el papel tienen que
+              numerarlas igual. */}
+          {document.cutNotes.length > 0 && (
+            <ol className="mt-3 flex flex-col gap-1 border-t border-border pt-3 text-sm">
+              {document.cutNotes.map((note, index) => (
+                <li key={index} className="flex gap-2">
+                  <span className="tabular shrink-0 font-medium">
+                    Nota {index + 1}.
+                  </span>
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       )}
 
@@ -232,4 +277,28 @@ function resolveTag(
     name: CUT_TAG_LABELS[legacy],
     color: CUT_TAG_COLORS[legacy].background,
   };
+}
+
+/**
+ * Un dato del encabezado del corte, o nada.
+ *
+ * Los campos vacíos NO se pintan con un guion: la hoja de corte se llena a
+ * medias con toda normalidad, y ocho renglones con "—" hacen creer que la
+ * captura quedó incompleta.
+ */
+function HeaderItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  if (!value) return null;
+
+  return (
+    <div className="flex flex-col">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
 }

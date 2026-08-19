@@ -304,4 +304,30 @@
     break-after: auto !important;
     page-break-after: auto !important;
   }
+
+  /* ── La hoja del vale cabe en UNA página ──
+     El taller trabaja con una sola plantilla clavada en la mesa de corte: un
+     desglose partido en dos hojas se separa el primer día y la segunda mitad
+     se pierde.
+
+     El alto es VARIABLE —de 3 tallas a 18, con rollos o sin ellos— así que no
+     alcanza con apretar los márgenes: un vale largo se sale de todos modos.
+     La escala la aplica el propio documento vía `--print-scale`, que la página
+     calcula midiendo su contenido contra el alto útil de la hoja. Sin script
+     el valor es 1 y la hoja sale a tamaño natural, que es lo correcto para
+     los vales cortos, que son la mayoría. */
+  .print-sheet {
+    transform: scale(var(--print-scale, 1));
+    transform-origin: top left;
+    /* Al escalar, el ancho sobrante se recupera para que la hoja siga
+       llenando el papel en vez de dejar una franja en blanco a la derecha. */
+    width: calc(100% / var(--print-scale, 1));
+  }
+
+  /* Las firmas nunca se van solas a una segunda hoja: una página con nada más
+     que dos rayas es el peor resultado posible de esta impresión. */
+  .print-signatures {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
