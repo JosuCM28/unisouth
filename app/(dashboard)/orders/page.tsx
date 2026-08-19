@@ -7,18 +7,30 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, cutProgress, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
+import { OrderFilters } from "@/components/orders/order-filters";
+import {
+  cuttingOrderWhere,
+  parseCuttingOrderFilters,
+} from "@/lib/repositories/cutting-order-filters";
 
 export const metadata: Metadata = { title: "Órdenes" };
 
 const PAGE_SIZE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; all?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    all?: string;
+    client?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+  }>;
 }
 
 /**
@@ -36,9 +48,13 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
   const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
 
-  const [total, orders] = await Promise.all([
-    prisma.cuttingOrder.count(),
+  const filters = parseCuttingOrderFilters(params);
+  const where = cuttingOrderWhere(filters);
+
+  const [total, orders, clients] = await Promise.all([
+    prisma.cuttingOrder.count({ where }),
     prisma.cuttingOrder.findMany({
+      where,
       // El id desempata: `orderedAt` no es único y sin criterio estable las
       // filas se barajan entre páginas.
       orderBy: [{ orderedAt: "desc" }, { id: "asc" }],
@@ -50,9 +66,17 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         lines: { select: { orderedQuantity: true, cutQuantity: true } },
       },
     }),
+    // Sólo los clientes que de verdad tienen órdenes: ofrecer el catálogo
+    // entero llena el filtro de nombres que no devuelven nada.
+    prisma.client.findMany({
+      where: { cuttingOrders: { some: {} } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  const hasFilters = Object.values(filters).some(Boolean);
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,12 +93,24 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         }
       />
 
+      <OrderFilters clients={clients} />
+
       {orders.length === 0 ? (
         <div className="flat-surface">
+          {/* Con filtros puestos, "aún no hay órdenes" haría creer que se
+              perdieron: lo que no hay es coincidencias. */}
           <EmptyState
             icon={ClipboardList}
-            title="Aún no hay órdenes"
-            description="Da de alta lo que pidió el cliente y ve descontando conforme se corta."
+            title={
+              hasFilters
+                ? "Ninguna orden coincide"
+                : "Aún no hay órdenes"
+            }
+            description={
+              hasFilters
+                ? "Prueba con otro rango de fechas, otro cliente u otro estado."
+                : "Da de alta lo que pidió el cliente y ve descontando conforme se corta."
+            }
           />
         </div>
       ) : (
@@ -88,7 +124,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
               (sum, line) => sum + line.cutQuantity,
               0,
             );
-            const pending = Math.max(0, ordered - cut);
+            const { pending, surplus } = cutProgress(ordered, cut);
 
             return (
               <li key={order.id}>
@@ -122,13 +158,20 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                     </p>
                   </div>
 
-                  {/* Lo que falta es el número que se busca al abrir la lista. */}
+                  {/* Lo que falta es el número que se busca al abrir la lista.
+                      Si se cortó de más, ese excedente pasa a ser el dato:
+                      un cero escondería que sobran piezas. */}
                   <div className="shrink-0 text-right">
-                    <p className="tabular text-lg font-bold leading-none">
-                      {pending}
+                    <p
+                      className={cn(
+                        "tabular text-lg font-bold leading-none",
+                        surplus > 0 && "text-state-remnant",
+                      )}
+                    >
+                      {surplus > 0 ? `+${surplus}` : pending}
                     </p>
                     <p className="tabular text-xs text-muted-foreground">
-                      de {ordered}
+                      {surplus > 0 ? "sobran" : `de ${ordered}`}
                     </p>
                   </div>
                 </Link>

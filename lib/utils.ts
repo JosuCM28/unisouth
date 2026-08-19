@@ -243,3 +243,31 @@ export function contrastText(background: string): string {
   // medio se lee peor que el negro.
   return luminance > 0.4 ? "#000000" : "#ffffff";
 }
+
+/**
+ * Cómo va un corte contra lo que se pidió.
+ *
+ * Vive aquí y no en cada pantalla porque la lista, la ficha y el reporte
+ * tienen que contar lo mismo. Antes cada una hacía `Math.max(0, pedido -
+ * cortado)` por su cuenta y el excedente se perdía: cortar 125 de 122 se veía
+ * igual que cortar exactamente 122, y el auxiliar no tenía cómo enterarse de
+ * que sobraban 3 piezas.
+ */
+export interface CutProgress {
+  /** Lo que todavía falta cortar. Cero si ya se alcanzó el pedido. */
+  pending: number;
+  /** Piezas cortadas DE MÁS. Cero mientras no se rebase el pedido. */
+  surplus: number;
+  /** Se llegó al pedido, con o sin excedente. */
+  done: boolean;
+}
+
+export function cutProgress(ordered: number, cut: number): CutProgress {
+  const difference = cut - ordered;
+
+  return {
+    pending: difference < 0 ? -difference : 0,
+    surplus: difference > 0 ? difference : 0,
+    done: difference >= 0,
+  };
+}

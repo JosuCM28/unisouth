@@ -8,7 +8,14 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
-import { cn, contrastText, formatDate, formatDateTime } from "@/lib/utils";
+import {
+  cn,
+  contrastText,
+  cutProgress,
+  formatDate,
+  formatDateTime,
+} from "@/lib/utils";
+import { Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
@@ -65,7 +72,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   const ordered = order.lines.reduce((s, l) => s + l.orderedQuantity, 0);
   const cut = order.lines.reduce((s, l) => s + l.cutQuantity, 0);
-  const pending = Math.max(0, ordered - cut);
+  const { pending, surplus } = cutProgress(ordered, cut);
   const isCancelled = order.status === "CANCELLED";
 
   // Todos los avances de la orden, del más reciente al más viejo.
@@ -91,6 +98,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
         action={
           !isCancelled ? (
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" className="touch-target">
+                <a href={`/print/order/${order.id}`} target="_blank" rel="noopener">
+                  <Printer className="size-4" aria-hidden />
+                  Imprimir
+                </a>
+              </Button>
               <Button asChild variant="outline" className="touch-target">
                 <Link href={`/orders/${order.id}/edit`}>
                   <Pencil className="size-4" aria-hidden />
@@ -122,7 +135,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-3 gap-2">
         <Stat label="Pedidas" value={ordered} />
         <Stat label="Cortadas" value={cut} />
-        <Stat label="Faltan" value={pending} strong />
+        {/* Rebasar el pedido no es un error: se cortó de más y hay que saber
+            cuánto sobra, no ver un cero que oculta el excedente. */}
+        {surplus > 0 ? (
+          <Stat label="Sobran" value={surplus} tone="surplus" prefix="+" />
+        ) : (
+          <Stat label="Faltan" value={pending} tone="pending" />
+        )}
       </div>
 
       <section className="flat-surface p-4">
@@ -130,11 +149,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
         <ul className="flex flex-col gap-2">
           {order.lines.map((line) => {
-            const linePending = Math.max(
-              0,
-              line.orderedQuantity - line.cutQuantity,
-            );
-            const done = line.cutQuantity >= line.orderedQuantity;
+            const {
+              pending: linePending,
+              surplus: lineSurplus,
+              done,
+            } = cutProgress(line.orderedQuantity, line.cutQuantity);
 
             return (
               <li
@@ -162,6 +181,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   <p className="tabular text-xs text-muted-foreground">
                     {line.cutQuantity} de {line.orderedQuantity} cortadas
                     {linePending > 0 && ` · faltan ${linePending}`}
+                    {lineSurplus > 0 && ` · sobran ${lineSurplus}`}
                   </p>
 
                   {line.notes && (
@@ -176,9 +196,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     className={cn(
                       "tabular text-lg font-bold leading-none",
                       done && "text-state-available",
+                      lineSurplus > 0 && "text-state-remnant",
                     )}
                   >
-                    {linePending}
+                    {lineSurplus > 0 ? `+${lineSurplus}` : linePending}
                   </p>
                 </div>
 
@@ -297,23 +318,32 @@ export default async function OrderDetailPage({ params }: PageProps) {
   );
 }
 
+/** Ámbar mientras falte, violeta cuando sobre: el color dice el sentido. */
+const STAT_TONES: Record<string, string> = {
+  pending: "text-state-reserved",
+  surplus: "text-state-remnant",
+};
+
 function Stat({
   label,
   value,
-  strong,
+  tone,
+  prefix,
 }: {
   label: string;
   value: number;
-  strong?: boolean;
+  tone?: "pending" | "surplus";
+  prefix?: string;
 }) {
   return (
     <div className="flat-surface p-3 text-center">
       <p
         className={cn(
           "tabular text-2xl font-bold leading-none",
-          strong && "text-state-reserved",
+          tone && STAT_TONES[tone],
         )}
       >
+        {prefix}
         {value}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{label}</p>

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cutProgress } from "@/lib/utils";
 import { addCuttingProgressAction } from "@/app/actions/cutting-order.actions";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export function OrderProgressDialog({
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const pending = ordered - cut;
+  const { pending, surplus } = cutProgress(ordered, cut);
   const typed = Number(quantity) || 0;
 
   async function handleSave() {
@@ -80,7 +81,9 @@ export function OrderProgressDialog({
       open={open}
       onOpenChange={handleOpenChange}
       title={`Avance de la talla ${sizeCode}`}
-      description={`Pedidas ${ordered} · cortadas ${cut} · faltan ${pending}`}
+      description={`Pedidas ${ordered} · cortadas ${cut} · ${
+        surplus > 0 ? `sobran ${surplus}` : `faltan ${pending}`
+      }`}
       trigger={trigger}
     >
       <div className="flex flex-col gap-4">
@@ -103,10 +106,10 @@ export function OrderProgressDialog({
 
         {/* Se avisa, no se bloquea: cortar de más pasa y el sistema debe
             poder registrarlo en vez de obligar a falsear el número. */}
-        {typed > pending && pending >= 0 && (
+        {typed > 0 && cut + typed > ordered && (
           <p className="border border-border bg-muted p-2 text-xs">
             Con este avance la talla quedaría en {cut + typed} de {ordered}{" "}
-            pedidas.
+            pedidas: sobran {cut + typed - ordered}.
           </p>
         )}
 
