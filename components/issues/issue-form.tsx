@@ -383,6 +383,13 @@ export function IssueForm({
 
   const usedLotIds = lines.map((line) => line.lotId);
 
+  /* Un vale es guardable si lleva ALGO: rollos que descontar o prendas en el
+     desglose. Sólo con cortes es un caso legítimo —se manda al taller lo ya
+     cortado— y por eso el botón no puede exigir rollos. */
+  const hasSomething =
+    lines.length > 0 ||
+    cutLines.some((line) => line.sizeId && Number(line.quantity) > 0);
+
   /* Con dueño elegido sólo se ofrecen SUS materiales. Antes se listaban los
      seis del catálogo y cuatro de ellos devolvían lista vacía: el auxiliar
      tenía que probar uno por uno para descubrir cuál tenía tela suya. */
@@ -566,7 +573,7 @@ export function IssueForm({
           onClick={handleSubmit}
           isSubmitting={isSubmitting}
           pendingLabel="Guardando…"
-          disabled={lines.length === 0}
+          disabled={!hasSomething}
           className="h-12 w-full"
         >
           {isEditing ? "Guardar cambios" : "Guardar salida en borrador"}
