@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/issue.actions";
 import type { RequirementResult } from "@/lib/services/calculation.service";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
+import { sumIssueLines, type IssueTotals } from "@/lib/issue-totals";
 import { formatQuantity } from "@/lib/utils";
 import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
@@ -26,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchSelect } from "@/components/shared/search-select";
 import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
+import { IssueRunningTotal } from "./issue-running-total";
 import {
   IssueCutTable,
   type CutLineDraft,
@@ -402,6 +404,11 @@ export function IssueForm({
 
   const usedLotIds = lines.map((line) => line.lotId);
 
+  /* Se recalcula en cada tecla: el punto de mostrarlo es que el total siga a
+     la mano que escribe. Son decenas de renglones, no miles, así que sumar
+     de nuevo cuesta menos que cualquier esquema para evitarlo. */
+  const totals = useMemo(() => sumIssueLines(lines), [lines]);
+
   /* Un vale es guardable si lleva ALGO: rollos que descontar o prendas en el
      desglose. Sólo con cortes es un caso legítimo —se manda al taller lo ya
      cortado— y por eso el botón no puede exigir rollos. */
@@ -496,6 +503,16 @@ export function IssueForm({
                 onPick={handlePick}
               />
 
+              {/* El acumulado, dentro del propio selector: es aquí donde se
+                  va marcando rollo por rollo, así que es aquí donde se decide
+                  si ya se juntaron los metros. Verlo obligaba a cerrar el
+                  diálogo, mirar la lista y volver a abrirlo. */}
+              {totals.lines > 0 && (
+                <div className="border border-border bg-muted px-3 py-2">
+                  <IssueRunningTotal totals={totals} />
+                </div>
+              )}
+
               {/* Cerrar es explícito: el selector se queda abierto para poder
                   marcar varios rollos seguidos sin reabrirlo cada vez. */}
               <Button
@@ -513,6 +530,7 @@ export function IssueForm({
 
       <IssueLines
         lines={lines}
+        totals={totals}
         onChangeQuantity={updateQuantity}
         onRemove={removeLine}
       />
@@ -641,12 +659,13 @@ export function IssueForm({
 
 interface LinesProps {
   lines: IssueLine[];
+  totals: IssueTotals;
   onChangeQuantity: (index: number, value: string) => void;
   onRemove: (index: number) => void;
 }
 
 /** Los renglones del vale, cada uno con su rollo y su cantidad. */
-function IssueLines({ lines, onChangeQuantity, onRemove }: LinesProps) {
+function IssueLines({ lines, totals, onChangeQuantity, onRemove }: LinesProps) {
   if (lines.length === 0) {
     return (
       <div className="flat-surface p-6 text-center">
@@ -665,9 +684,16 @@ function IssueLines({ lines, onChangeQuantity, onRemove }: LinesProps) {
 
   return (
     <section className="flat-surface p-4">
-      <h2 className="mb-3 text-sm font-semibold">Renglones ({lines.length})</h2>
+      <h2 className="text-sm font-semibold">Renglones ({lines.length})</h2>
 
-      <ul className="flex flex-col gap-3">
+      {/* El acumulado va ARRIBA de la lista y no al pie: en el celular la
+          lista crece más que la pantalla, y un total al final obligaría a
+          bajar hasta el fondo justo para ver el número que se consulta más. */}
+      <div className="mt-3 border-y border-border bg-muted px-3 py-2">
+        <IssueRunningTotal totals={totals} />
+      </div>
+
+      <ul className="mt-3 flex flex-col gap-3">
         {lines.map((line, index) => (
           <IssueLineRow
             key={`${line.lotId}-${index}`}
