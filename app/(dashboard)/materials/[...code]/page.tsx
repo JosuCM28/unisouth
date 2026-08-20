@@ -1,20 +1,28 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Boxes, Layers, Printer } from "lucide-react";
+import { ArrowLeft, Boxes, History, Layers, Printer } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { getPileSheetData } from "@/lib/pile-sheet-data";
+import { materialPath } from "@/lib/material-url";
+import { getMaterialKpis } from "@/lib/material-history";
+import { resolveRange, toLocalInputValue } from "@/lib/history-range";
+import { MovementRepository } from "@/lib/repositories/movement.repository";
 import {
   LOT_STATUS_LABELS,
   LOT_STATUS_STYLES,
   MATERIAL_TYPE_LABELS,
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
-import { cn, formatDate, formatQuantity } from "@/lib/utils";
+import { cn, formatDate, formatQuantity, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
+import { MovementList } from "@/components/movements/movement-list";
+import { MaterialKpis } from "@/components/materials/material-kpis";
+import { MaterialHistoryFilters } from "@/components/materials/material-history-filters";
 
 interface PageProps {
   /**
@@ -22,7 +30,18 @@ interface PageProps {
    * "/" (TELA/AZUL). Con `[code]` esas fichas daban 404.
    */
   params: Promise<{ code: string[] }>;
+  searchParams: Promise<{
+    /** Preset de la ventana: "hoy", "7", "30", "365". */
+    rango?: string;
+    /** Rango a mano, en hora de la planta. Gana sobre el preset. */
+    desde?: string;
+    hasta?: string;
+    page?: string;
+  }>;
 }
+
+/** Movimientos por página del historial. */
+const HISTORY_PAGE_SIZE = 20;
 
 /**
  * Junta los tramos de la ruta y los normaliza a la clave real.
@@ -60,10 +79,14 @@ export async function generateMetadata({
  * la estiba con el teléfono, lo que se quiere saber es qué tela es, cuánta
  * queda y de qué tonos, sin tener que cruzar dos pantallas.
  */
-export default async function MaterialDetailPage({ params }: PageProps) {
+export default async function MaterialDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   await requirePermission("inventory:read");
 
   const { code } = await params;
+  const query = await searchParams;
   const decoded = readCode(code);
 
   if (!decoded) notFound();
@@ -82,6 +105,30 @@ export default async function MaterialDetailPage({ params }: PageProps) {
 
   const { material: spec, totals } = data;
   const unitLabel = UNIT_SHORT_LABELS[totals.unit];
+
+  /* La ventana se resuelve UNA vez y alimenta tanto los KPIs como la lista:
+     si cada uno la calculara por su lado, un movimiento registrado entre las
+     dos consultas haría que el total no cuadrara con las filas de abajo. */
+  const range = resolveRange(query);
+  const page = Math.max(1, Number(query.page) || 1);
+
+  const movements = new MovementRepository();
+
+  const [kpis, history] = await Promise.all([
+    getMaterialKpis({
+      materialId: material.id,
+      unit: spec.baseUnit,
+      from: range.from,
+      to: range.to,
+    }),
+    movements.search({
+      materialId: material.id,
+      from: range.from,
+      to: range.to,
+      page,
+      pageSize: HISTORY_PAGE_SIZE,
+    }),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,6 +175,51 @@ export default async function MaterialDetailPage({ params }: PageProps) {
           {totals.remnants > 0 && ` · ${totals.remnants} retazo(s)`}
           {totals.unverified > 0 && ` · ${totals.unverified} sin verificar`}
         </p>
+      </section>
+
+      {/* El historial va ARRIBA de las especificaciones: la ficha técnica se
+          consulta una vez y no cambia, mientras que "qué entró y salió hoy"
+          es la pregunta que se hace todos los días. */}
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <History className="size-4" aria-hidden />
+            Movimiento del periodo
+          </h2>
+          <p className="tabular text-xs text-muted-foreground">{range.label}</p>
+        </div>
+
+        <MaterialHistoryFilters
+          preset={range.preset}
+          desde={toLocalInputValue(range.from)}
+          hasta={toLocalInputValue(range.to)}
+        />
+
+        <MaterialKpis kpis={kpis} />
+      </section>
+
+      <section className="flat-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold">
+          Entradas y salidas
+          <span className="tabular ml-2 font-normal text-muted-foreground">
+            ({history.total})
+          </span>
+        </h2>
+
+        <MovementList movements={history.items.map(toPlainObject)} />
+
+        <Pager
+          page={history.page}
+          totalPages={history.totalPages}
+          basePath={materialPath(spec.code)}
+          params={{
+            rango: query.rango,
+            desde: query.desde,
+            hasta: query.hasta,
+          }}
+          total={history.total}
+          itemLabel={{ one: "movimiento", many: "movimientos" }}
+        />
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">
