@@ -234,6 +234,21 @@ function formatStamp(date: Date): string {
   }).format(date);
 }
 
+/**
+ * A qué día calendario pertenece un instante, en la zona de la fábrica.
+ *
+ * Devuelve "2026-08-19". Se agrupa por esto y no por la fecha UTC porque una
+ * recepción de las 19:00 de Veracruz cae en el día siguiente en UTC, y el
+ * reporte diario la mostraría en la fecha equivocada —justo el día que el
+ * auxiliar viene a cuadrar lo que recibió.
+ */
+export function zonedDayKey(instant: Date): string {
+  const parts = zonedParts(instant);
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
 /** Valor para un `<input type="datetime-local">` en la zona de la fábrica. */
 export function toLocalInputValue(date: Date): string {
   const parts = zonedParts(date);

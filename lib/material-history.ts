@@ -1,5 +1,6 @@
 import type { MovementDirection, Unit } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { zonedDayKey } from "@/lib/history-range";
 
 /**
  * Qué movió el material en la ventana consultada, por dirección.
@@ -113,5 +114,108 @@ function buildWhere(params: { materialId: string; from?: Date; to?: Date }) {
           },
         }
       : {}),
+  };
+}
+
+
+/** Lo que se movió en un día concreto. */
+export interface MaterialDayRow {
+  /** "2026-08-19", en la zona de la planta. */
+  day: string;
+  inQuantity: number;
+  inLots: number;
+  outQuantity: number;
+  outLots: number;
+}
+
+/**
+ * Cuántos días se desglosan como máximo.
+ *
+ * Con el rango en "Año" serían 365 renglones, que ya no es un reporte sino un
+ * volcado. Se cortan los más viejos y se avisa: los días recientes son los
+ * que se vienen a cuadrar.
+ */
+const MAX_DAYS = 62;
+
+export interface MaterialDailyReport {
+  rows: MaterialDayRow[];
+  unit: Unit;
+  /** Hubo más días con movimiento de los que se listan. */
+  truncated: boolean;
+}
+
+/**
+ * Desglose día por día de lo que entró y salió del material.
+ *
+ * Responde la pregunta de la recepción masiva: "hoy metí 50 rollos de esta
+ * tela, ¿cuántos metros fueron?". Los KPIs dan el total de la ventana; esto
+ * dice en qué día cayó cada cosa, que es lo que se coteja contra las guías
+ * del proveedor.
+ *
+ * Se agrupa en memoria y no con un `groupBy` de SQL por fecha porque el día
+ * hay que calcularlo EN LA ZONA DE LA PLANTA: Postgres agruparía por fecha
+ * UTC y una recepción de las 19:00 aparecería al día siguiente.
+ */
+export async function getMaterialDailyReport(params: {
+  materialId: string;
+  unit: Unit;
+  from?: Date;
+  to?: Date;
+}): Promise<MaterialDailyReport> {
+  const movements = await prisma.movement.findMany({
+    where: buildWhere(params),
+    select: {
+      createdAt: true,
+      direction: true,
+      quantity: true,
+      lotId: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  /* Los rollos se cuentan DISTINTOS por día: dos cortes al mismo rollo en la
+     misma jornada son un rollo tocado, no dos. */
+  const byDay = new Map<
+    string,
+    { row: MaterialDayRow; inLots: Set<string>; outLots: Set<string> }
+  >();
+
+  for (const movement of movements) {
+    const day = zonedDayKey(movement.createdAt);
+
+    const entry =
+      byDay.get(day) ??
+      {
+        row: { day, inQuantity: 0, inLots: 0, outQuantity: 0, outLots: 0 },
+        inLots: new Set<string>(),
+        outLots: new Set<string>(),
+      };
+
+    const quantity = Math.abs(Number(movement.quantity));
+
+    if (movement.direction === "IN") {
+      entry.row.inQuantity += quantity;
+      entry.inLots.add(movement.lotId);
+    } else {
+      entry.row.outQuantity += quantity;
+      entry.outLots.add(movement.lotId);
+    }
+
+    byDay.set(day, entry);
+  }
+
+  const all = [...byDay.values()].map((entry) => ({
+    ...entry.row,
+    inLots: entry.inLots.size,
+    outLots: entry.outLots.size,
+  }));
+
+  // Del día más reciente al más viejo: lo de hoy es lo que se viene a cuadrar.
+  all.sort((a, b) => b.day.localeCompare(a.day));
+
+  return {
+    rows: all.slice(0, MAX_DAYS),
+    unit: params.unit,
+    truncated: all.length > MAX_DAYS,
   };
 }

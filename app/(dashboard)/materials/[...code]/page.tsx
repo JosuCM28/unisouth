@@ -1,12 +1,19 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Boxes, History, Layers, Printer } from "lucide-react";
+import {
+  ArrowLeft,
+  Boxes,
+  CalendarDays,
+  History,
+  Layers,
+  Printer,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { getPileSheetData } from "@/lib/pile-sheet-data";
 import { materialPath } from "@/lib/material-url";
-import { getMaterialKpis } from "@/lib/material-history";
+import { getMaterialKpis, getMaterialDailyReport } from "@/lib/material-history";
 import { resolveRange, toLocalInputValue } from "@/lib/history-range";
 import { MovementRepository } from "@/lib/repositories/movement.repository";
 import {
@@ -22,6 +29,7 @@ import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
 import { MovementList } from "@/components/movements/movement-list";
 import { MaterialKpis } from "@/components/materials/material-kpis";
+import { MaterialDailyReport } from "@/components/materials/material-daily-report";
 import { MaterialHistoryFilters } from "@/components/materials/material-history-filters";
 
 interface PageProps {
@@ -114,8 +122,14 @@ export default async function MaterialDetailPage({
 
   const movements = new MovementRepository();
 
-  const [kpis, history] = await Promise.all([
+  const [kpis, daily, history] = await Promise.all([
     getMaterialKpis({
+      materialId: material.id,
+      unit: spec.baseUnit,
+      from: range.from,
+      to: range.to,
+    }),
+    getMaterialDailyReport({
       materialId: material.id,
       unit: spec.baseUnit,
       from: range.from,
@@ -196,6 +210,18 @@ export default async function MaterialDetailPage({
         />
 
         <MaterialKpis kpis={kpis} />
+      </section>
+
+      {/* El desglose por día va entre los KPIs y el kárdex: el total responde
+          "cuánto", este responde "qué día", y el kárdex "en qué movimiento".
+          De lo general a lo particular, que es como se investiga un faltante. */}
+      <section className="flat-surface p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <CalendarDays className="size-4" aria-hidden />
+          Por día
+        </h2>
+
+        <MaterialDailyReport report={daily} />
       </section>
 
       <section className="flat-surface p-4">
