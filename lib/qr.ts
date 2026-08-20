@@ -52,7 +52,14 @@ export async function generatePileQr(params: {
   materialCode: string;
 }): Promise<string> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const url = `${baseUrl}/m/${encodeURIComponent(params.materialCode)}`;
+  /* Cada tramo se codifica por separado: una clave con "/" adentro
+     (TELA/AZUL) debe viajar como dos tramos de la ruta, no como un "%2F" que
+     algunos lectores de QR y proxies devuelven decodificado y rompen. */
+  const path = params.materialCode
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  const url = `${baseUrl}/m/${path}`;
 
   return QRCode.toString(url, {
     type: "svg",

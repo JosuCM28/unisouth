@@ -8,18 +8,54 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** El QR del rollo contiene {APP_URL}/r/{code}; también se acepta el folio solo. */
-function extractCode(raw: string): string | null {
+/** Qué se leyó: un rollo suelto o la hoja de una pila completa. */
+type ScanTarget = { kind: "lot" | "material"; code: string };
+
+/**
+ * Traduce lo que devolvió la cámara a un destino de la app.
+ *
+ * Se aceptan los DOS códigos que se imprimen en bodega, porque el auxiliar
+ * apunta el mismo escáner a los dos sin fijarse cuál es: la etiqueta del
+ * rollo ({APP_URL}/r/{folio}) y la hoja de la pila ({APP_URL}/m/{clave}).
+ * Antes sólo se reconocía el del rollo, así que escanear una pila no hacía
+ * absolutamente nada: el lector seguía buscando y parecía descompuesto.
+ */
+function extractTarget(raw: string): ScanTarget | null {
   const text = raw.trim();
   if (!text) return null;
 
-  const match = text.match(/\/r\/([^/?#]+)/i);
-  if (match?.[1]) return decodeURIComponent(match[1]);
+  // El código del material puede traer "/" (TELA/AZUL), así que se toma todo
+  // lo que sigue a /m/ hasta el query, no sólo el primer segmento.
+  const material = text.match(/\/m\/([^?#]+)/i);
+  if (material?.[1]) {
+    const code = safeDecode(material[1]);
+    return code ? { kind: "material", code } : null;
+  }
 
-  // Un folio tecleado a mano: R-2026-00841
-  if (/^[A-Za-z0-9-]+$/.test(text)) return text.toUpperCase();
+  const lot = text.match(/\/r\/([^/?#]+)/i);
+  if (lot?.[1]) {
+    const code = safeDecode(lot[1]);
+    return code ? { kind: "lot", code } : null;
+  }
+
+  // Tecleado a mano. Se asume rollo: es lo que se teclea en el piso, y si la
+  // clave resulta ser de un material la propia ficha del rollo dirá que no
+  // existe ese folio.
+  if (/^[A-Za-z0-9-]+$/.test(text)) {
+    return { kind: "lot", code: text.toUpperCase() };
+  }
 
   return null;
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    const decoded = decodeURIComponent(value).trim().replace(/\/+$/, "");
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    // Un porcentaje mal formado revienta decodeURIComponent.
+    return null;
+  }
 }
 
 type ScannerState = "idle" | "starting" | "scanning" | "unsupported" | "denied";
@@ -42,10 +78,21 @@ export function QrScanner() {
     };
   }, []);
 
-  function goToLot(code: string) {
+  /**
+   * Apaga la cámara y navega al destino que se leyó.
+   *
+   * El rollo abre su ficha; la pila abre la ficha del MATERIAL, que es lo que
+   * se quiere ver parado frente a la estiba: qué tela es, cuánta queda y de
+   * qué tonos. Cada segmento se codifica por separado para que una clave con
+   * "/" adentro (TELA/AZUL) no se lea como dos tramos de la ruta.
+   */
+  function goTo(target: ScanTarget) {
     stopRef.current?.();
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    router.push(`/lots/${encodeURIComponent(code)}`);
+
+    const segment = encodeURIComponent(target.code);
+    const base = target.kind === "material" ? "/materials" : "/lots";
+    router.push(`${base}/${segment}`);
   }
 
   async function startScanning() {
@@ -93,10 +140,10 @@ export function QrScanner() {
       try {
         const codes = await detector.detect(videoRef.current);
         const raw = codes[0]?.rawValue;
-        const code = raw ? extractCode(raw) : null;
+        const target = raw ? extractTarget(raw) : null;
 
-        if (code) {
-          goToLot(code);
+        if (target) {
+          goTo(target);
           return;
         }
       } catch {
@@ -121,8 +168,8 @@ export function QrScanner() {
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 240, height: 240 } },
       (decoded) => {
-        const code = extractCode(decoded);
-        if (code) goToLot(code);
+        const target = extractTarget(decoded);
+        if (target) goTo(target);
       },
       () => undefined,
     );
@@ -145,14 +192,14 @@ export function QrScanner() {
 
   function handleManualSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const code = extractCode(manualCode);
+    const target = extractTarget(manualCode);
 
-    if (!code) {
+    if (!target) {
       toast.error("Escribe un folio válido, como R-2026-00841.");
       return;
     }
 
-    goToLot(code);
+    goTo(target);
   }
 
   return (
@@ -171,7 +218,7 @@ export function QrScanner() {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
               <Camera className="size-8 text-muted-foreground" aria-hidden />
               <p className="text-sm text-muted-foreground">
-                Apunta al código QR pegado en el rollo.
+                Apunta al código QR del rollo o de la hoja de la pila.
               </p>
               <Button
                 type="button"

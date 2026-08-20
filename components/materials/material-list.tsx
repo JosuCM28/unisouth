@@ -8,6 +8,7 @@ import {
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
 import { formatFabricSpec } from "@/lib/material-spec";
+import { materialPath } from "@/lib/material-url";
 import { cn, formatQuantity, type PlainObject } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
@@ -55,7 +56,7 @@ export function MaterialList({
       cell: ({ row }) => (
         <div className="tabular flex items-center gap-2 font-medium">
           <Link
-            href={`/materials/${row.original.code}`}
+            href={materialPath(row.original.code)}
             className="hover:underline"
           >
             {row.original.code}
@@ -171,7 +172,7 @@ export function MaterialList({
                   pulgar, y obligar a atinarle al menú de tres puntos para ver
                   el material es un toque de más cada vez. */}
               <Link
-                href={`/materials/${material.code}`}
+                href={materialPath(material.code)}
                 className="min-w-0 flex-1"
               >
                 <div className="flex items-center gap-2">

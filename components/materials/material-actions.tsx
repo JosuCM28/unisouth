@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Boxes, Pencil, Printer } from "lucide-react";
 import type { Material } from "@prisma/client";
+import { materialPath } from "@/lib/material-url";
 import type { PlainObject } from "@/lib/utils";
 import { removeMaterialAction } from "@/app/actions/material.actions";
 import { RowActions } from "@/components/shared/row-actions";
@@ -28,7 +29,7 @@ export function MaterialActions({ material }: { material: PlainObject<Material> 
         <>
           {/* La ficha del material: especificaciones, tonos y su pila. */}
           <DropdownMenuItem asChild>
-            <Link href={`/materials/${material.code}`}>
+            <Link href={materialPath(material.code)}>
               <Boxes className="size-4" aria-hidden />
               Ver ficha
             </Link>
