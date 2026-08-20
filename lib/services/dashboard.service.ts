@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 
 export interface DashboardKpis {
   lotesEnBodega: number;
-  porMedir: number;
   retazos: number;
   sinMover90Dias: number;
   materialesBajoReorden: number;
@@ -54,15 +53,14 @@ const STALE_DAYS = 90;
  */
 export class DashboardService {
   /**
-   * Las 8 cifras del tablero, todas en paralelo.
+   * Las 7 cifras del tablero, todas en paralelo.
    *
-   * En serie serían 8 viajes a Neon encadenados y el tablero tardaría
+   * En serie serían 7 viajes a Neon encadenados y el tablero tardaría
    * segundos en pintar desde el celular.
    */
   async getKpis(): Promise<DashboardKpis> {
     const [
       lotesEnBodega,
-      porMedir,
       retazos,
       sinMover90Dias,
       materialesBajoReorden,
@@ -72,15 +70,6 @@ export class DashboardService {
     ] = await Promise.all([
       prisma.lot.count({
         where: { status: { in: [...STATUSES_PHYSICALLY_PRESENT] } },
-      }),
-
-      // Metraje que nadie ha confirmado con cinta: el saldo es el de la
-      // etiqueta del proveedor y puede venir corto.
-      prisma.lot.count({
-        where: {
-          verified: false,
-          status: { in: [...STATUSES_PHYSICALLY_PRESENT] },
-        },
       }),
 
       prisma.lot.count({
@@ -113,7 +102,6 @@ export class DashboardService {
 
     return {
       lotesEnBodega,
-      porMedir,
       retazos,
       sinMover90Dias,
       materialesBajoReorden,

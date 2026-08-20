@@ -4,7 +4,6 @@ import {
   Calculator,
   Clock,
   PackageSearch,
-  Ruler,
   Scissors,
   ShoppingCart,
 } from "lucide-react";
@@ -40,15 +39,6 @@ export function KpiGrid({ kpis }: KpiGridProps) {
         value={kpis.lotesEnBodega}
         icon={Boxes}
         href="/lots"
-      />
-
-      <KpiCard
-        label="Por medir"
-        value={kpis.porMedir}
-        hint="Metraje sin confirmar"
-        icon={Ruler}
-        tone={toneForCount(kpis.porMedir, 5, 20)}
-        href="/lots?verified=false"
       />
 
       <KpiCard
