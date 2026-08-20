@@ -1741,3 +1741,52 @@ enum AttachmentType {
   DOCUMENT
   OTHER
 }
+
+/// A pinned objective of the warehouse ("Objetivo 1", "Objetivo 2"…).
+/// Deliberately free-form: this is a notepad, not a controlled process.
+model Goal {
+  id     String  @id @default(cuid())
+  title  String
+  detail String?
+
+  /// Manual order on the board. Lower shows first.
+  position Int    @default(0)
+  /// Accent colour key, resolved to a token in the UI.
+  color    String @default("slate")
+  done     Boolean @default(false)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([position])
+  @@map("goals")
+}
+
+/// A card on the kanban board: an order to prepare, a pending errand.
+model Task {
+  id     String  @id @default(cuid())
+  title  String
+  detail String?
+
+  status TaskStatus @default(PENDING)
+  /// Manual order INSIDE its column. Lower shows first.
+  position Int      @default(0)
+  color    String   @default("slate")
+  /// Free text on purpose: "Ternium", "pedido 4410" — no catalogue behind it.
+  tag      String?
+  dueAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, position])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}

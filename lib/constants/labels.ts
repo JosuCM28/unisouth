@@ -12,6 +12,7 @@ import type {
   MovementType,
   ProductionRunStatus,
   PurchaseRequestStatus,
+  TaskStatus,
   Unit,
 } from "@prisma/client";
 
@@ -300,4 +301,11 @@ export const CUT_VERSION_LABELS: Record<CutVersion, string> = {
   V3: "Versión 3",
   V4: "Versión 4",
   V5: "Versión 5",
+};
+
+/** Las tres columnas del tablero de tareas. */
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  PENDING: "Pendientes",
+  IN_PROGRESS: "En curso",
+  DONE: "Listas",
 };

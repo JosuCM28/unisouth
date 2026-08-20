@@ -52,6 +52,19 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
+    label: "Planeación",
+    items: [
+      {
+        // El pizarrón del almacén: objetivos arriba, pendientes abajo. No es
+        // parte del inventario, por eso va en su propia sección.
+        href: "/tasks",
+        label: "Tareas",
+        icon: "tasks",
+        permission: "inventory:read",
+      },
+    ],
+  },
+  {
     label: "Catálogos",
     items: [
       {
