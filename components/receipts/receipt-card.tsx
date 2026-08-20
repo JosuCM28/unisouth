@@ -1,18 +1,25 @@
 import Link from "next/link";
 import { Boxes, CalendarDays, Factory, Truck, User } from "lucide-react";
 import type { ReceiptCardData } from "@/lib/repositories/receipt.repository";
-import { formatDate } from "@/lib/utils";
+import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
+import { formatDate, formatQuantity } from "@/lib/utils";
 
 /**
  * Tarjeta de una recepción.
  *
  * El orden responde a cómo llega la pregunta en el piso: primero CUÁNDO
- * ("¿qué llegó el martes?"), luego la GUÍA —que es el papel que trae en la
- * mano quien pregunta— y después de quién venía. El número de rollos va
- * grande a la derecha porque es lo que se compara de un vistazo contra lo
- * que se bajó del camión.
+ * ("¿qué llegó el martes?"), luego QUÉ TELA —que es lo que de verdad
+ * identifica la entrega— y después la guía, que es el papel que trae en la
+ * mano quien pregunta.
+ *
+ * A la derecha van los METROS grandes y los rollos debajo. El metraje es lo
+ * que se compara contra la factura; el conteo de rollos, contra lo que se
+ * bajó del camión. Antes sólo estaba el conteo y había que abrir la
+ * recepción para saber cuánta tela era.
  */
 export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
+  const unitLabel = receipt.unit ? UNIT_SHORT_LABELS[receipt.unit] : "";
+
   return (
     <Link
       href={`/receipts/${receipt.code}`}
@@ -24,6 +31,14 @@ export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
             <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <span className="tabular">{formatDate(receipt.date)}</span>
           </p>
+
+          {/* La tela, en grande: es lo que distingue una recepción de otra
+              cuando llegan tres el mismo día. */}
+          {receipt.materialNames.length > 0 && (
+            <p className="mt-1 truncate text-sm font-medium">
+              {receipt.materialNames.join(" · ")}
+            </p>
+          )}
 
           <p className="tabular mt-1 text-xs text-muted-foreground">
             {receipt.code}
@@ -38,20 +53,27 @@ export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="tabular text-2xl font-semibold leading-none">
-            {receipt.lotCount}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {receipt.lotCount === 1 ? "rollo" : "rollos"}
+          {receipt.totalQuantity > 0 && (
+            <p className="tabular text-2xl font-semibold leading-none">
+              {formatQuantity(receipt.totalQuantity, { unit: unitLabel })}
+            </p>
+          )}
+          <p className="tabular mt-0.5 text-xs text-muted-foreground">
+            {receipt.lotCount} {receipt.lotCount === 1 ? "rollo" : "rollos"}
           </p>
         </div>
       </div>
 
+      {/* Sólo se pintan los chips que traen dato: una fila de "—" ocupa el
+          mismo espacio que la información y no dice nada. */}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        {receipt.carrier && <Chip icon={Truck} label={receipt.carrier.name} />}
-        {receipt.supplier && <Chip icon={Factory} label={receipt.supplier.name} />}
         {receipt.client && <Chip icon={User} label={receipt.client.name} />}
         {receipt.origin && <Chip icon={Boxes} label={receipt.origin} />}
+        {receipt.invoiceRef && (
+          <Chip icon={Factory} label={`Factura ${receipt.invoiceRef}`} />
+        )}
+        {receipt.carrier && <Chip icon={Truck} label={receipt.carrier.name} />}
+        {receipt.supplier && <Chip icon={Factory} label={receipt.supplier.name} />}
       </div>
 
       {/* Sin un solo rollo la recepción es un encabezado huérfano: casi
@@ -73,7 +95,7 @@ function Chip({
   label: string;
 }) {
   return (
-    <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+    <span className="flex max-w-full items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
       <Icon className="size-3 shrink-0" aria-hidden />
       <span className="truncate">{label}</span>
     </span>

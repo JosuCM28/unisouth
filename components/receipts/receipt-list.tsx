@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Truck } from "lucide-react";
 import type { ReceiptCardData } from "@/lib/repositories/receipt.repository";
-import { formatDate } from "@/lib/utils";
+import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
+import { formatDate, formatQuantity } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { usePageParam } from "@/components/shared/use-page-param";
@@ -52,6 +53,18 @@ export function ReceiptList({
       ),
     },
     {
+      // La tela va pegada al folio: sin ella la tabla es una lista de
+      // números en la que todas las filas se ven iguales.
+      id: "material",
+      header: "Material",
+      accessorFn: (receipt) => receipt.materialNames.join(", "),
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.materialNames.join(" · ") || "—"}
+        </span>
+      ),
+    },
+    {
       accessorKey: "guideNumber",
       header: "Guía",
       cell: ({ row }) => (
@@ -59,22 +72,22 @@ export function ReceiptList({
       ),
     },
     {
-      id: "carrier",
-      header: "Paquetería",
-      accessorFn: (receipt) => receipt.carrier?.name ?? "",
+      id: "invoiceRef",
+      header: "Factura",
+      accessorFn: (receipt) => receipt.invoiceRef ?? "",
       cell: ({ row }) => (
-        <span className="text-muted-foreground">
-          {row.original.carrier?.name ?? "—"}
+        <span className="tabular text-muted-foreground">
+          {row.original.invoiceRef ?? "—"}
         </span>
       ),
     },
     {
-      id: "supplier",
-      header: "Proveedor",
-      accessorFn: (receipt) => receipt.supplier?.name ?? "",
+      id: "origin",
+      header: "Origen",
+      accessorFn: (receipt) => receipt.origin ?? "",
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {row.original.supplier?.name ?? "—"}
+          {row.original.origin ?? "—"}
         </span>
       ),
     },
@@ -93,8 +106,23 @@ export function ReceiptList({
       header: "Rollos",
       accessorFn: (receipt) => receipt.lotCount,
       cell: ({ row }) => (
-        <span className="tabular text-right font-medium">
-          {row.original.lotCount}
+        <span className="tabular font-medium">{row.original.lotCount}</span>
+      ),
+    },
+    {
+      // El metraje es el dato que se coteja contra la factura.
+      id: "totalQuantity",
+      header: "Metraje",
+      accessorFn: (receipt) => receipt.totalQuantity,
+      cell: ({ row }) => (
+        <span className="tabular font-medium">
+          {row.original.totalQuantity > 0
+            ? formatQuantity(row.original.totalQuantity, {
+                unit: row.original.unit
+                  ? UNIT_SHORT_LABELS[row.original.unit]
+                  : "",
+              })
+            : "—"}
         </span>
       ),
     },

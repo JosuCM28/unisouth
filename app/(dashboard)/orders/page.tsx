@@ -156,6 +156,30 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                       {order.material && ` · ${order.material.name}`}
                       {` · ${formatDate(order.orderedAt)}`}
                     </p>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {order.reference && (
+                        <span className="tabular rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+                          Ref. {order.reference}
+                        </span>
+                      )}
+
+                      {/* La entrega se destaca en rojo si ya se pasó y la
+                          orden sigue abierta: es lo que convierte la lista en
+                          una alerta y no en un archivo. */}
+                      {order.dueDate && (
+                        <span
+                          className={cn(
+                            "tabular rounded border px-1.5 py-0.5 text-xs",
+                            isLate(order.dueDate, pending)
+                              ? "border-state-defective text-state-defective"
+                              : "border-border text-muted-foreground",
+                          )}
+                        >
+                          Entrega {formatDate(order.dueDate)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Lo que falta es el número que se busca al abrir la lista.
@@ -172,6 +196,11 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                     </p>
                     <p className="tabular text-xs text-muted-foreground">
                       {surplus > 0 ? "sobran" : `de ${ordered}`}
+                    </p>
+                    {/* Cuánto se lleva cortado: sin esto, "faltan 300" no
+                        distingue una orden recién abierta de una casi lista. */}
+                    <p className="tabular mt-0.5 text-xs text-muted-foreground">
+                      {cut} cortadas
                     </p>
                   </div>
                 </Link>
@@ -191,6 +220,17 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       />
     </div>
   );
+}
+
+/**
+ * ¿Se pasó la fecha de entrega con trabajo pendiente?
+ *
+ * Se exige que FALTE algo: una orden entregada tarde pero ya terminada no
+ * necesita alarma, y pintarla de rojo para siempre haría que el color
+ * dejara de significar "hay que correr".
+ */
+function isLate(dueDate: Date, pending: number): boolean {
+  return pending > 0 && dueDate.getTime() < Date.now();
 }
 
 /** Entero positivo o nada. Cualquier basura en la URL se ignora. */

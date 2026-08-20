@@ -1,4 +1,4 @@
-import type { Prisma, Receipt } from "@prisma/client";
+import type { Prisma, Receipt, Unit } from "@prisma/client";
 import {
   BaseRepository,
   type PaginatedResult,
@@ -22,6 +22,16 @@ export interface ReceiptCardData extends Receipt {
   carrier: { id: string; name: string } | null;
   recordedBy: { id: string; name: string } | null;
   lotCount: number;
+  /**
+   * Metraje que entró con esta guía y qué tela era.
+   *
+   * Se resuelven aquí y no al abrir el detalle porque son las dos cosas que
+   * de verdad identifican una recepción: "los 5,502 m de Lincon verde". Sin
+   * ellas, la lista obliga a abrir una por una para saber cuál es cuál.
+   */
+  totalQuantity: number;
+  unit: Unit | null;
+  materialNames: string[];
 }
 
 export class ReceiptRepository extends BaseRepository<
@@ -102,13 +112,86 @@ export class ReceiptRepository extends BaseRepository<
       _count: { select: { lots: true } },
     });
 
-    return {
-      ...result,
-      items: result.items.map(({ _count, ...receipt }) => ({
-        ...receipt,
-        lotCount: _count.lots,
-      })),
-    };
+    const base = result.items.map(({ _count, ...receipt }) => ({
+      ...receipt,
+      lotCount: _count.lots,
+    }));
+
+    return { ...result, items: await this.withLotSummary(base) };
+  }
+
+  /**
+   * Agrega metraje y tela a cada recepción de la página.
+   *
+   * Va en DOS consultas agrupadas sobre la página completa, no una por
+   * recepción: con 50 filas serían 100 viajes a Neon y la lista tardaría
+   * segundos en pintar desde el celular.
+   *
+   * Se suma `initialQuantity` y no `currentQuantity` porque la pregunta es
+   * "cuánto ENTRÓ con esta guía". El saldo de hoy ya bajó por los cortes, y
+   * usarlo haría que una recepción vieja pareciera haber traído menos tela
+   * de la que de verdad se bajó del camión.
+   */
+  private async withLotSummary<T extends { id: string }>(
+    receipts: T[],
+  ): Promise<(T & {
+    totalQuantity: number;
+    unit: Unit | null;
+    materialNames: string[];
+  })[]> {
+    if (receipts.length === 0) return [];
+
+    const ids = receipts.map((receipt) => receipt.id);
+
+    const [sums, materials] = await Promise.all([
+      this.db.lot.groupBy({
+        by: ["receiptId", "unit"],
+        where: { receiptId: { in: ids } },
+        _sum: { initialQuantity: true },
+      }),
+      this.db.lot.findMany({
+        where: { receiptId: { in: ids } },
+        distinct: ["receiptId", "materialId"],
+        select: {
+          receiptId: true,
+          material: { select: { name: true } },
+        },
+      }),
+    ]);
+
+    const totals = new Map<string, { quantity: number; unit: Unit | null }>();
+    for (const row of sums as {
+      receiptId: string | null;
+      unit: Unit;
+      _sum: { initialQuantity: Prisma.Decimal | null };
+    }[]) {
+      if (!row.receiptId) continue;
+      const current = totals.get(row.receiptId) ?? { quantity: 0, unit: null };
+      current.quantity += Number(row._sum.initialQuantity ?? 0);
+      // La unidad de la primera partida: una recepción no mezcla metros con
+      // piezas, y si lo hiciera el total ya no sería un número que sumar.
+      current.unit = current.unit ?? row.unit;
+      totals.set(row.receiptId, current);
+    }
+
+    const names = new Map<string, string[]>();
+    for (const row of materials as {
+      receiptId: string | null;
+      material: { name: string };
+    }[]) {
+      if (!row.receiptId) continue;
+      names.set(row.receiptId, [
+        ...(names.get(row.receiptId) ?? []),
+        row.material.name,
+      ]);
+    }
+
+    return receipts.map((receipt) => ({
+      ...receipt,
+      totalQuantity: totals.get(receipt.id)?.quantity ?? 0,
+      unit: totals.get(receipt.id)?.unit ?? null,
+      materialNames: names.get(receipt.id) ?? [],
+    }));
   }
 
   /**
