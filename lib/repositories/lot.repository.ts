@@ -140,7 +140,12 @@ export class LotRepository extends BaseRepository<
         createdBy: { select: { id: true, name: true } },
         movements: {
           take: 50,
-          orderBy: { createdAt: "desc" },
+          /* El folio desempata, no el id: varios movimientos de la misma
+             transacción comparten `createdAt` al milisegundo, y `MOV-2026-…`
+             es un correlativo con ceros a la izquierda, así que ordenarlo
+             como texto da el orden real de captura. Con un empate sin
+             desempate, `take: 50` podía recortar por en medio. */
+          orderBy: [{ createdAt: "desc" }, { code: "desc" }],
           include: {
             user: { select: { id: true, name: true } },
           },

@@ -47,7 +47,10 @@ export default async function IssuesPage({ searchParams }: PageProps) {
       where,
       // El id desempata: `date` no es único y sin criterio estable las filas
       // se barajan entre páginas.
-      orderBy: [{ date: "desc" }, { id: "asc" }],
+      /* Desempate por `createdAt` y no por `id`: la fecha se ancla al inicio
+         del día, así que todo lo capturado hoy queda empatado, y `cuid()` no
+         es cronológico. Sin esto lo más viejo del día sale hasta arriba. */
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
       skip,
       take,
       include: {

@@ -72,7 +72,9 @@ export async function GET(request: Request) {
 
   const orders = await prisma.cuttingOrder.findMany({
     where: cuttingOrderWhere(filters),
-    orderBy: [{ orderedAt: "desc" }, { id: "asc" }],
+    /* Mismo desempate que la lista: el CSV debe salir en el orden que el
+       usuario acaba de ver en pantalla. */
+    orderBy: [{ orderedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     // El tope es de órdenes, pero el archivo crece por tallas: 500 órdenes de
     // seis tallas son 3,000 renglones, que Excel abre sin problema.
     take: 500,

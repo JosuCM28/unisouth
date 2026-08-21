@@ -211,18 +211,38 @@ export abstract class BaseRepository<TEntity, TCreate, TUpdate> {
     const fullWhere = { ...where, ...this.notDeleted };
 
     /**
-     * Desempate obligatorio por `id`.
+     * Desempate obligatorio, y en el orden correcto.
      *
-     * Sin esto la paginación PIERDE registros. Los criterios del dominio
-     * —`receivedAt`, `createdAt`— no son únicos: en una recepción entran 120
-     * rollos con la misma fecha. Ante un empate Postgres no garantiza ningún
+     * Sin desempate la paginación PIERDE registros. Los criterios del dominio
+     * no son únicos: `Receipt.date` es un DÍA —la fecha que se teclea en el
+     * formulario se ancla al inicio del día—, así que las quince recepciones
+     * de hoy quedan EMPATADAS. Ante un empate Postgres no garantiza ningún
      * orden, y como cada página es una consulta aparte, puede devolver la
      * misma fila en la página 1 y en la 2 mientras otra no sale en ninguna.
-     * El `id` es único, así que fija un orden total y estable entre páginas.
+     *
+     * Se desempata por `createdAt` descendente y NO por `id`: lo último que se
+     * capturó tiene que quedar hasta arriba. Con `{ id: "asc" }` pasaba lo
+     * contrario —de las recepciones de hoy salía primero la más vieja— porque
+     * `cuid()` no es cronológico: ordenarlo es un orden arbitrario, sólo que
+     * estable.
+     *
+     * El `id` se queda al final como último recurso: dos filas creadas en el
+     * mismo milisegundo (una carga con varios documentos en la misma
+     * transacción) siguen necesitando un criterio único o la paginación
+     * vuelve a perder filas.
      */
+    const requested = Array.isArray(orderBy) ? orderBy : [orderBy];
+
+    /* Los criterios que ya pidió la subclase no se repiten: varios
+       repositorios ordenan por `createdAt` de entrada, y volver a agregarlo
+       dejaría un ORDER BY con la columna dos veces. */
+    const alreadySorts = (field: string) =>
+      requested.some((clause) => field in clause);
+
     const stableOrderBy = [
-      ...(Array.isArray(orderBy) ? orderBy : [orderBy]),
-      { id: "asc" },
+      ...requested,
+      ...(alreadySorts("createdAt") ? [] : [{ createdAt: "desc" }]),
+      ...(alreadySorts("id") ? [] : [{ id: "desc" }]),
     ];
 
     /* Acumulado: desde la primera fila hasta el final de la página pedida.

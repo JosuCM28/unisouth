@@ -86,8 +86,11 @@ export class MovementRepository extends BaseRepository<
 
     return this.paginate<MovementWithRelations>(
       where,
-      // Cronológico inverso: lo último que pasó es lo que se viene a mirar.
-      { createdAt: "desc" },
+      /* Cronológico inverso: lo último que pasó es lo que se viene a mirar.
+         Desempata el folio, que es un correlativo con ceros a la izquierda:
+         es lo único que distingue dos movimientos del mismo instante, y son
+         comunes porque una sola transacción escribe varios. */
+      [{ createdAt: "desc" }, { code: "desc" }],
       filters,
       {
         lot: { select: { id: true, code: true, shade: true } },
