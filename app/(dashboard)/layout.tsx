@@ -23,11 +23,15 @@ export default async function DashboardLayout({
       <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
         <MobileHeader user={user} />
 
-        {/* `keyboard-safe` = pb-24 en celular (la barra inferior tapa la última
-            fila y el auxiliar no alcanza el botón de corte) MÁS la altura del
-            teclado cuando está abierto: sin ese extra el scroll se detiene
-            justo donde empieza el teclado y el último campo nunca sube. */}
-        <main className="keyboard-safe flex-1 p-4 md:min-h-0 md:overflow-y-auto md:p-6 md:pb-6">
+        {/* `keyboard-safe` reserva abajo la barra inferior MÁS la altura del
+            teclado cuando está abierto: sin ese aire el scroll se detiene
+            antes y el último botón —el de guardar— queda tapado.
+
+            El padding se declara por lados y NO con `p-4`: la forma corta
+            escribe también `padding-bottom` y, al vivir en la misma capa,
+            puede pisar el respiro según el orden en que Tailwind emita las
+            utilidades. Separados no hay pleito posible. */}
+        <main className="keyboard-safe flex-1 px-4 pt-4 md:min-h-0 md:overflow-y-auto md:px-6 md:py-6">
           {children}
         </main>
       </div>

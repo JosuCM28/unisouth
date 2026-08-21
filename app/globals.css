@@ -235,50 +235,6 @@
     @apply min-h-11 min-w-11;
   }
 
-  /* Respeto del notch en celular. */
-  .safe-top {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-
-  .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  /* ── Teclado del celular ────────────────────────────────────────────
-     `--keyboard-inset` la publica <KeyboardInsets> con la altura real que
-     tapa el teclado. Sin script vale 0 y todo se comporta como siempre. */
-
-  /* Espacio bajo el último campo de una pantalla larga. Los 6rem base son la
-     barra inferior; al abrir el teclado se le suma su altura.
-
-     Sin ese aire NO hay a dónde scrollear: el documento ya está al fondo y el
-     campo se queda tapado por más que se le pida subir. Es la mitad del
-     arreglo; la otra la hace <KeyboardInsets> moviendo el scroll.
-
-     `keyboard-safe-only` es la misma idea sin reservar la barra inferior, para
-     pantallas que no la tienen (login).
-
-     Repetir la clase sube la especificidad lo justo para ganarle a un `p-4` de
-     Tailwind en el mismo nodo, que si no ordena el padding de abajo y anula el
-     respiro. Y va sólo debajo de `md`: en escritorio no hay teclado que tape
-     nada ni barra inferior que esquivar. */
-  @media (width < 48rem) {
-    .keyboard-safe.keyboard-safe {
-      padding-bottom: calc(6rem + var(--keyboard-inset, 0px));
-    }
-
-    .keyboard-safe-only.keyboard-safe-only {
-      padding-bottom: var(--keyboard-inset, 0px);
-    }
-  }
-
-  /* Un contenedor que scrollea por dentro (hoja inferior, diálogo) tiene que
-     ceder el alto del teclado, o su scroll interno topa antes de llegar al
-     campo de abajo. */
-  .keyboard-inset-scroll {
-    padding-bottom: calc(1rem + var(--keyboard-inset, 0px));
-  }
-
   /* Lista de resultados del buscador dentro de una hoja: ocupa lo que sobre
      entre el buscador y el borde de la hoja. Sin `min-height: 0` un hijo
      flexible se niega a encogerse y la lista empuja el buscador fuera. */
@@ -296,6 +252,63 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ═══ Notch y teclado del celular ═════════════════════════════════════════
+   Van como `@utility` y NO dentro de `@layer components`, y la razón importa:
+   Tailwind v4 declara el orden `theme, base, components, utilities`, y entre
+   capas gana la última sin importar la especificidad. Estando en components,
+   un `p-4` en el mismo nodo les ordenaba el padding de abajo y borraba el
+   respiro —por eso el botón de guardar quedaba debajo de la barra inferior en
+   pantallas largas—. Duplicar la clase no servía: la especificidad no cuenta
+   entre capas. Como `@utility` comparten capa con `p-4` y, al declararse
+   después, ganan.
+
+   `--keyboard-inset` la publica <KeyboardInsets> con la altura real que tapa
+   el teclado. Sin script vale 0 y todo se comporta como siempre. */
+
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Espacio bajo el último campo de una pantalla larga. Los 6rem base son la
+   barra inferior; se le suma el notch y, al abrir el teclado, su altura.
+
+   Sin ese aire NO hay a dónde scrollear: el documento ya está al fondo y el
+   último control se queda tapado por más que se le pida subir. Es la mitad
+   del arreglo; la otra la hace <KeyboardInsets> moviendo el scroll.
+
+   Sólo debajo de `md`: en escritorio no hay teclado que tape nada ni barra
+   inferior que esquivar. */
+@utility keyboard-safe {
+  @media (width < 48rem) {
+    padding-bottom: calc(
+      6rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)
+    );
+  }
+}
+
+/* La misma idea sin reservar la barra inferior, para pantallas que no la
+   tienen (login). */
+@utility keyboard-safe-only {
+  @media (width < 48rem) {
+    padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)
+    );
+  }
+}
+
+/* Un contenedor que scrollea por dentro (hoja inferior, diálogo) tiene que
+   ceder el alto del teclado, o su scroll interno topa antes de llegar al
+   campo de abajo. */
+@utility keyboard-inset-scroll {
+  padding-bottom: calc(
+    1rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)
+  );
 }
 
 /* ─── Teclado abierto en celular ──────────────────────────────────────────

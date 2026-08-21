@@ -50,7 +50,7 @@ export function MobileMenu({ sections }: MobileMenuProps) {
       </SheetTrigger>
 
       {/* Entra por la izquierda, como el sidebar que sustituye. */}
-      <SheetContent side="left" className="safe-top w-72 overflow-y-auto p-0">
+      <SheetContent side="left" className="w-72 overflow-y-auto p-0 pt-[env(safe-area-inset-top,0px)]">
         <SheetHeader className="border-b border-border">
           <SheetTitle>Menú</SheetTitle>
         </SheetHeader>
