@@ -7,6 +7,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pager } from "@/components/shared/pager";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Documentos" };
 
@@ -17,6 +18,11 @@ interface PageProps {
 }
 
 export default async function DocumentsPage({ searchParams }: PageProps) {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
   /* "Cargar más" del celular: trae desde la primera fila hasta el final de

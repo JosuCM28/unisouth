@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Imprimir rollos" };
  * concretos. Sirve para imprimir de golpe todo lo que llegó en una recepción.
  */
 export default async function PrintLotsPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
   const isLabel = params.formato === "etiqueta";

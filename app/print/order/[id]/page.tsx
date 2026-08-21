@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Orden de corte" };
  * estas y cuándo", que un total no puede responder.
  */
 export default async function PrintOrderPage({ params }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
   const { id } = await params;
 
   const order = await prisma.cuttingOrder.findUnique({

@@ -43,7 +43,7 @@ export async function generateMetadata({
  * saber qué queda pendiente sin tener que sumar a mano.
  */
 export default async function OrderDetailPage({ params }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { id } = await params;
 

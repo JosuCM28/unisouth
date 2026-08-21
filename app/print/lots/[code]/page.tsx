@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * sin ese parámetro sale la hoja completa que acompaña al rollo.
  */
 export default async function PrintLotPage({ params, searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { code } = await params;
   const { formato } = await searchParams;

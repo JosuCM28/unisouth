@@ -30,7 +30,7 @@ export async function generateMetadata({
  * tener que cruzar el inventario a mano.
  */
 export default async function ReceiptDetailPage({ params }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { code } = await params;
   const repository = new ReceiptRepository();

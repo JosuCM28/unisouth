@@ -21,7 +21,7 @@ interface PageProps {
 }
 
 export default async function ReportsPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
   const days = parseRangeDays(params.dias);

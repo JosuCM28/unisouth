@@ -10,7 +10,7 @@ export async function GET() {
   // Recorren tablas completas: sin límite, son un vector de denegación.
   await enforceRateLimit("export:materials", EXPORT_LIMIT);
 
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const repository = new MaterialRepository();
   const { items } = await repository.search({ pageSize: 100 });

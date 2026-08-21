@@ -32,7 +32,7 @@ export async function GET() {
   // Recorren tablas completas: sin límite, son un vector de denegación.
   await enforceRateLimit("export:lots", EXPORT_LIMIT);
 
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { items } = await new LotRepository().search({ pageSize: 100 });
   return csvResponse(toCsv(items as Row[], COLUMNS), "inventario");

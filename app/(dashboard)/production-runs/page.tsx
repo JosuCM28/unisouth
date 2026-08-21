@@ -9,6 +9,7 @@ import { ProductionRunFormDialog } from "@/components/production-runs/production
 import { ProductionRunList } from "@/components/production-runs/production-run-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Producciones" };
 
@@ -21,6 +22,11 @@ interface PageProps {
 }
 
 export default async function ProductionRunsPage({ searchParams }: PageProps) {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const params = await searchParams;
   const clients = await new ClientRepository().findOptions();
 

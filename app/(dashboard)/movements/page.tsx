@@ -28,7 +28,7 @@ interface PageProps {
 }
 
 export default async function MovementsPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
   const materials = await new MovementRepository().findMaterials();

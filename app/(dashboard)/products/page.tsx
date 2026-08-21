@@ -8,6 +8,7 @@ import { Pager } from "@/components/shared/pager";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { Button } from "@/components/ui/button";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Productos" };
 
@@ -18,6 +19,11 @@ interface PageProps {
 }
 
 export default async function ProductsPage({ searchParams }: PageProps) {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
   /* "Cargar más" del celular: trae desde la primera fila hasta el final de

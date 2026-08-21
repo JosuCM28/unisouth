@@ -25,7 +25,10 @@ export default function proxy(request: NextRequest) {
   }
 
   if (hasSession && isLoginRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    /* A la raíz y no a `/dashboard`: aquí sólo se ve la cookie, no el rol, y
+       el tablero está cerrado para Dirección. `/` sí lee la sesión y manda a
+       cada quien al primer destino que su rol puede ver. */
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

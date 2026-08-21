@@ -25,14 +25,14 @@ export const NAVIGATION: NavSection[] = [
         href: "/dashboard",
         label: "Tablero",
         icon: "dashboard",
-        permission: "inventory:read",
+        permission: "inventory:browse",
         showOnMobileBar: true,
       },
       {
         href: "/lots",
         label: "Inventario",
         icon: "lots",
-        permission: "inventory:read",
+        permission: "inventory:browse",
         showOnMobileBar: true,
       },
       {
@@ -71,55 +71,55 @@ export const NAVIGATION: NavSection[] = [
         href: "/materials",
         label: "Materiales",
         icon: "materials",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/products",
         label: "Productos",
         icon: "products",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/sizes",
         label: "Tallas",
         icon: "sizes",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/cut-tags",
         label: "Foleos",
         icon: "cutTags",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/warehouses",
         label: "Almacenes",
         icon: "warehouses",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/locations",
         label: "Ubicaciones",
         icon: "locations",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/clients",
         label: "Clientes",
         icon: "clients",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/production-runs",
         label: "Producciones",
         icon: "productionRuns",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/partners",
         label: "Proveedores",
         icon: "partners",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/helpers",
@@ -139,7 +139,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/receipts",
         label: "Recepciones",
         icon: "receipts",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         // Apunta al registro y no a /issues/new por la misma razón que
@@ -148,13 +148,13 @@ export const NAVIGATION: NavSection[] = [
         href: "/issues",
         label: "Salidas",
         icon: "issues",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/orders",
         label: "Órdenes",
         icon: "orders",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         // El kárdex, no los vales: aquí sólo aparece lo que YA afectó
@@ -163,13 +163,13 @@ export const NAVIGATION: NavSection[] = [
         href: "/movements",
         label: "Movimientos",
         icon: "movements",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/documents",
         label: "Documentos",
         icon: "documents",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/purchase-requests",
@@ -181,7 +181,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/reports",
         label: "Reportes",
         icon: "reports",
-        permission: "inventory:read",
+        permission: "inventory:browse",
       },
       {
         href: "/audit",
@@ -202,6 +202,23 @@ export const NAVIGATION: NavSection[] = [
 export const MOBILE_BAR_ITEMS: NavItem[] = NAVIGATION.flatMap((section) =>
   section.items.filter((item) => item.showOnMobileBar),
 );
+
+/**
+ * A dónde entra cada quien al iniciar sesión.
+ *
+ * No puede ser `/dashboard` fijo: Dirección no tiene `inventory:browse`, así
+ * que el tablero le está cerrado y aterrizaría en un error de permiso justo
+ * después de escribir bien su contraseña. Se resuelve tomando el PRIMER
+ * destino que su rol sí puede ver, que por el orden de NAVIGATION es el más
+ * importante para ese rol.
+ */
+export function landingRoute(
+  role: string,
+  hasPermission: (role: string, permission: Permission) => boolean,
+): string {
+  const [primera] = visibleSections(role, hasPermission);
+  return primera?.items[0]?.href ?? "/lots/scan";
+}
 
 /**
  * Secciones que el usuario puede ver, según su rol.

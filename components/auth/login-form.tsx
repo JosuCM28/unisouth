@@ -17,16 +17,18 @@ import { Label } from "@/components/ui/label";
  *
  * Sin esta guarda, `?redirect=https://sitio-malicioso.com` mandaría al
  * usuario fuera JUSTO después de teclear su contraseña, que es cuando más
- * confía en lo que ve. La raíz se traduce al tablero: `/` es sólo un desvío.
+ * confía en lo que ve.
+ *
+ * El destino por defecto es `/` y no `/dashboard`: aquí no se conoce el rol, y
+ * el tablero está cerrado para Dirección. `/` es un desvío que sí lee la
+ * sesión y manda a cada quien a donde su rol puede entrar.
  */
 function safeRedirect(target: string | null): string {
-  if (!target || !target.startsWith("/")) return "/dashboard";
+  if (!target || !target.startsWith("/")) return "/";
 
   // `//evil.com` y `/\evil.com` son rutas relativas al protocolo: el
   // navegador las trata como absolutas.
-  if (target.startsWith("//") || target.startsWith("/\\")) return "/dashboard";
-
-  if (target === "/") return "/dashboard";
+  if (target.startsWith("//") || target.startsWith("/\\")) return "/";
 
   return target;
 }

@@ -25,7 +25,7 @@ const RANGE_LABELS: Record<number, string> = {
  * grises indistinguibles. En papel manda la tabla con los números exactos.
  */
 export default async function PrintReportPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
   const days = parseRangeDays(params.dias);

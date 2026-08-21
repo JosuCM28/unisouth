@@ -6,10 +6,16 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { SizeFormDialog } from "@/components/products/size-form-dialog";
 import { Button } from "@/components/ui/button";
 import { formatQuantity, toPlainObject } from "@/lib/utils";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Tallas" };
 
 export default async function SizesPage() {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   // Size.consumptionFactor es Decimal y SizeFormDialog es cliente: sin
   // convertir, React no puede serializarlo al pasar la frontera.
   const sizes = toPlainObject(

@@ -32,7 +32,7 @@ export default async function DashboardLayout({
         </main>
       </div>
 
-      <MobileNav />
+      <MobileNav role={user.role} />
     </div>
   );
 }

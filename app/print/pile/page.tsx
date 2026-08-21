@@ -26,7 +26,7 @@ export const metadata: Metadata = { title: "Hoja de pila" };
  * ahí se sabe qué hay debajo sin levantar rollo por rollo.
  */
 export default async function PrintPilePage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
 

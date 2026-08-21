@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Foleos" };
  */
 export default async function CutTagsPage() {
   // Leer catálogos va con inventory:read, igual que tallas y materiales.
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const tags = await prisma.cutTagOption.findMany({
     where: { deletedAt: null },

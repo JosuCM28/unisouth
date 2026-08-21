@@ -244,8 +244,14 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `WAREHOUSE` | Todo el menú salvo Auditoría: entradas, salidas, cortes, conteos, ajustes, catálogos, fichas técnicas, cálculos y levantar requisiciones (no autorizarlas) |
 | `PRODUCTION` | Consultar inventario, editar fichas técnicas, correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
-| `MANAGEMENT` | Sólo lectura + reportes + auditoría |
+| `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · Ayudantes. Edita tareas, ayudantes y cálculos; NO recorre el almacén ni ve auditoría |
 | `READ_ONLY` | Sólo lectura |
+
+`inventory:read` es consultar un dato; **`inventory:browse` es recorrer el
+almacén** (rollos, catálogos, documentos, reportes). Están separados porque
+Dirección entra sólo a lo suyo: sin `browse` se le caen del menú 18 destinos.
+El destino de entrada tras el login NO es `/dashboard` fijo — lo resuelve
+`landingRoute()` con el primer destino que el rol puede ver.
 
 Los permisos son capacidades (`inventory:write`, `inventory:adjust`,
 `catalog:write`…), no pantallas. `executeAction` exige el permiso antes de

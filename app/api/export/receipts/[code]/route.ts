@@ -65,7 +65,7 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> },
 ) {
   await enforceRateLimit("export:receipt", EXPORT_LIMIT);
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { code } = await params;
   const receipt = await new ReceiptRepository().findByCodeWithLots(

@@ -37,6 +37,13 @@ export const ROLE_LABELS: Record<Role, string> = {
  */
 export const PERMISSIONS = [
   "inventory:read",
+  /* Recorrer el inventario y sus catálogos: rollos, materiales, recepciones,
+     salidas, movimientos, reportes… Se separó de `inventory:read` —que es
+     consultar un dato suelto— porque Dirección entra sólo a lo suyo (escanear,
+     tareas, ayudantes, cálculo) y no al grueso del almacén. Sin esta capacidad
+     aparte los dos casos eran indistinguibles: 18 destinos del menú pedían
+     exactamente el mismo permiso. */
+  "inventory:browse",
   "inventory:write",
   "inventory:adjust",
   "catalog:write",
@@ -77,6 +84,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
                         auditoría por la puerta de atrás. */
   WAREHOUSE: [
     "inventory:read",
+    "inventory:browse",
     "inventory:write",
     "inventory:adjust",
     "catalog:write",
@@ -86,14 +94,35 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ],
 
   // Consulta inventario, mantiene fichas técnicas y corre cálculos.
-  PRODUCTION: ["inventory:read", "bom:write", "calculation:run"],
+  PRODUCTION: [
+    "inventory:read",
+    "inventory:browse",
+    "bom:write",
+    "calculation:run",
+  ],
 
-  PURCHASING: ["inventory:read", "purchase:request", "purchase:approve"],
+  PURCHASING: [
+    "inventory:read",
+    "inventory:browse",
+    "purchase:request",
+    "purchase:approve",
+  ],
 
-  // Dirección no captura: mira, reportea y audita.
-  MANAGEMENT: ["inventory:read", "audit:read"],
+  /* Dirección tiene un menú corto y a propósito: escanear un rollo, el
+     pizarrón de tareas, el padrón de ayudantes y el motor de cálculo. Ahí sí
+     captura —mueve tarjetas, da de alta un ayudante, corre un cálculo—, pero
+     NO recorre el almacén: sin `inventory:browse` se le caen del menú los 18
+     destinos de rollos, catálogos y documentos.
 
-  READ_ONLY: ["inventory:read"],
+     Tampoco lleva `audit:read`: la bitácora queda sólo en ADMIN. */
+  MANAGEMENT: [
+    "inventory:read",
+    "inventory:write",
+    "catalog:write",
+    "calculation:run",
+  ],
+
+  READ_ONLY: ["inventory:read", "inventory:browse"],
 };
 
 /** Convierte el String de la base a un Role válido. */

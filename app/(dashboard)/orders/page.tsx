@@ -40,7 +40,7 @@ interface PageProps {
  * por cortar de cada orden.
  */
 export default async function OrdersPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;

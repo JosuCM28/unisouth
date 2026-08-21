@@ -7,12 +7,17 @@ import { RecentMovements } from "@/components/dashboard/recent-movements";
 import { StockByClient } from "@/components/dashboard/stock-by-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardService } from "@/lib/services/dashboard.service";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = {
   title: "Tablero",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  /* El tablero resume el almacén entero, así que va con los demás destinos
+     que Dirección no recorre. Su propio menú arranca en Escanear. */
+  await requirePermission("inventory:browse");
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader

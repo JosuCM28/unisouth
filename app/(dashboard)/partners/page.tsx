@@ -9,10 +9,16 @@ import { CarrierActions, SupplierActions } from "@/components/partners/partner-a
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Proveedores y paqueterías" };
 
 export default async function PartnersPage() {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const [carriers, suppliers] = await Promise.all([
     prisma.carrier.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } }),
     prisma.supplier.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } }),

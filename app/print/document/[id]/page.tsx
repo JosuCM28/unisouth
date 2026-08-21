@@ -35,7 +35,7 @@ export const metadata: Metadata = { title: "Vale" };
  * imprimen en vez de dejar el hueco.
  */
 export default async function PrintDocumentPage({ params }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
   const { id } = await params;
 
   const document = await prisma.inventoryDocument.findUnique({

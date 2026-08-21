@@ -10,6 +10,7 @@ import { LocationList } from "@/components/locations/location-list";
 import { WarehouseMap } from "@/components/locations/warehouse-map";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = {
   title: "Ubicaciones",
@@ -24,6 +25,11 @@ interface PageProps {
 }
 
 export default async function LocationsPage({ searchParams }: PageProps) {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const params = await searchParams;
   const warehouses = await new WarehouseRepository().findOptions();
 

@@ -18,6 +18,7 @@ import { LotList } from "@/components/lots/lot-list";
 import type { LotCardData } from "@/components/lots/lot-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Inventario" };
 
@@ -43,6 +44,11 @@ interface PageProps {
 }
 
 export default async function LotsPage({ searchParams }: PageProps) {
+  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
+     no está en su menú, y ésta es la línea que de verdad la cierra —el
+     enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("inventory:browse");
+
   const params = await searchParams;
 
   const [materials, locations, clients, productionRuns] = await Promise.all([

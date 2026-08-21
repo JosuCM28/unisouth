@@ -91,7 +91,7 @@ export default async function MaterialDetailPage({
   params,
   searchParams,
 }: PageProps) {
-  await requirePermission("inventory:read");
+  await requirePermission("inventory:browse");
 
   const { code } = await params;
   const query = await searchParams;
