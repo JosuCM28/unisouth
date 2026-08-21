@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Copy, Plus, Save, Trash2 } from "lucide-react";
 import {
@@ -23,16 +23,13 @@ import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { cn, todayInputValue } from "@/lib/utils";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
+import {
+  SearchSelect,
+  type SearchSelectOption,
+} from "@/components/shared/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface HeaderState {
   date: string;
@@ -116,6 +113,43 @@ export function ReceiptWizard({
 
   /** Fila que se va a borrar. `null` = el diálogo está cerrado. */
   const [rowToDelete, setRowToDelete] = useState<number | null>(null);
+
+  /* Las opciones se derivan una vez y no por renglón: con veinte rollos en
+     pantalla, rearmar la lista de 200 materiales veinte veces por tecla
+     capturada se siente en un celular de bodega. */
+  const materialSelectOptions = useMemo<SearchSelectOption[]>(
+    () =>
+      materialOptions.map((material) => ({
+        value: material.id,
+        label: material.name,
+        // El código va de subtítulo porque dos materiales pueden llamarse
+        // casi igual y es el código lo que trae impresa la etiqueta.
+        hint: material.code,
+        // Color y composición no se pintan, pero sí se buscan: el auxiliar
+        // muchas veces sabe "la azul marino" y no el nombre del catálogo.
+        keywords: `${material.colorName ?? ""} ${material.composition ?? ""}`,
+      })),
+    [materialOptions],
+  );
+
+  const locationOptions = useMemo<SearchSelectOption[]>(
+    () =>
+      locations.map((location) => ({
+        value: location.id,
+        label: location.code,
+        hint: location.name,
+      })),
+    [locations],
+  );
+
+  // El de ayudantes se pinta una vez POR RENGLÓN: aquí sí importa memorizarlo.
+  const helperSelectOptions = useMemo(
+    () => nameOptions(helperOptions),
+    [helperOptions],
+  );
+  const carrierOptions = useMemo(() => nameOptions(carriers), [carriers]);
+  const supplierOptions = useMemo(() => nameOptions(suppliers), [suppliers]);
+  const clientOptions = useMemo(() => nameOptions(clients), [clients]);
 
   function updateRow(index: number, patch: Partial<LotRow>) {
     setRows((current) =>
@@ -267,24 +301,15 @@ export function ReceiptWizard({
             />
 
             <FormSelectField id="carrierId" label="Paquetería">
-              <Select
-                value={header.carrierId || "none"}
-                onValueChange={(value) =>
-                  setHeader({ ...header, carrierId: value === "none" ? "" : value })
-                }
-              >
-                <SelectTrigger id="carrierId" className="touch-target w-full">
-                  <SelectValue placeholder="Sin especificar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin especificar</SelectItem>
-                  {carriers.map((carrier) => (
-                    <SelectItem key={carrier.id} value={carrier.id}>
-                      {carrier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchSelect
+                id="carrierId"
+                options={carrierOptions}
+                value={header.carrierId}
+                onChange={(value) => setHeader({ ...header, carrierId: value })}
+                placeholder="Sin especificar"
+                searchPlaceholder="Buscar paquetería…"
+                clearLabel="Sin especificar"
+              />
             </FormSelectField>
           </div>
 
@@ -298,24 +323,15 @@ export function ReceiptWizard({
 
           <div className="grid gap-3 md:grid-cols-2">
             <FormSelectField id="supplierId" label="Proveedor">
-              <Select
-                value={header.supplierId || "none"}
-                onValueChange={(value) =>
-                  setHeader({ ...header, supplierId: value === "none" ? "" : value })
-                }
-              >
-                <SelectTrigger id="supplierId" className="touch-target w-full">
-                  <SelectValue placeholder="Sin especificar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin especificar</SelectItem>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchSelect
+                id="supplierId"
+                options={supplierOptions}
+                value={header.supplierId}
+                onChange={(value) => setHeader({ ...header, supplierId: value })}
+                placeholder="Sin especificar"
+                searchPlaceholder="Buscar proveedor…"
+                clearLabel="Sin especificar"
+              />
             </FormSelectField>
 
             {/* El dueño se hereda a TODOS los rollos de la carga. */}
@@ -324,24 +340,15 @@ export function ReceiptWizard({
               label="Cliente dueño"
               hint="Se aplica a todos los rollos de esta guía."
             >
-              <Select
-                value={header.clientId || "none"}
-                onValueChange={(value) =>
-                  setHeader({ ...header, clientId: value === "none" ? "" : value })
-                }
-              >
-                <SelectTrigger id="clientId" className="touch-target w-full">
-                  <SelectValue placeholder="De la fábrica" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">De la fábrica</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchSelect
+                id="clientId"
+                options={clientOptions}
+                value={header.clientId}
+                onChange={(value) => setHeader({ ...header, clientId: value })}
+                placeholder="De la fábrica"
+                searchPlaceholder="Buscar cliente…"
+                clearLabel="De la fábrica"
+              />
             </FormSelectField>
           </div>
 
@@ -394,9 +401,17 @@ export function ReceiptWizard({
 
                 <FormSelectField id={`material-row-${index}`} label="Material">
                   <div className="flex gap-2">
-                    <Select
+                    {/* Buscador Y desplegable: con 200 materiales en el
+                        catálogo, recorrer la lista con el dedo es más lento
+                        que teclear tres letras. Se busca también por código y
+                        por color, que es lo que trae impreso la etiqueta del
+                        rollo cuando el nombre no se lee. */}
+                    <SearchSelect
+                      id={`material-row-${index}`}
+                      className="min-w-0 flex-1"
+                      options={materialSelectOptions}
                       value={row.materialId}
-                      onValueChange={(value) => {
+                      onChange={(value) => {
                         const material = materialOptions.find(
                           (item) => item.id === value,
                         );
@@ -405,21 +420,10 @@ export function ReceiptWizard({
                           unit: material?.baseUnit ?? "",
                         });
                       }}
-                    >
-                      <SelectTrigger
-                        id={`material-row-${index}`}
-                        className="touch-target min-w-0 flex-1"
-                      >
-                        <SelectValue placeholder="Elige el material" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {materialOptions.map((material) => (
-                          <SelectItem key={material.id} value={material.id}>
-                            {material.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Elige el material"
+                      searchPlaceholder="Buscar por nombre, código o color…"
+                      emptyMessage="Ningún material coincide."
+                    />
 
                     {/* Llega un material que nadie dio de alta: se registra
                         aquí mismo y queda seleccionado, sin perder la
@@ -490,27 +494,15 @@ export function ReceiptWizard({
 
                 <div className="grid grid-cols-2 gap-3">
                   <FormSelectField id={`location-row-${index}`} label="Ubicación">
-                    <Select
-                      value={row.locationId || "none"}
-                      onValueChange={(value) =>
-                        updateRow(index, { locationId: value === "none" ? "" : value })
-                      }
-                    >
-                      <SelectTrigger
-                        id={`location-row-${index}`}
-                        className="touch-target w-full"
-                      >
-                        <SelectValue placeholder="Sin asignar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchSelect
+                      id={`location-row-${index}`}
+                      options={locationOptions}
+                      value={row.locationId}
+                      onChange={(value) => updateRow(index, { locationId: value })}
+                      placeholder="Sin asignar"
+                      searchPlaceholder="Buscar ubicación…"
+                      clearLabel="Sin asignar"
+                    />
                   </FormSelectField>
 
                   <FormField
@@ -530,29 +522,16 @@ export function ReceiptWizard({
                   label="Ayudante que lo bajó"
                 >
                   <div className="flex gap-2">
-                    <Select
-                      value={row.helperId || "none"}
-                      onValueChange={(value) =>
-                        updateRow(index, {
-                          helperId: value === "none" ? "" : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger
-                        id={`helper-row-${index}`}
-                        className="touch-target min-w-0 flex-1"
-                      >
-                        <SelectValue placeholder="Sin asignar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {helperOptions.map((helper) => (
-                          <SelectItem key={helper.id} value={helper.id}>
-                            {helper.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchSelect
+                      id={`helper-row-${index}`}
+                      className="min-w-0 flex-1"
+                      options={helperSelectOptions}
+                      value={row.helperId}
+                      onChange={(value) => updateRow(index, { helperId: value })}
+                      placeholder="Sin asignar"
+                      searchPlaceholder="Buscar ayudante…"
+                      clearLabel="Sin asignar"
+                    />
 
                     {/* Llega un ayudante nuevo con el camión: se registra sin
                         salir de la captura. */}
@@ -788,6 +767,11 @@ function Step({
       </span>
     </li>
   );
+}
+
+/** Catálogos que sólo son id + nombre: paquetería, proveedor, cliente, ayudante. */
+function nameOptions(items: { id: string; name: string }[]): SearchSelectOption[] {
+  return items.map((item) => ({ value: item.id, label: item.name }));
 }
 
 function emptyRow(): LotRow {

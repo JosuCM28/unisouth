@@ -17,6 +17,9 @@ export function MobileNav() {
 
   return (
     <nav
+      // Con el teclado abierto quedan ~250px útiles y esta barra se lleva 64.
+      // El CSS la esconde mientras dure la captura; ver globals.css.
+      data-mobile-nav
       className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card md:hidden"
       aria-label="Navegación principal"
     >

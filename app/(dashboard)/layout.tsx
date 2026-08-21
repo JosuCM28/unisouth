@@ -23,9 +23,11 @@ export default async function DashboardLayout({
       <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
         <MobileHeader user={user} />
 
-        {/* pb-24 en celular: sin ese respiro la barra inferior tapa la última
-            fila de la lista y el auxiliar no alcanza el botón de corte. */}
-        <main className="flex-1 p-4 pb-24 md:min-h-0 md:overflow-y-auto md:p-6 md:pb-6">
+        {/* `keyboard-safe` = pb-24 en celular (la barra inferior tapa la última
+            fila y el auxiliar no alcanza el botón de corte) MÁS la altura del
+            teclado cuando está abierto: sin ese extra el scroll se detiene
+            justo donde empieza el teclado y el último campo nunca sube. */}
+        <main className="keyboard-safe flex-1 p-4 md:min-h-0 md:overflow-y-auto md:p-6 md:pb-6">
           {children}
         </main>
       </div>

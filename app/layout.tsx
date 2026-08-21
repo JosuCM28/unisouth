@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { KeyboardInsets } from "@/components/layout/keyboard-insets";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -50,6 +51,12 @@ export default function RootLayout({
           además de que oculta la barra de direcciones del navegador. */}
       <body className="flex min-h-dvh flex-col font-sans md:h-dvh md:min-h-0 md:overflow-hidden">
         {children}
+
+        {/* No pinta nada: mide el teclado del celular y sube el campo enfocado
+            por encima de él. Va en el layout raíz para que valga en TODA la
+            app, login incluido. */}
+        <KeyboardInsets />
+
         {/* Arriba y al centro: abajo lo taparía la barra de navegación móvil. */}
         <Toaster position="top-center" richColors />
       </body>

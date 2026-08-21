@@ -49,7 +49,7 @@ export function ResponsiveFormDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="keyboard-aware-dialog max-h-[85dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description && (
@@ -65,15 +65,18 @@ export function ResponsiveFormDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
+      {/* `dvh` y no `vh`: con la barra del navegador visible, `vh` mide de más
+          y la hoja se sale por abajo. La clase la usa globals.css para subirla
+          por encima del teclado. */}
       <SheetContent
         side="bottom"
-        className="safe-bottom max-h-[90vh] overflow-y-auto"
+        className="keyboard-aware-sheet safe-bottom max-h-[90dvh] overflow-y-auto"
       >
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
-        <div className="px-4 pb-4">{children}</div>
+        <div className="keyboard-inset-scroll px-4">{children}</div>
       </SheetContent>
     </Sheet>
   );

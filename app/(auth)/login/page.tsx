@@ -9,7 +9,10 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="safe-top safe-bottom flex flex-1 items-center justify-center p-4">
+    // `keyboard-safe-only`: al abrir el teclado el documento necesita margen
+    // abajo para poder scrollear, o el campo enfocado se queda tapado aunque
+    // el navegador quiera subirlo. Sin ese aire no hay a dónde ir.
+    <main className="keyboard-safe-only safe-top safe-bottom flex flex-1 items-center justify-center px-4 pt-4">
       <div className="flat-surface w-full max-w-sm p-6">
         <div className="mb-6">
           <h1 className="text-xl font-semibold tracking-tight">UNISOUTH</h1>

@@ -244,6 +244,49 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* ── Teclado del celular ────────────────────────────────────────────
+     `--keyboard-inset` la publica <KeyboardInsets> con la altura real que
+     tapa el teclado. Sin script vale 0 y todo se comporta como siempre. */
+
+  /* Espacio bajo el último campo de una pantalla larga. Los 6rem base son la
+     barra inferior; al abrir el teclado se le suma su altura.
+
+     Sin ese aire NO hay a dónde scrollear: el documento ya está al fondo y el
+     campo se queda tapado por más que se le pida subir. Es la mitad del
+     arreglo; la otra la hace <KeyboardInsets> moviendo el scroll.
+
+     `keyboard-safe-only` es la misma idea sin reservar la barra inferior, para
+     pantallas que no la tienen (login).
+
+     Repetir la clase sube la especificidad lo justo para ganarle a un `p-4` de
+     Tailwind en el mismo nodo, que si no ordena el padding de abajo y anula el
+     respiro. Y va sólo debajo de `md`: en escritorio no hay teclado que tape
+     nada ni barra inferior que esquivar. */
+  @media (width < 48rem) {
+    .keyboard-safe.keyboard-safe {
+      padding-bottom: calc(6rem + var(--keyboard-inset, 0px));
+    }
+
+    .keyboard-safe-only.keyboard-safe-only {
+      padding-bottom: var(--keyboard-inset, 0px);
+    }
+  }
+
+  /* Un contenedor que scrollea por dentro (hoja inferior, diálogo) tiene que
+     ceder el alto del teclado, o su scroll interno topa antes de llegar al
+     campo de abajo. */
+  .keyboard-inset-scroll {
+    padding-bottom: calc(1rem + var(--keyboard-inset, 0px));
+  }
+
+  /* Lista de resultados del buscador dentro de una hoja: ocupa lo que sobre
+     entre el buscador y el borde de la hoja. Sin `min-height: 0` un hijo
+     flexible se niega a encogerse y la lista empuja el buscador fuera. */
+  .keyboard-list {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   /* Listas horizontales sin barra visible (chips de filtro en celular). */
   .no-scrollbar {
     -ms-overflow-style: none;
@@ -253,6 +296,28 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ─── Teclado abierto en celular ──────────────────────────────────────────
+   Con el teclado arriba quedan ~250px de alto útil. La barra inferior de
+   navegación se lleva 64px de esos, y estorba: nadie navega mientras teclea,
+   y en cambio tapa el campo. Se esconde mientras dure la captura y vuelve al
+   cerrar el teclado. */
+html[data-keyboard-open="true"] nav[data-mobile-nav] {
+  display: none;
+}
+
+/* Las hojas inferiores suben para no quedar detrás del teclado.
+   La clase la pone <ResponsiveFormDialog>; no se toca components/ui/. */
+html[data-keyboard-open="true"] .keyboard-aware-sheet {
+  bottom: var(--keyboard-inset, 0px);
+  max-height: calc(100dvh - var(--keyboard-inset, 0px));
+}
+
+/* Un diálogo centrado se recentra sobre la mitad que SÍ se ve. */
+html[data-keyboard-open="true"] .keyboard-aware-dialog {
+  top: calc((100dvh - var(--keyboard-inset, 0px)) / 2);
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
 }
 
 /* ─── Impresión ───────────────────────────────────────────────────────────
