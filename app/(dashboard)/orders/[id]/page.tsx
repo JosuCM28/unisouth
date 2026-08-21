@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
 import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
+import { OrderSendToIssueDialog } from "@/components/orders/order-send-to-issue-dialog";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -95,6 +96,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { pending, surplus } = cutProgress(ordered, cut);
   const isCancelled = order.status === "CANCELLED";
 
+  /* Lo que viajaría a un vale de salida: sólo las tallas con corte, porque
+     lo que sale por la puerta son las prendas que ya existen. Se calcula
+     aquí para poder enseñarlo ANTES de crear el borrador. */
+  const issueSizes = order.lines
+    .filter((line) => line.cutQuantity > 0)
+    .map((line) => ({ sizeCode: line.size.code, quantity: line.cutQuantity }));
+
+  // Sin nada cortado no hay nada que entregar y el botón no se ofrece: la
+  // orden se manda cuando el taller ya cortó, no antes.
+  const canSendToIssue = !isCancelled && issueSizes.length > 0;
+
   // Todos los avances de la orden, del más reciente al más viejo.
   const history = order.lines
     .flatMap((line) =>
@@ -132,6 +144,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   Editar
                 </Link>
               </Button>
+              {/* Va antes de Mover y Cancelar: es la acción que sigue cuando
+                  el taller termina, y estaba costando recapturar el desglose
+                  entero en Salidas. */}
+              {canSendToIssue && (
+                <OrderSendToIssueDialog
+                  orderId={order.id}
+                  orderCode={order.code}
+                  sizes={issueSizes}
+                  pendingSizes={order.lines.length - issueSizes.length}
+                />
+              )}
               <OrderMoveDialog
                 orderId={order.id}
                 orderCode={order.code}

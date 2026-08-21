@@ -11,6 +11,7 @@ import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 
 const REVALIDATE = ["/orders", "/dashboard"];
 
+const idSchema = z.object({ id: cuidSchema });
 const updateSchema = z.object({ id: cuidSchema, data: cuttingOrderSchema });
 const cancelSchema = z.object({
   id: cuidSchema,
@@ -59,5 +60,21 @@ export async function cancelCuttingOrderAction(input: unknown) {
     successMessage: "Orden cancelada",
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).cancel(input.id, input.reason),
+  });
+}
+
+/**
+ * Manda la orden a Salidas como borrador.
+ *
+ * Revalida también `/issues` y `/documents`: el vale nuevo tiene que
+ * aparecer en el registro sin que haya que recargar a mano.
+ */
+export async function sendOrderToIssueAction(input: unknown) {
+  return executeAction(input, {
+    schema: idSchema,
+    permission: "inventory:write",
+    revalidate: [...REVALIDATE, "/issues", "/documents"],
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).sendToIssue(input.id),
   });
 }
