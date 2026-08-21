@@ -16,6 +16,9 @@ export const cuttingOrderSchema = z.object({
   clientId: optionalCuid,
   materialId: optionalCuid,
   productionRunId: optionalCuid,
+  /// La carpeta de pedido a la que pertenece. Sin ella la orden queda suelta,
+  /// que es un estado normal: agrupar es opcional.
+  folderId: optionalCuid,
   description: optionalText,
   reference: optionalText,
   orderedAt: localDate.optional(),

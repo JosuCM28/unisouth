@@ -42,6 +42,7 @@ export default async function EditOrderPage({ params }: PageProps) {
     clientId: order.clientId,
     materialId: order.materialId,
     productionRunId: order.productionRunId,
+    folderId: order.folderId,
     description: order.description,
     reference: order.reference,
     orderedAt: toDateInputValue(order.orderedAt),
@@ -80,6 +81,7 @@ export default async function EditOrderPage({ params }: PageProps) {
         productionRuns={options.productionRuns}
         sizes={options.sizes}
         tags={options.tags}
+        folders={options.folders}
         order={editable}
       />
     </div>

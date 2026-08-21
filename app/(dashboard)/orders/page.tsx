@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardList, Plus } from "lucide-react";
+import { ClipboardList, FolderPlus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
-import {
-  CUTTING_ORDER_STATUS_LABELS,
-  CUTTING_ORDER_STATUS_STYLES,
-} from "@/lib/constants/labels";
-import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pager } from "@/components/shared/pager";
 import { Button } from "@/components/ui/button";
+import { FolderCard } from "@/components/orders/folder-card";
 import { OrderFilters } from "@/components/orders/order-filters";
+import { OrderListItem } from "@/components/orders/order-list-item";
 import {
   cuttingOrderWhere,
+  LOOSE_ORDERS,
   parseCuttingOrderFilters,
 } from "@/lib/repositories/cutting-order-filters";
 
@@ -30,14 +29,17 @@ interface PageProps {
     status?: string;
     from?: string;
     to?: string;
+    folder?: string;
+    archived?: string;
   }>;
 }
 
 /**
  * Órdenes de corte: qué pidió cada cliente y cómo va.
  *
- * La lista responde de un vistazo lo único que importa a diario: cuánto falta
- * por cortar de cada orden.
+ * Arriba los pedidos —las carpetas que agrupan varias órdenes— y abajo las
+ * órdenes sueltas. La lista responde de un vistazo lo único que importa a
+ * diario: cuánto falta por cortar.
  */
 export default async function OrdersPage({ searchParams }: PageProps) {
   await requirePermission("inventory:browse");
@@ -49,14 +51,25 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
 
   const filters = parseCuttingOrderFilters(params);
-  const where = cuttingOrderWhere(filters);
+  const showArchived = params.archived === "1";
 
-  const [total, orders, clients] = await Promise.all([
+  /* Sin filtros, abajo van SÓLO las sueltas: las que están en un pedido ya se
+     ven dentro de su carpeta y repetirlas haría la lista el doble de larga.
+     En cuanto se filtra por algo, se busca en todas —quien filtra por cliente
+     o por fecha quiere encontrar la orden, esté donde esté. */
+  const isSearching = Boolean(
+    filters.clientId || filters.status || filters.from || filters.to,
+  );
+  const listFilters = {
+    ...filters,
+    folderId: filters.folderId ?? (isSearching ? undefined : LOOSE_ORDERS),
+  };
+  const where = cuttingOrderWhere(listFilters);
+
+  const [total, orders, clients, folders] = await Promise.all([
     prisma.cuttingOrder.count({ where }),
     prisma.cuttingOrder.findMany({
       where,
-      // El id desempata: `orderedAt` no es único y sin criterio estable las
-      // filas se barajan entre páginas.
       /* Desempate por `createdAt` y no por `id`: la fecha se ancla al inicio
          del día, así que todo lo capturado hoy queda empatado, y `cuid()` no
          es cronológico. Sin esto lo más viejo del día sale hasta arriba. */
@@ -66,6 +79,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       include: {
         client: { select: { name: true } },
         material: { select: { name: true } },
+        folder: { select: { name: true } },
         lines: { select: { orderedQuantity: true, cutQuantity: true } },
       },
     }),
@@ -76,10 +90,15 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    new OrderFolderRepository().findAllWithTotals({
+      clientId: filters.clientId,
+      includeArchived: showArchived,
+    }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters = isSearching || Boolean(filters.folderId);
+  const isEmpty = orders.length === 0 && folders.length === 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -87,28 +106,47 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         title="Órdenes"
         description="Qué pidieron y cuánto falta por cortar"
         action={
-          <Button asChild className="touch-target">
-            <Link href="/orders/new">
-              <Plus className="size-4" aria-hidden />
-              Nueva
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="touch-target">
+              <Link href="/orders/folders/new">
+                <FolderPlus className="size-4" aria-hidden />
+                Pedido
+              </Link>
+            </Button>
+            <Button asChild className="touch-target">
+              <Link href="/orders/new">
+                <Plus className="size-4" aria-hidden />
+                Nueva
+              </Link>
+            </Button>
+          </div>
         }
       />
 
-      <OrderFilters clients={clients} />
+      <OrderFilters clients={clients} showArchived={showArchived} />
 
-      {orders.length === 0 ? (
+      {folders.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Pedidos
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {folders.map((folder) => (
+              <li key={folder.id}>
+                <FolderCard folder={folder} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {isEmpty ? (
         <div className="flat-surface">
           {/* Con filtros puestos, "aún no hay órdenes" haría creer que se
               perdieron: lo que no hay es coincidencias. */}
           <EmptyState
             icon={ClipboardList}
-            title={
-              hasFilters
-                ? "Ninguna orden coincide"
-                : "Aún no hay órdenes"
-            }
+            title={hasFilters ? "Ninguna orden coincide" : "Aún no hay órdenes"}
             description={
               hasFilters
                 ? "Prueba con otro rango de fechas, otro cliente u otro estado."
@@ -117,100 +155,29 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           />
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {orders.map((order) => {
-            const ordered = order.lines.reduce(
-              (sum, line) => sum + line.orderedQuantity,
-              0,
-            );
-            const cut = order.lines.reduce(
-              (sum, line) => sum + line.cutQuantity,
-              0,
-            );
-            const { pending, surplus } = cutProgress(ordered, cut);
-
-            return (
-              <li key={order.id}>
-                <Link
-                  href={`/orders/${order.id}`}
-                  className="flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="tabular text-sm font-medium">
-                        {order.code}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 text-xs",
-                          CUTTING_ORDER_STATUS_STYLES[order.status],
-                        )}
-                      >
-                        {CUTTING_ORDER_STATUS_LABELS[order.status]}
-                      </span>
-                    </div>
-
-                    <p className="truncate text-sm">
-                      {order.description ?? "Sin descripción"}
-                    </p>
-
-                    <p className="truncate text-xs text-muted-foreground">
-                      {order.client?.name ?? "Sin cliente"}
-                      {order.material && ` · ${order.material.name}`}
-                      {` · ${formatDate(order.orderedAt)}`}
-                    </p>
-
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {order.reference && (
-                        <span className="tabular rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
-                          Ref. {order.reference}
-                        </span>
-                      )}
-
-                      {/* La entrega se destaca en rojo si ya se pasó y la
-                          orden sigue abierta: es lo que convierte la lista en
-                          una alerta y no en un archivo. */}
-                      {order.dueDate && (
-                        <span
-                          className={cn(
-                            "tabular rounded border px-1.5 py-0.5 text-xs",
-                            isLate(order.dueDate, pending)
-                              ? "border-state-defective text-state-defective"
-                              : "border-border text-muted-foreground",
-                          )}
-                        >
-                          Entrega {formatDate(order.dueDate)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Lo que falta es el número que se busca al abrir la lista.
-                      Si se cortó de más, ese excedente pasa a ser el dato:
-                      un cero escondería que sobran piezas. */}
-                  <div className="shrink-0 text-right">
-                    <p
-                      className={cn(
-                        "tabular text-lg font-bold leading-none",
-                        surplus > 0 && "text-state-remnant",
-                      )}
-                    >
-                      {surplus > 0 ? `+${surplus}` : pending}
-                    </p>
-                    <p className="tabular text-xs text-muted-foreground">
-                      {surplus > 0 ? "sobran" : `de ${ordered}`}
-                    </p>
-                    {/* Cuánto se lleva cortado: sin esto, "faltan 300" no
-                        distingue una orden recién abierta de una casi lista. */}
-                    <p className="tabular mt-0.5 text-xs text-muted-foreground">
-                      {cut} cortadas
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        orders.length > 0 && (
+          <section className="flex flex-col gap-2">
+            {/* El encabezado sólo aparece si hay pedidos arriba: sin ellos
+                sería una etiqueta sobre la única lista de la pantalla. */}
+            {folders.length > 0 && (
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {isSearching ? "Órdenes" : "Órdenes sueltas"}
+              </h2>
+            )}
+            <ul className="flex flex-col gap-2">
+              {orders.map((order) => (
+                <li key={order.id}>
+                  <OrderListItem
+                    order={order}
+                    // El pedido sólo se etiqueta al buscar, que es cuando
+                    // aparecen mezcladas órdenes de dentro y de fuera.
+                    folderName={isSearching ? order.folder?.name : null}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
       )}
 
       <Pager
@@ -223,17 +190,6 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       />
     </div>
   );
-}
-
-/**
- * ¿Se pasó la fecha de entrega con trabajo pendiente?
- *
- * Se exige que FALTE algo: una orden entregada tarde pero ya terminada no
- * necesita alarma, y pintarla de rojo para siempre haría que el color
- * dejara de significar "hay que correr".
- */
-function isLate(dueDate: Date, pending: number): boolean {
-  return pending > 0 && dueDate.getTime() < Date.now();
 }
 
 /** Entero positivo o nada. Cualquier basura en la URL se ignora. */

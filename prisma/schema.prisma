@@ -74,6 +74,7 @@ model User {
   purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
   cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
   cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
+  orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
 
   @@index([active, role])
   @@map("user")
@@ -304,6 +305,7 @@ model Client {
   productionOrders ProductionOrder[]
   documents        InventoryDocument[]
   cuttingOrders    CuttingOrder[]
+  orderFolders     OrderFolder[]
 
   @@index([active])
   @@map("clients")
@@ -1470,6 +1472,52 @@ model ProductionOrderLine {
 //  7b. CUTTING ORDERS
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// A CLIENT'S OVERALL ORDER: the folder that holds several cutting orders.
+///
+/// The shop floor already thinks this way. A client calls asking for "the
+/// Ternium order" and that one order is really eight papers: shirts, trousers
+/// and overalls, each cut on its own schedule. Without the folder those eight
+/// live loose in one long list and nobody can answer "how is the Ternium order
+/// going" without adding up by hand.
+///
+/// The folder never holds quantities of its own. Its numbers are always the
+/// sum of its orders, so there is a single place where the truth lives and no
+/// total can drift away from the papers underneath it.
+model OrderFolder {
+  id   String @id @default(cuid())
+  code String @unique
+  /// Free text, whatever the client calls it ("Pedido Ternium marzo").
+  name String
+
+  /// Whose order it is. Their fabric never gets cut for someone else.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  /// The client's own order number, written on the paper.
+  reference String?
+
+  /// When the whole thing is due. Each order may promise its own date; this
+  /// one is the commitment made to the client.
+  dueDate DateTime?
+
+  notes String?
+
+  /// Filed away. Not a delete: a delivered order keeps its history and can be
+  /// looked up, it just stops crowding the daily list.
+  archivedAt DateTime?
+
+  createdById String?
+  createdBy   User?    @relation("OrderFolderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders CuttingOrder[]
+
+  @@index([archivedAt, createdAt])
+  @@index([clientId])
+  @@map("order_folders")
+}
+
 /// WHAT THE CLIENT ORDERED and how the cutting is going.
 ///
 /// Separate from ProductionOrder —which is planned around finished products
@@ -1492,6 +1540,14 @@ model CuttingOrder {
   productionRunId String?
   productionRun   ProductionRun? @relation(fields: [productionRunId], references: [id])
 
+  /// The client's overall order this one belongs to, if any.
+  ///
+  /// Optional and SetNull on delete: orders existed before folders did, and an
+  /// order must never disappear because someone tidied up the grouping. A
+  /// loose order is a normal state, not an incomplete one.
+  folderId String?
+  folder   OrderFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   /// Free text ("Blusa manga larga"): the catalogue of finished products is
   /// not always filled in, and the order must not wait for it.
   description String?
@@ -1513,6 +1569,7 @@ model CuttingOrder {
 
   @@index([status, orderedAt])
   @@index([clientId])
+  @@index([folderId])
   @@map("cutting_orders")
 }
 
@@ -1750,9 +1807,9 @@ model Goal {
   detail String?
 
   /// Manual order on the board. Lower shows first.
-  position Int    @default(0)
+  position Int     @default(0)
   /// Accent colour key, resolved to a token in the UI.
-  color    String @default("slate")
+  color    String  @default("slate")
   done     Boolean @default(false)
 
   createdById String?
@@ -1769,10 +1826,10 @@ model Task {
   title  String
   detail String?
 
-  status TaskStatus @default(PENDING)
+  status   TaskStatus @default(PENDING)
   /// Manual order INSIDE its column. Lower shows first.
-  position Int      @default(0)
-  color    String   @default("slate")
+  position Int        @default(0)
+  color    String     @default("slate")
   /// Free text on purpose: "Ternium", "pedido 4410" — no catalogue behind it.
   tag      String?
   dueAt    DateTime?

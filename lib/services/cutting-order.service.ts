@@ -28,6 +28,7 @@ export class CuttingOrderService extends BaseService {
           clientId: input.clientId,
           materialId: input.materialId,
           productionRunId: input.productionRunId,
+          folderId: input.folderId,
           description: input.description,
           reference: input.reference,
           orderedAt: input.orderedAt ?? new Date(),
@@ -139,6 +140,10 @@ export class CuttingOrderService extends BaseService {
           clientId: input.clientId,
           materialId: input.materialId,
           productionRunId: input.productionRunId,
+          /* `?? null` y no `input.folderId` a secas: si el usuario vacía el
+             selector llega `undefined`, y Prisma ignora undefined —la orden
+             se quedaría en la carpeta de la que se acaba de sacar. */
+          folderId: input.folderId ?? null,
           description: input.description,
           reference: input.reference,
           orderedAt: input.orderedAt ?? current.orderedAt,

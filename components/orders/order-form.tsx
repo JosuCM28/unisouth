@@ -53,6 +53,7 @@ export interface EditableOrder {
   clientId: string | null;
   materialId: string | null;
   productionRunId: string | null;
+  folderId: string | null;
   description: string | null;
   reference: string | null;
   orderedAt: string;
@@ -67,7 +68,15 @@ interface Props {
   productionRuns: OrderOption[];
   sizes: SizeOption[];
   tags: TagOption[];
+  folders: OrderOption[];
   order?: EditableOrder;
+  /**
+   * Pedido y cliente precargados al entrar desde la ficha de una carpeta.
+   *
+   * Se pasan aparte de `order` porque no es una orden existente: es un alta
+   * que ya sabe a qué pedido va, para no obligar a elegirlo otra vez.
+   */
+  defaults?: { folderId?: string; clientId?: string; dueDate?: string };
 }
 
 /**
@@ -83,12 +92,19 @@ export function OrderForm({
   productionRuns,
   sizes,
   tags,
+  folders,
   order,
+  defaults,
 }: Props) {
   const router = useRouter();
   const isEditing = Boolean(order);
 
-  const [clientId, setClientId] = useState(order?.clientId ?? "");
+  const [clientId, setClientId] = useState(
+    order?.clientId ?? defaults?.clientId ?? "",
+  );
+  const [folderId, setFolderId] = useState(
+    order?.folderId ?? defaults?.folderId ?? "",
+  );
   const [materialId, setMaterialId] = useState(order?.materialId ?? "");
   const [productionRunId, setProductionRunId] = useState(
     order?.productionRunId ?? "",
@@ -98,7 +114,9 @@ export function OrderForm({
   const [orderedAt, setOrderedAt] = useState(
     order?.orderedAt ?? todayInputValue(),
   );
-  const [dueDate, setDueDate] = useState(order?.dueDate ?? "");
+  const [dueDate, setDueDate] = useState(
+    order?.dueDate ?? defaults?.dueDate ?? "",
+  );
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [lines, setLines] = useState<LineDraft[]>(order?.lines ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -173,6 +191,7 @@ export function OrderForm({
       clientId: clientId || undefined,
       materialId: materialId || undefined,
       productionRunId: productionRunId || undefined,
+      folderId: folderId || undefined,
       description: description || undefined,
       reference: reference || undefined,
       orderedAt: orderedAt || undefined,
@@ -206,6 +225,29 @@ export function OrderForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flat-surface flex flex-col gap-4 p-4">
+        {/* El pedido va primero: cuando la orden es parte de uno, es el dato
+            que el auxiliar ya trae en la cabeza al abrir el formulario. */}
+        <FormSelectField
+          id="order-folder"
+          label="Pedido"
+          hint="Agrupa esta orden con las demás del mismo pedido. Opcional."
+        >
+          <SearchSelect
+            id="order-folder"
+            options={folders.map((folder) => ({
+              value: folder.id,
+              label: folder.name,
+              hint: folder.hint,
+              keywords: folder.hint,
+            }))}
+            value={folderId}
+            onChange={setFolderId}
+            placeholder="Sin pedido"
+            searchPlaceholder="Buscar pedido…"
+            clearLabel="Sin pedido"
+          />
+        </FormSelectField>
+
         <FormSelectField
           id="order-client"
           label="Cliente"

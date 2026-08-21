@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, FolderOpen, Pencil, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
@@ -19,6 +19,7 @@ import { Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
+import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -53,6 +54,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       client: { select: { name: true } },
       material: { select: { name: true, code: true } },
       productionRun: { select: { code: true, name: true } },
+      folder: { select: { id: true, code: true, name: true } },
       createdBy: { select: { name: true } },
       lines: {
         orderBy: { position: "asc" },
@@ -70,6 +72,24 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   if (!order) notFound();
 
+  // Para el diálogo de mover: los pedidos vivos a los que puede ir la orden.
+  const folders = (
+    await prisma.orderFolder.findMany({
+      where: { archivedAt: null },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        client: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+  ).map((folder) => ({
+    id: folder.id,
+    name: folder.name,
+    hint: [folder.code, folder.client?.name].filter(Boolean).join(" · "),
+  }));
+
   const ordered = order.lines.reduce((s, l) => s + l.orderedQuantity, 0);
   const cut = order.lines.reduce((s, l) => s + l.cutQuantity, 0);
   const { pending, surplus } = cutProgress(ordered, cut);
@@ -84,12 +104,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Se regresa al pedido, no a la lista: si se entró desde la carpeta,
+          mandar a la lista general obliga a volver a buscarla. */}
       <Link
-        href="/orders"
+        href={order.folder ? `/orders/folders/${order.folder.id}` : "/orders"}
         className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        Órdenes
+        {order.folder ? order.folder.name : "Órdenes"}
       </Link>
 
       <PageHeader
@@ -110,6 +132,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   Editar
                 </Link>
               </Button>
+              <OrderMoveDialog
+                orderId={order.id}
+                orderCode={order.code}
+                currentFolderId={order.folderId}
+                folders={folders}
+              />
               <OrderCancelDialog orderId={order.id} orderCode={order.code} />
             </div>
           ) : undefined
@@ -129,6 +157,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
           {order.client?.name ?? "Sin cliente"}
           {order.material && ` · ${order.material.name}`}
         </span>
+
+        {order.folder && (
+          <Link
+            href={`/orders/folders/${order.folder.id}`}
+            className="flex items-center gap-1.5 rounded border border-border px-2 py-1 text-sm text-muted-foreground"
+          >
+            <FolderOpen className="size-3.5" aria-hidden />
+            {order.folder.name}
+          </Link>
+        )}
       </div>
 
       {/* Los tres números que se buscan al abrir la orden. */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { Archive, X } from "lucide-react";
 import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ const STATUSES = ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const;
 
 interface Props {
   clients: { id: string; name: string }[];
+  /** Si los pedidos archivados se están mostrando. */
+  showArchived?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * exactamente lo que se está viendo, sin una segunda ruta que mantener en
  * sincronía.
  */
-export function OrderFilters({ clients }: Props) {
+export function OrderFilters({ clients, showArchived }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -44,8 +46,9 @@ export function OrderFilters({ clients }: Props) {
   const status = searchParams.get("status") ?? "";
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
+  const folder = searchParams.get("folder") ?? "";
 
-  const hasFilters = Boolean(client || status || from || to);
+  const hasFilters = Boolean(client || status || from || to || showArchived);
 
   // El export recibe los filtros vigentes, nunca la página ni el acumulador.
   const exportParams = new URLSearchParams();
@@ -53,6 +56,7 @@ export function OrderFilters({ clients }: Props) {
   if (status) exportParams.set("status", status);
   if (from) exportParams.set("from", from);
   if (to) exportParams.set("to", to);
+  if (folder) exportParams.set("folder", folder);
 
   const exportHref = exportParams.toString()
     ? `/api/export/orders?${exportParams}`
@@ -118,6 +122,23 @@ export function OrderFilters({ clients }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <ExportButton href={exportHref} />
+
+        {/* Los pedidos archivados se piden a propósito: son los entregados, y
+            si salieran siempre la lista crecería sin parar con trabajo que ya
+            no existe. */}
+        <button
+          type="button"
+          onClick={() => setParam("archived", showArchived ? null : "1")}
+          aria-pressed={showArchived}
+          className={
+            showArchived
+              ? "touch-target flex items-center gap-1.5 rounded border border-primary bg-card px-3 text-sm text-primary"
+              : "touch-target flex items-center gap-1.5 rounded border border-border bg-card px-3 text-sm text-muted-foreground"
+          }
+        >
+          <Archive className="size-3.5" aria-hidden />
+          Archivados
+        </button>
 
         {hasFilters && (
           <button

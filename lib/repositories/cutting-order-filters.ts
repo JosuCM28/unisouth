@@ -14,7 +14,18 @@ export interface CuttingOrderFilters {
   status?: string;
   from?: string;
   to?: string;
+  /**
+   * Carpeta de pedido. El valor especial "none" trae las órdenes SUELTAS.
+   *
+   * Se necesita un valor explícito porque "sin filtro" y "sin carpeta" son
+   * cosas distintas: la lista principal muestra sólo las sueltas, mientras
+   * que el Excel de un cliente las quiere todas.
+   */
+  folderId?: string;
 }
+
+/** Valor del filtro que pide las órdenes que no están en ninguna carpeta. */
+export const LOOSE_ORDERS = "none";
 
 /** Estados válidos. Cualquier otra cosa en la URL se ignora en vez de tronar. */
 const STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
@@ -24,6 +35,7 @@ export function parseCuttingOrderFilters(
 ): CuttingOrderFilters {
   return {
     clientId: params.client || undefined,
+    folderId: params.folder || undefined,
     status: params.status && STATUSES.has(params.status) ? params.status : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
@@ -36,6 +48,12 @@ export function cuttingOrderWhere(
   const where: Prisma.CuttingOrderWhereInput = {};
 
   if (filters.clientId) where.clientId = filters.clientId;
+
+  if (filters.folderId === LOOSE_ORDERS) {
+    where.folderId = null;
+  } else if (filters.folderId) {
+    where.folderId = filters.folderId;
+  }
 
   if (filters.status) {
     where.status = filters.status as Prisma.CuttingOrderWhereInput["status"];

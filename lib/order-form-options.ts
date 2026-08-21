@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
  * ficha— y duplicarlo garantizaría que un día ofrezcan cosas distintas.
  */
 export async function getOrderFormOptions() {
-  const [clients, materials, productionRuns, sizes, tags] = await Promise.all([
+  const [clients, materials, productionRuns, sizes, tags, folders] =
+    await Promise.all([
     prisma.client.findMany({
       where: { deletedAt: null, active: true },
       select: { id: true, name: true },
@@ -33,6 +34,18 @@ export async function getOrderFormOptions() {
       select: { id: true, name: true, color: true },
       orderBy: [{ order: "asc" }, { name: "asc" }],
     }),
+    // Sólo pedidos vivos: ofrecer los archivados invitaría a meter órdenes
+    // nuevas en algo que ya se dio por entregado.
+    prisma.orderFolder.findMany({
+      where: { archivedAt: null },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        client: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   return {
@@ -49,5 +62,12 @@ export async function getOrderFormOptions() {
     })),
     sizes,
     tags,
+    folders: folders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+      /* El folio y el cliente van de pista: dos pedidos del mismo cliente
+         suelen llamarse casi igual, y el folio es lo que los distingue. */
+      hint: [folder.code, folder.client?.name].filter(Boolean).join(" · "),
+    })),
   };
 }

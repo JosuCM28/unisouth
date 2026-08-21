@@ -21,6 +21,7 @@ import type { CuttingOrderStatus } from "@prisma/client";
 interface Row {
   code: string;
   status: CuttingOrderStatus;
+  folder: string;
   client: string;
   description: string;
   reference: string;
@@ -36,6 +37,9 @@ interface Row {
 const COLUMNS: CsvColumn<Row>[] = [
   { header: "Orden", value: (r) => r.code },
   { header: "Estado", value: (r) => CUTTING_ORDER_STATUS_LABELS[r.status] },
+  // El pedido va junto a la orden para poder agrupar el Excel por pedido,
+  // que es como el cliente pregunta por su trabajo.
+  { header: "Pedido", value: (r) => r.folder },
   { header: "Cliente", value: (r) => r.client },
   { header: "Descripción", value: (r) => r.description },
   { header: "Orden del cliente", value: (r) => r.reference },
@@ -68,6 +72,7 @@ export async function GET(request: Request) {
     status: url.searchParams.get("status") ?? undefined,
     from: url.searchParams.get("from") ?? undefined,
     to: url.searchParams.get("to") ?? undefined,
+    folder: url.searchParams.get("folder") ?? undefined,
   });
 
   const orders = await prisma.cuttingOrder.findMany({
@@ -81,6 +86,7 @@ export async function GET(request: Request) {
     include: {
       client: { select: { name: true } },
       material: { select: { code: true, name: true } },
+      folder: { select: { code: true, name: true } },
       lines: {
         orderBy: { position: "asc" },
         include: {
@@ -95,6 +101,7 @@ export async function GET(request: Request) {
     order.lines.map((line) => ({
       code: order.code,
       status: order.status,
+      folder: order.folder ? `${order.folder.code} · ${order.folder.name}` : "",
       client: order.client?.name ?? "Fábrica",
       description: order.description ?? "",
       reference: order.reference ?? "",
