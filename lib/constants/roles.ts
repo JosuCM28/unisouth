@@ -62,12 +62,27 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Todo, incluido usuarios y configuración.
   ADMIN: PERMISSIONS,
 
-  // Es quien mueve el material: entradas, salidas, cortes, conteos, ajustes.
+  /* Es quien mueve el material: entradas, salidas, cortes, conteos, ajustes.
+     Llega a todo el menú salvo Auditoría —de ahí que traiga `bom:write`,
+     `calculation:run` y `purchase:request`— porque en la práctica el auxiliar
+     es quien detecta que falta tela y quien levanta la requisición.
+
+     Lo que NO tiene y no debe tener:
+     · `audit:read`   — la bitácora de "quién metió mano" existe para vigilar
+                        justo a quien captura; que la vea el capturista la
+                        vuelve inútil.
+     · `purchase:approve` — pedir no es autorizar. Quien detecta el faltante no
+                        firma su propia compra.
+     · `user:manage`  — con esto podría subirse a ADMIN y entrar a la
+                        auditoría por la puerta de atrás. */
   WAREHOUSE: [
     "inventory:read",
     "inventory:write",
     "inventory:adjust",
     "catalog:write",
+    "bom:write",
+    "calculation:run",
+    "purchase:request",
   ],
 
   // Consulta inventario, mantiene fichas técnicas y corre cálculos.

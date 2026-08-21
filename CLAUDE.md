@@ -241,7 +241,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | Rol | Qué puede |
 |---|---|
 | `ADMIN` | Todo, incluido usuarios y configuración |
-| `WAREHOUSE` | Entradas, salidas, cortes, conteos, ajustes, catálogos |
+| `WAREHOUSE` | Todo el menú salvo Auditoría: entradas, salidas, cortes, conteos, ajustes, catálogos, fichas técnicas, cálculos y levantar requisiciones (no autorizarlas) |
 | `PRODUCTION` | Consultar inventario, editar fichas técnicas, correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | Sólo lectura + reportes + auditoría |
