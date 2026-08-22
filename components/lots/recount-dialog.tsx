@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { recountLotAction } from "@/app/actions/lot.actions";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { cn, formatQuantity } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -55,11 +56,11 @@ export function RecountDialog({
     }
 
     setIsSubmitting(true);
-    const result = await recountLotAction({
+    const result = await runAction(() => recountLotAction({
       lotId,
       countedQuantity: String(counted),
       reason: reason.trim(),
-    });
+    }));
     setIsSubmitting(false);
 
     if (!result.success) {

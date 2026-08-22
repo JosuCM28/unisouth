@@ -15,6 +15,7 @@ import {
   productionRunFormSchema,
   type ProductionRunFormValues,
 } from "@/lib/validations/production-run.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -66,8 +67,8 @@ export function ProductionRunFormDialog({ run, clients, trigger }: Props) {
     };
 
     const result = isEditing
-      ? await updateProductionRunAction({ id: run!.id, data: payload })
-      : await createProductionRunAction(payload);
+      ? await runAction(() => updateProductionRunAction({ id: run!.id, data: payload }))
+      : await runAction(() => createProductionRunAction(payload));
 
     if (!result.success) {
       if (result.field && FORM_FIELDS.includes(result.field as keyof ProductionRunFormValues)) {

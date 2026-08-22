@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { OfflineIndicator } from "@/components/layout/offline-indicator";
 import { getCurrentUser } from "@/lib/core/session";
 
 export default async function DashboardLayout({
@@ -37,6 +38,9 @@ export default async function DashboardLayout({
       </div>
 
       <MobileNav role={user.role} />
+
+      {/* Sólo aparece si hay capturas sin enviar o se cayó la red. */}
+      <OfflineIndicator />
     </div>
   );
 }

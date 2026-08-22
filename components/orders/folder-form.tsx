@@ -7,6 +7,7 @@ import {
   createOrderFolderAction,
   updateOrderFolderAction,
 } from "@/app/actions/order-folder.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SearchSelect } from "@/components/shared/search-select";
@@ -65,8 +66,8 @@ export function FolderForm({ clients, folder }: Props) {
     };
 
     const result = folder
-      ? await updateOrderFolderAction({ id: folder.id, data: payload })
-      : await createOrderFolderAction(payload);
+      ? await runAction(() => updateOrderFolderAction({ id: folder.id, data: payload }))
+      : await runAction(() => createOrderFolderAction(payload));
 
     setIsSubmitting(false);
 

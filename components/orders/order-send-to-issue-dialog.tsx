@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { sendOrderToIssueAction } from "@/app/actions/cutting-order.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 
@@ -47,7 +48,7 @@ export function OrderSendToIssueDialog({
 
   async function handleSend() {
     setIsSaving(true);
-    const result = await sendOrderToIssueAction({ id: orderId });
+    const result = await runAction(() => sendOrderToIssueAction({ id: orderId }));
     setIsSaving(false);
 
     if (!result.success) {

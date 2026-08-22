@@ -7,7 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { Unit } from "@prisma/client";
-import { createLotAction } from "@/app/actions/lot.actions";
+import { submitOrQueue } from "@/lib/offline/submit";
+import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import { UNIT_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
@@ -117,13 +118,27 @@ export function LotFormSheet({
       comment: values.comment || undefined,
     };
 
-    const result = await createLotAction(payload);
+    // Si no hay señal en el andén, la captura NO se pierde: se guarda y se
+    // manda sola al volver la red.
+    const outcome = await submitOrQueue("lot.create", payload, describe(values, selected));
 
-    if (!result.success) {
-      if (result.field && result.field in values) {
-        setError(result.field as keyof LotFormValues, { message: result.error });
+    if (outcome.status === "failed") {
+      if (outcome.field && outcome.field in values) {
+        setError(outcome.field as keyof LotFormValues, { message: outcome.error });
       }
-      toast.error(result.error);
+      toast.error(outcome.error);
+      return;
+    }
+
+    if (outcome.status === "queued") {
+      // Sin folio todavía: el R-2026-… lo asigna el servidor al sincronizar,
+      // porque el correlativo es atómico y no se puede inventar aquí.
+      toast.warning("Guardado sin conexión", {
+        description: "Se enviará solo en cuanto vuelva el internet.",
+      });
+      notifyQueueChanged();
+      reset(emptyValues());
+      setOpen(false);
       return;
     }
 
@@ -338,6 +353,15 @@ export function LotFormSheet({
       </form>
     </ResponsiveFormDialog>
   );
+}
+
+/** Cómo se lee la captura en la lista de pendientes, sin folio todavía. */
+function describe(
+  values: LotFormValues,
+  material?: { name: string },
+): string {
+  const name = material?.name ?? "Material";
+  return `${name} · ${values.quantity} ${values.unit}`.trim();
 }
 
 function emptyValues(): LotFormValues {

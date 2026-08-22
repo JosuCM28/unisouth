@@ -14,6 +14,7 @@ import {
   warehouseFormSchema,
   type WarehouseFormValues,
 } from "@/lib/validations/warehouse.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -62,8 +63,8 @@ export function WarehouseFormDialog({
     };
 
     const result = isEditing
-      ? await updateWarehouseAction({ ...payload, id: warehouse!.id })
-      : await createWarehouseAction(payload);
+      ? await runAction(() => updateWarehouseAction({ ...payload, id: warehouse!.id }))
+      : await runAction(() => createWarehouseAction(payload));
 
     if (!result.success) {
       if (result.field && result.field in values) {

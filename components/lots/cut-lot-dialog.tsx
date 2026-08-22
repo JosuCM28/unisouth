@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cutLotAction } from "@/app/actions/lot.actions";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 
@@ -56,7 +57,7 @@ export function CutLotDialog({
     }
 
     setIsSubmitting(true);
-    const result = await cutLotAction({ lotId, quantity: String(quantity) });
+    const result = await runAction(() => cutLotAction({ lotId, quantity: String(quantity) }));
     setIsSubmitting(false);
 
     if (!result.success) {

@@ -10,6 +10,7 @@ import {
   createCutTagAction,
   updateCutTagAction,
 } from "@/app/actions/cut-tag.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -84,8 +85,8 @@ export function CutTagFormDialog({
     };
 
     const result = tag
-      ? await updateCutTagAction({ id: tag.id, data: payload })
-      : await createCutTagAction(payload);
+      ? await runAction(() => updateCutTagAction({ id: tag.id, data: payload }))
+      : await runAction(() => createCutTagAction(payload));
 
     if (!result.success) {
       toast.error(result.error);

@@ -6,7 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { FinishedProduct, Unit } from "@prisma/client";
-import { createProductAction, updateProductAction } from "@/app/actions/product.actions";
+import { updateProductAction } from "@/app/actions/product.actions";
+import { submitOrQueue } from "@/lib/offline/submit";
+import { runAction } from "@/lib/offline/run-action";
+import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import { UNIT_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import { productFormSchema, type ProductFormValues } from "@/lib/validations/product.schema";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
@@ -37,6 +40,13 @@ export function ProductFormDialog({ product, clients, trigger }: Props) {
       defaultValues: toDefaults(product),
     });
 
+  function applyFieldError(field: string | undefined, message: string) {
+    if (!field) return;
+    if (!FIELDS.includes(field as keyof ProductFormValues)) return;
+
+    setError(field as keyof ProductFormValues, { message });
+  }
+
   async function onSubmit(values: ProductFormValues) {
     const payload = {
       ...values,
@@ -45,21 +55,48 @@ export function ProductFormDialog({ product, clients, trigger }: Props) {
       description: values.description || undefined,
     };
 
-    const result = isEditing
-      ? await updateProductAction({ id: product!.id, data: payload })
-      : await createProductAction(payload);
+    if (isEditing) {
+      // Editar NO se encola: reenviar a ciegas un cambio sobre una ficha que
+      // no se pudo releer pisaría lo que hubiera cambiado mientras tanto.
+      const result = await runAction(() => updateProductAction({ id: product!.id, data: payload }));
 
-    if (!result.success) {
-      if (result.field && FIELDS.includes(result.field as keyof ProductFormValues)) {
-        setError(result.field as keyof ProductFormValues, { message: result.error });
+      if (!result.success) {
+        applyFieldError(result.field, result.error);
+        toast.error(result.error);
+        return;
       }
-      toast.error(result.error);
+
+      toast.success(result.message ?? "Guardado");
+      setOpen(false);
+      router.refresh();
       return;
     }
 
-    toast.success(result.message ?? "Guardado");
+    const outcome = await submitOrQueue(
+      "product.create",
+      payload,
+      `${values.code} · ${values.name}`,
+    );
+
+    if (outcome.status === "failed") {
+      applyFieldError(outcome.field, outcome.error);
+      toast.error(outcome.error);
+      return;
+    }
+
+    if (outcome.status === "queued") {
+      toast.warning("Producto guardado sin conexión", {
+        description: "Se dará de alta solo al volver el internet.",
+      });
+      notifyQueueChanged();
+      reset(toDefaults());
+      setOpen(false);
+      return;
+    }
+
+    toast.success(outcome.message ?? "Guardado");
     setOpen(false);
-    if (!isEditing) reset(toDefaults());
+    reset(toDefaults());
     router.refresh();
   }
 

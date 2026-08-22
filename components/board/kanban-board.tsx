@@ -29,6 +29,7 @@ import {
 import { TASK_STATUS_LABELS } from "@/lib/constants/labels";
 import type { BoardColor } from "@/lib/constants/board-colors";
 import { cn } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { Button } from "@/components/ui/button";
 import { BoardItemDialog, type BoardItemDraft } from "./board-item-dialog";
 import { TaskCard } from "./task-card";
@@ -151,11 +152,11 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
       }),
     );
 
-    const result = await moveTaskAction({
+    const result = await runAction(() => moveTaskAction({
       id: task.id,
       status: target.status,
       orderedIds,
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
@@ -166,13 +167,13 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
   }
 
   async function handleCreate(draft: BoardItemDraft) {
-    const result = await createTaskAction({
+    const result = await runAction(() => createTaskAction({
       title: draft.title,
       detail: draft.detail || undefined,
       tag: draft.tag || undefined,
       color: draft.color,
       status: creatingIn ?? "PENDING",
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
@@ -186,7 +187,7 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
   async function handleUpdate(draft: BoardItemDraft) {
     if (!editing) return false;
 
-    const result = await updateTaskAction({
+    const result = await runAction(() => updateTaskAction({
       id: editing.id,
       data: {
         title: draft.title,
@@ -195,7 +196,7 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
         color: draft.color,
         status: editing.status,
       },
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
@@ -207,7 +208,7 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
   }
 
   async function handleRemove(task: Task) {
-    const result = await removeTaskAction({ id: task.id });
+    const result = await runAction(() => removeTaskAction({ id: task.id }));
     if (!result.success) toast.error(result.error);
   }
 

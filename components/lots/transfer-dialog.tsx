@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { transferLotAction } from "@/app/actions/lot.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { FormSelectField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,9 @@ export function TransferDialog({
     }
 
     setIsSubmitting(true);
-    const result = await transferLotAction({
+    const result = await runAction(() => transferLotAction({
       lotId, toLocationId, reason: reason.trim() || undefined,
-    });
+    }));
     setIsSubmitting(false);
 
     if (!result.success) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Ban } from "lucide-react";
 import { toast } from "sonner";
 import { cancelCuttingOrderAction } from "@/app/actions/cutting-order.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -33,10 +34,10 @@ export function OrderCancelDialog({
     }
 
     setIsSaving(true);
-    const result = await cancelCuttingOrderAction({
+    const result = await runAction(() => cancelCuttingOrderAction({
       id: orderId,
       reason: reason.trim(),
-    });
+    }));
     setIsSaving(false);
 
     if (!result.success) {

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { KeyboardInsets } from "@/components/layout/keyboard-insets";
+import { ServiceWorkerRegistrar } from "@/components/layout/service-worker";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -16,6 +17,10 @@ export const metadata: Metadata = {
     template: "%s · Unisouth",
   },
   description: "Control de inventario textil rollo por rollo",
+  // Permite instalarla en el celular y, con el service worker, abrirla sin red.
+  manifest: "/manifest.json",
+  appleWebApp: { capable: true, title: "Unisouth", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {
@@ -56,6 +61,10 @@ export default function RootLayout({
             por encima de él. Va en el layout raíz para que valga en TODA la
             app, login incluido. */}
         <KeyboardInsets />
+
+        {/* Tampoco pinta nada: registra el service worker para que la app
+            abra en los puntos muertos del almacén. */}
+        <ServiceWorkerRegistrar />
 
         {/* Arriba y al centro: abajo lo taparía la barra de navegación móvil. */}
         <Toaster position="top-center" richColors />

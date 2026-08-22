@@ -22,6 +22,7 @@ import { createReceiptAction } from "@/app/actions/receipt.actions";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { cn, todayInputValue } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import {
   SearchSelect,
@@ -250,7 +251,7 @@ export function ReceiptWizard({
     }
 
     setIsSubmitting(true);
-    const result = await createReceiptAction({
+    const result = await runAction(() => createReceiptAction({
       date: header.date,
       guideNumber: header.guideNumber || undefined,
       carrierId: header.carrierId || undefined,
@@ -259,7 +260,7 @@ export function ReceiptWizard({
       clientId: header.clientId || undefined,
       invoiceRef: header.invoiceRef || undefined,
       lots,
-    });
+    }));
     setIsSubmitting(false);
 
     if (!result.success) {

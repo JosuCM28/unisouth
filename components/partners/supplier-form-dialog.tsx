@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Supplier } from "@prisma/client";
 import { createSupplierAction, updateSupplierAction } from "@/app/actions/partner.actions";
 import { supplierFormSchema, type SupplierFormValues } from "@/lib/validations/partner.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -35,8 +36,8 @@ export function SupplierFormDialog({ supplier, trigger }: { supplier?: Supplier;
     );
 
     const result = isEditing
-      ? await updateSupplierAction({ id: supplier!.id, data: payload })
-      : await createSupplierAction(payload);
+      ? await runAction(() => updateSupplierAction({ id: supplier!.id, data: payload }))
+      : await runAction(() => createSupplierAction(payload));
 
     if (!result.success) {
       if (result.field && FIELDS.includes(result.field as keyof SupplierFormValues)) {

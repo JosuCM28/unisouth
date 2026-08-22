@@ -9,6 +9,7 @@ import {
   updateCuttingOrderAction,
 } from "@/app/actions/cutting-order.actions";
 import { todayInputValue } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SearchSelect } from "@/components/shared/search-select";
@@ -206,8 +207,8 @@ export function OrderForm({
     };
 
     const result = order
-      ? await updateCuttingOrderAction({ id: order.id, data: payload })
-      : await createCuttingOrderAction(payload);
+      ? await runAction(() => updateCuttingOrderAction({ id: order.id, data: payload }))
+      : await runAction(() => createCuttingOrderAction(payload));
 
     setIsSubmitting(false);
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cutProgress } from "@/lib/utils";
 import { addCuttingProgressAction } from "@/app/actions/cutting-order.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,11 +50,11 @@ export function OrderProgressDialog({
     }
 
     setIsSaving(true);
-    const result = await addCuttingProgressAction({
+    const result = await runAction(() => addCuttingProgressAction({
       lineId,
       quantity: typed,
       notes: notes || undefined,
-    });
+    }));
     setIsSaving(false);
 
     if (!result.success) {

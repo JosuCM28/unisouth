@@ -7,6 +7,7 @@ import { Ban, Check, Pencil, Printer } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentStatus } from "@prisma/client";
 import { applyDocumentAction, cancelDocumentAction } from "@/app/actions/document.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,7 @@ export function DocumentActions({
 
   async function handleApply() {
     setIsApplying(true);
-    const result = await applyDocumentAction({ id: documentId });
+    const result = await runAction(() => applyDocumentAction({ id: documentId }));
     setIsApplying(false);
 
     if (!result.success) {
@@ -69,7 +70,7 @@ export function DocumentActions({
     }
 
     setIsCancelling(true);
-    const result = await cancelDocumentAction({ id: documentId, reason: reason.trim() });
+    const result = await runAction(() => cancelDocumentAction({ id: documentId, reason: reason.trim() }));
     setIsCancelling(false);
 
     if (!result.success) {

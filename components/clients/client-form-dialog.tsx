@@ -5,10 +5,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { Client } from "@prisma/client";
-import {
-  createClientAction,
-  updateClientAction,
-} from "@/app/actions/client.actions";
+import { updateClientAction } from "@/app/actions/client.actions";
+import { submitOrQueue } from "@/lib/offline/submit";
+import { runAction } from "@/lib/offline/run-action";
+import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import {
   clientFormSchema,
   type ClientFormValues,
@@ -47,6 +47,13 @@ export function ClientFormDialog({ client, trigger }: ClientFormDialogProps) {
     defaultValues: toDefaults(client),
   });
 
+  function applyFieldError(field: string | undefined, message: string) {
+    if (!field) return;
+    if (!FORM_FIELDS.includes(field as keyof ClientFormValues)) return;
+
+    setError(field as keyof ClientFormValues, { message });
+  }
+
   async function onSubmit(values: ClientFormValues) {
     // Los vacíos se omiten para que Zod los reciba como undefined y no como "".
     const payload = Object.fromEntries(
@@ -55,21 +62,41 @@ export function ClientFormDialog({ client, trigger }: ClientFormDialogProps) {
       ),
     );
 
-    const result = isEditing
-      ? await updateClientAction({ id: client!.id, data: payload })
-      : await createClientAction(payload);
+    if (isEditing) {
+      const result = await runAction(() => updateClientAction({ id: client!.id, data: payload }));
 
-    if (!result.success) {
-      if (result.field && FORM_FIELDS.includes(result.field as keyof ClientFormValues)) {
-        setError(result.field as keyof ClientFormValues, { message: result.error });
+      if (!result.success) {
+        applyFieldError(result.field, result.error);
+        toast.error(result.error);
+        return;
       }
-      toast.error(result.error);
+
+      toast.success(result.message ?? "Guardado");
+      setOpen(false);
       return;
     }
 
-    toast.success(result.message ?? "Guardado");
+    const outcome = await submitOrQueue("client.create", payload, values.name);
+
+    if (outcome.status === "failed") {
+      applyFieldError(outcome.field, outcome.error);
+      toast.error(outcome.error);
+      return;
+    }
+
+    if (outcome.status === "queued") {
+      toast.warning("Cliente guardado sin conexión", {
+        description: "Se dará de alta solo al volver el internet.",
+      });
+      notifyQueueChanged();
+      reset(toDefaults());
+      setOpen(false);
+      return;
+    }
+
+    toast.success(outcome.message ?? "Guardado");
     setOpen(false);
-    if (!isEditing) reset(toDefaults());
+    reset(toDefaults());
   }
 
   return (

@@ -5,6 +5,7 @@ import { AlertTriangle, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { explodeForIssueAction } from "@/app/actions/issue.actions";
 import type { RequirementResult } from "@/lib/services/calculation.service";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { FormSelectField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
@@ -60,13 +61,13 @@ export function IssueFromCalculation({
     if (!product?.activeBomId || !quantity) return;
 
     setIsRunning(true);
-    const result = await explodeForIssueAction({
+    const result = await runAction(() => explodeForIssueAction({
       productId: product.id,
       bomId: product.activeBomId,
       quantity: Number(quantity),
       sizeId: sizeId || undefined,
       clientId,
-    });
+    }));
     setIsRunning(false);
 
     if (!result.success) {

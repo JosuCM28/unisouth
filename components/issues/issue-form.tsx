@@ -17,6 +17,7 @@ import type { RequirementResult } from "@/lib/services/calculation.service";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { sumIssueLines, type IssueTotals } from "@/lib/issue-totals";
 import { formatQuantity } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -198,10 +199,10 @@ export function IssueForm({
     setPickerMaterialId(materialId);
     setPickerState({ kind: "loading" });
 
-    const result = await availableLotsAction({
+    const result = await runAction(() => availableLotsAction({
       materialId,
       clientId: realClientId,
-    });
+    }));
 
     if (!result.success) {
       setPickerState({ kind: "error", message: result.error });
@@ -382,8 +383,8 @@ export function IssueForm({
        alguien deja la pestaña abierta y el vale se aplica desde otro lado, el
        guardado se rechaza en vez de reescribir un documento ya aplicado. */
     const result = document
-      ? await updateDocumentAction({ id: document.id, data: payload })
-      : await createDocumentAction(payload);
+      ? await runAction(() => updateDocumentAction({ id: document.id, data: payload }))
+      : await runAction(() => createDocumentAction(payload));
 
     setIsSubmitting(false);
 

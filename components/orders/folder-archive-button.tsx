@@ -8,6 +8,7 @@ import {
   archiveOrderFolderAction,
   unarchiveOrderFolderAction,
 } from "@/app/actions/order-folder.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -30,8 +31,8 @@ export function FolderArchiveButton({ folderId, isArchived }: Props) {
     setIsSaving(true);
 
     const result = isArchived
-      ? await unarchiveOrderFolderAction({ id: folderId })
-      : await archiveOrderFolderAction({ id: folderId });
+      ? await runAction(() => unarchiveOrderFolderAction({ id: folderId }))
+      : await runAction(() => archiveOrderFolderAction({ id: folderId }));
 
     setIsSaving(false);
 

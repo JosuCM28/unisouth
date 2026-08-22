@@ -5,10 +5,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { Location, LocationType } from "@prisma/client";
-import {
-  createLocationAction,
-  updateLocationAction,
-} from "@/app/actions/location.actions";
+import { updateLocationAction } from "@/app/actions/location.actions";
+import { submitOrQueue } from "@/lib/offline/submit";
+import { runAction } from "@/lib/offline/run-action";
+import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import { LOCATION_TYPE_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import {
   locationFormSchema,
@@ -65,6 +65,19 @@ export function LocationFormDialog({
     defaultValues: toDefaults(location, warehouses),
   });
 
+  /**
+   * Marca en rojo el campo señalado por el servidor.
+   *
+   * Se valida contra las claves del esquema, no contra `values`: un campo
+   * opcional vacío no aparece en el objeto y quedaría sin marcar.
+   */
+  function applyFieldError(field: string | undefined, message: string) {
+    if (!field) return;
+    if (!FORM_FIELDS.includes(field as keyof LocationFormValues)) return;
+
+    setError(field as keyof LocationFormValues, { message });
+  }
+
   async function onSubmit(values: LocationFormValues) {
     const payload = {
       ...values,
@@ -74,30 +87,47 @@ export function LocationFormDialog({
       notes: values.notes || undefined,
     };
 
-    const result = isEditing
-      ? await updateLocationAction({ ...payload, id: location!.id })
-      : await createLocationAction(payload);
+    if (isEditing) {
+      const result = await runAction(() => updateLocationAction({ ...payload, id: location!.id }));
 
-    if (!result.success) {
-      // Se valida contra las claves del esquema, no contra `values`: un campo
-      // opcional vacío no aparece en el objeto y quedaría sin marcar.
-      if (
-        result.field &&
-        FORM_FIELDS.includes(result.field as keyof LocationFormValues)
-      ) {
-        setError(result.field as keyof LocationFormValues, {
-          message: result.error,
-        });
+      if (!result.success) {
+        applyFieldError(result.field, result.error);
+        toast.error(result.error);
+        return;
       }
-      toast.error(result.error);
+
+      toast.success(result.message ?? "Guardado");
+      setOpen(false);
+      // Al editar se conservan los valores: permite corregir algo y volver a
+      // abrir sin recapturar todo.
       return;
     }
 
-    toast.success(result.message ?? "Guardado");
+    const outcome = await submitOrQueue(
+      "location.create",
+      payload,
+      `${values.code} · ${values.name}`,
+    );
+
+    if (outcome.status === "failed") {
+      applyFieldError(outcome.field, outcome.error);
+      toast.error(outcome.error);
+      return;
+    }
+
+    if (outcome.status === "queued") {
+      toast.warning("Ubicación guardada sin conexión", {
+        description: "Se dará de alta sola al volver el internet.",
+      });
+      notifyQueueChanged();
+      reset(toDefaults(undefined, warehouses));
+      setOpen(false);
+      return;
+    }
+
+    toast.success(outcome.message ?? "Guardado");
     setOpen(false);
-    // Sólo al crear: al editar, conservar los valores permite corregir algo
-    // y volver a abrir sin recapturar todo.
-    if (!isEditing) reset(toDefaults(undefined, warehouses));
+    reset(toDefaults(undefined, warehouses));
   }
 
   return (

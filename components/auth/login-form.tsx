@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { loginAction } from "@/app/actions/auth.actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
+import { runAction } from "@/lib/offline/run-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,7 @@ export function LoginForm() {
 
     // Pasa por una Server Action, no por el cliente de BetterAuth: así el
     // límite de intentos se aplica en el servidor, donde no se puede saltar.
-    const result = await loginAction(values);
+    const result = await runAction(() => loginAction(values));
 
     if (!result.success) {
       setError("password", { message: result.error });

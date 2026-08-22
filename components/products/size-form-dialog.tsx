@@ -19,6 +19,7 @@ import type { PlainObject } from "@/lib/utils";
 type PlainSize = PlainObject<Size>;
 import { createSizeAction, updateSizeAction } from "@/app/actions/product.actions";
 import { sizeFormSchema, type SizeFormValues } from "@/lib/validations/product.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -46,8 +47,8 @@ export function SizeFormDialog({ size, trigger }: { size?: PlainSize; trigger: R
     };
 
     const result = isEditing
-      ? await updateSizeAction({ id: size!.id, data: payload })
-      : await createSizeAction(payload);
+      ? await runAction(() => updateSizeAction({ id: size!.id, data: payload }))
+      : await runAction(() => createSizeAction(payload));
 
     if (!result.success) {
       if (result.field && FIELDS.includes(result.field as keyof SizeFormValues)) {

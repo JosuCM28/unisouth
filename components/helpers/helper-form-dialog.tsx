@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Helper } from "@prisma/client";
 import { createHelperAction, updateHelperAction } from "@/app/actions/helper.actions";
 import { helperFormSchema, type HelperFormValues } from "@/lib/validations/helper.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -45,8 +46,8 @@ export function HelperFormDialog({ helper, trigger, onCreated }: Props) {
     };
 
     const result = isEditing
-      ? await updateHelperAction({ id: helper!.id, data: payload })
-      : await createHelperAction(payload);
+      ? await runAction(() => updateHelperAction({ id: helper!.id, data: payload }))
+      : await runAction(() => createHelperAction(payload));
 
     if (!result.success) {
       if (result.field && FIELDS.includes(result.field as keyof HelperFormValues)) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FolderInput } from "lucide-react";
 import { toast } from "sonner";
 import { moveOrderToFolderAction } from "@/app/actions/order-folder.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SearchSelect } from "@/components/shared/search-select";
 import { Button } from "@/components/ui/button";
@@ -38,10 +39,10 @@ export function OrderMoveDialog({
 
   async function handleMove() {
     setIsSaving(true);
-    const result = await moveOrderToFolderAction({
+    const result = await runAction(() => moveOrderToFolderAction({
       orderId,
       folderId: folderId || undefined,
-    });
+    }));
     setIsSaving(false);
 
     if (!result.success) {

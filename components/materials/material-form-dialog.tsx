@@ -9,10 +9,10 @@ import type { PlainObject } from "@/lib/utils";
 
 /** Material con sus 9 Decimal ya convertidos a number. Ver PlainSize. */
 type PlainMaterial = PlainObject<Material>;
-import {
-  createMaterialAction,
-  updateMaterialAction,
-} from "@/app/actions/material.actions";
+import { updateMaterialAction } from "@/app/actions/material.actions";
+import { submitOrQueue } from "@/lib/offline/submit";
+import { runAction } from "@/lib/offline/run-action";
+import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import {
   MATERIAL_TYPE_LABELS,
   UNIT_LABELS,
@@ -84,34 +84,63 @@ export function MaterialFormDialog({
   // composición y encogimiento a un cierre es ruido.
   const isFabric = type === "FABRIC";
 
+  /** Marca en rojo el campo que el servidor señaló, si es uno del formulario. */
+  function applyFieldError(field: string | undefined, message: string) {
+    if (!field) return;
+    if (!FORM_FIELDS.includes(field as keyof MaterialFormValues)) return;
+
+    setError(field as keyof MaterialFormValues, { message });
+  }
+
   async function onSubmit(values: MaterialFormValues) {
     const payload = toPayload(values);
 
-    const result = isEditing
-      ? await updateMaterialAction({ id: material!.id, data: payload })
-      : await createMaterialAction(payload);
+    if (isEditing) {
+      // La edición NO se encola: sin conexión no se puede leer la ficha
+      // actual, y mandar a ciegas un cambio sobre un material que alguien
+      // más pudo tocar pisaría datos buenos.
+      const result = await runAction(() => updateMaterialAction({ id: material!.id, data: payload }));
 
-    if (!result.success) {
-      if (result.field && FORM_FIELDS.includes(result.field as keyof MaterialFormValues)) {
-        setError(result.field as keyof MaterialFormValues, {
-          message: result.error,
-        });
+      if (!result.success) {
+        applyFieldError(result.field, result.error);
+        toast.error(result.error);
+        return;
       }
-      toast.error(result.error);
+
+      toast.success(result.message ?? "Guardado");
+      setOpen(false);
       return;
     }
 
-    toast.success(result.message ?? "Guardado");
-    setOpen(false);
+    const outcome = await submitOrQueue<{ id: string; name: string; baseUnit: Unit }>(
+      "material.create",
+      payload,
+      `${values.code} · ${values.name}`,
+    );
 
-    if (!isEditing) {
-      reset(toDefaults());
-
-      const created = result.data as
-        | { id: string; name: string; baseUnit: Unit }
-        | undefined;
-      if (created?.id) onCreated?.(created);
+    if (outcome.status === "failed") {
+      applyFieldError(outcome.field, outcome.error);
+      toast.error(outcome.error);
+      return;
     }
+
+    if (outcome.status === "queued") {
+      // Ojo: NO se llama a onCreated. El material todavía no tiene id, y el
+      // wizard de recepción lo seleccionaría con uno inventado que la base
+      // rechazaría al sincronizar.
+      toast.warning("Material guardado sin conexión", {
+        description: "Se dará de alta solo al volver el internet.",
+      });
+      notifyQueueChanged();
+      reset(toDefaults());
+      setOpen(false);
+      return;
+    }
+
+    toast.success(outcome.message ?? "Guardado");
+    setOpen(false);
+    reset(toDefaults());
+    if (outcome.data?.id) onCreated?.(outcome.data);
   }
 
   return (

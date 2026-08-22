@@ -15,6 +15,7 @@ import {
   type BoardColor,
 } from "@/lib/constants/board-colors";
 import { cn } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { Button } from "@/components/ui/button";
 import { BoardItemDialog, type BoardItemDraft } from "./board-item-dialog";
 
@@ -40,11 +41,11 @@ export function GoalsPanel({ goals }: { goals: Goal[] }) {
   }
 
   async function handleCreate(draft: BoardItemDraft) {
-    const result = await createGoalAction({
+    const result = await runAction(() => createGoalAction({
       title: draft.title,
       detail: draft.detail || undefined,
       color: draft.color,
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
@@ -56,14 +57,14 @@ export function GoalsPanel({ goals }: { goals: Goal[] }) {
   async function handleUpdate(draft: BoardItemDraft) {
     if (!editing) return false;
 
-    const result = await updateGoalAction({
+    const result = await runAction(() => updateGoalAction({
       id: editing.id,
       data: {
         title: draft.title,
         detail: draft.detail || undefined,
         color: draft.color,
       },
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);

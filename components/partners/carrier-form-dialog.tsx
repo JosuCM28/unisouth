@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Carrier } from "@prisma/client";
 import { createCarrierAction, updateCarrierAction } from "@/app/actions/partner.actions";
 import { carrierFormSchema, type CarrierFormValues } from "@/lib/validations/partner.schema";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -35,8 +36,8 @@ export function CarrierFormDialog({ carrier, trigger }: { carrier?: Carrier; tri
     };
 
     const result = isEditing
-      ? await updateCarrierAction({ id: carrier!.id, data: payload })
-      : await createCarrierAction(payload);
+      ? await runAction(() => updateCarrierAction({ id: carrier!.id, data: payload }))
+      : await runAction(() => createCarrierAction(payload));
 
     if (!result.success) {
       if (result.field && FIELDS.includes(result.field as keyof CarrierFormValues)) {

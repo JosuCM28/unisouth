@@ -11,6 +11,7 @@ import { UNIT_LABELS, UNIT_SHORT_LABELS, toSelectOptions } from "@/lib/constants
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { simulate } from "@/lib/bom-simulator";
 import { formatQuantity } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Button } from "@/components/ui/button";
@@ -120,8 +121,8 @@ export function BomEditor({
     };
 
     const result = isEditing
-      ? await updateBomAction({ id: bom!.id, data: payload })
-      : await createBomAction(payload);
+      ? await runAction(() => updateBomAction({ id: bom!.id, data: payload }))
+      : await runAction(() => createBomAction(payload));
 
     if (!result.success) {
       toast.error(result.error);

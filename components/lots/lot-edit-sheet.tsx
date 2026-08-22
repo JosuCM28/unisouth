@@ -8,6 +8,7 @@ import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { updateLotAction } from "@/app/actions/lot.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -95,7 +96,7 @@ export function LotEditSheet({
   });
 
   async function onSubmit(values: EditFormValues) {
-    const result = await updateLotAction({
+    const result = await runAction(() => updateLotAction({
       id: lot.id,
       locationId: values.locationId || undefined,
       clientId: values.clientId || undefined,
@@ -110,7 +111,7 @@ export function LotEditSheet({
       unitCost: values.unitCost || undefined,
       comment: values.comment || undefined,
       reason: values.reason || undefined,
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);

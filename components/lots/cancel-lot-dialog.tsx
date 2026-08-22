@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cancelLotAction } from "@/app/actions/lot.actions";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity } from "@/lib/utils";
+import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,7 @@ export function CancelLotDialog({
     }
 
     setIsSubmitting(true);
-    const result = await cancelLotAction({ id: lotId, reason: reason.trim() });
+    const result = await runAction(() => cancelLotAction({ id: lotId, reason: reason.trim() }));
     setIsSubmitting(false);
 
     if (!result.success) {

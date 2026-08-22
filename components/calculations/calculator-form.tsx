@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { runCalculationAction } from "@/app/actions/calculation.actions";
 import { createFromCalculationAction } from "@/app/actions/purchase-request.actions";
 import type { RequirementResult } from "@/lib/services/calculation.service";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -100,14 +101,14 @@ export function CalculatorForm({
       return;
     }
 
-    const result = await runCalculationAction({
+    const result = await runAction(() => runCalculationAction({
       clientId: values.clientId || undefined,
       safetyMarginPct: values.safetyMarginPct || 0,
       globalWastePct: 0,
       respectOwnership: values.respectOwnership,
       includeRemnants: values.includeRemnants,
       lines,
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
@@ -317,7 +318,7 @@ export function CalculatorForm({
 
               // Los faltantes ya están calculados: retecleárlos sería pedir
               // errores de dedo justo en lo que se va a comprar.
-              const created = await createFromCalculationAction({ calculationId });
+              const created = await runAction(() => createFromCalculationAction({ calculationId }));
 
               if (!created.success) {
                 toast.error(created.error);

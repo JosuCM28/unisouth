@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { toDateInputValue } from "@/lib/utils";
 import { updateReceiptAction } from "@/app/actions/receipt.actions";
+import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -103,7 +104,7 @@ export function ReceiptEditSheet({
     (form.watch("clientId") || "") !== (receipt.clientId ?? "");
 
   async function onSubmit(values: EditFormValues) {
-    const result = await updateReceiptAction({
+    const result = await runAction(() => updateReceiptAction({
       id: receipt.id,
       date: values.date,
       guideNumber: values.guideNumber || undefined,
@@ -116,7 +117,7 @@ export function ReceiptEditSheet({
       packageCount: values.packageCount || undefined,
       notes: values.notes || undefined,
       reason: values.reason || undefined,
-    });
+    }));
 
     if (!result.success) {
       toast.error(result.error);
