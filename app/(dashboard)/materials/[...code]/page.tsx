@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
-import { getPileSheetData } from "@/lib/pile-sheet-data";
+import { getPileFilterOptions, getPileSheetData } from "@/lib/pile-sheet-data";
 import { materialPath } from "@/lib/material-url";
 import { getMaterialKpis, getMaterialDailyReport } from "@/lib/material-history";
 import { resolveRange, toLocalInputValue } from "@/lib/history-range";
@@ -31,6 +31,7 @@ import { MovementList } from "@/components/movements/movement-list";
 import { MaterialKpis } from "@/components/materials/material-kpis";
 import { MaterialDailyReport } from "@/components/materials/material-daily-report";
 import { MaterialHistoryFilters } from "@/components/materials/material-history-filters";
+import { PileFilters } from "@/components/materials/pile-filters";
 
 interface PageProps {
   /**
@@ -45,6 +46,12 @@ interface PageProps {
     desde?: string;
     hasta?: string;
     page?: string;
+    /* Filtros de la pila. Acotan SÓLO la lista de rollos de abajo; el
+       historial de movimientos sigue siendo del material completo. */
+    clientId?: string;
+    locationId?: string;
+    colorName?: string;
+    shade?: string;
   }>;
 }
 
@@ -108,10 +115,30 @@ export default async function MaterialDetailPage({
 
   if (!material) notFound();
 
-  const data = await getPileSheetData({ materialId: material.id });
-  if (!data) notFound();
+  /* Dos lecturas de la pila: una COMPLETA para el total del encabezado y
+     otra acotada para la lista de abajo. Si el número grande se moviera con
+     cada filtro, quien lo mira de lejos leería que la existencia bajó. */
+  const [full, data, pileOptions] = await Promise.all([
+    getPileSheetData({ materialId: material.id }),
+    getPileSheetData({
+      materialId: material.id,
+      clientId: query.clientId,
+      locationId: query.locationId,
+      colorName: query.colorName,
+      shade: query.shade,
+    }),
+    getPileFilterOptions(material.id),
+  ]);
 
-  const { material: spec, totals } = data;
+  if (!full || !data) notFound();
+
+  const { material: spec } = full;
+  const totals = full.totals;
+  /* Lo que está viendo abajo, ya filtrado. */
+  const shown = data.totals;
+  const isPileFiltered = Boolean(
+    query.clientId || query.locationId || query.colorName || query.shade,
+  );
   const unitLabel = UNIT_SHORT_LABELS[totals.unit];
 
   /* La ventana se resuelve UNA vez y alimenta tanto los KPIs como la lista:
@@ -338,11 +365,34 @@ export default async function MaterialDetailPage({
           Rollos de esta pila
         </h2>
 
+        <PileFilters
+          clients={pileOptions.clients}
+          locations={pileOptions.locations}
+          colors={pileOptions.colors}
+          shades={pileOptions.shades}
+        />
+
+        {/* Cuánto es lo que se está viendo. Con un filtro puesto, la lista
+            corta se leería como "ya no hay tela"; este renglón dice que el
+            resto sigue ahí, sólo que fuera del filtro. */}
+        {isPileFiltered && (
+          <p className="tabular mb-3 text-xs text-muted-foreground">
+            {shown.lots} de {totals.lots}{" "}
+            {totals.lots === 1 ? "rollo" : "rollos"} ·{" "}
+            {formatQuantity(shown.quantity, { unit: unitLabel })} de{" "}
+            {formatQuantity(totals.quantity, { unit: unitLabel })}
+          </p>
+        )}
+
         {data.lots.length === 0 ? (
           <EmptyState
             icon={Boxes}
-            title="Sin rollos en bodega"
-            description="No hay existencia de este material ahora mismo."
+            title={isPileFiltered ? "Ningún rollo coincide" : "Sin rollos en bodega"}
+            description={
+              isPileFiltered
+                ? "Quita algún filtro para ver el resto de la pila."
+                : "No hay existencia de este material ahora mismo."
+            }
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -386,7 +436,10 @@ export default async function MaterialDetailPage({
 
         {data.truncated && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Se listan los primeros {data.lots.length} de {totals.lots} rollos.
+            {/* Contra lo FILTRADO y no contra la pila entera: con un filtro
+                puesto, "los primeros 200 de 640" compararía la lista contra
+                un total que no es el suyo. */}
+            Se listan los primeros {data.lots.length} de {shown.lots} rollos.
             El total de arriba sí los considera todos.
           </p>
         )}

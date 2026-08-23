@@ -32,6 +32,8 @@ interface PageProps {
     materialId?: string;
     locationId?: string;
     clientId?: string;
+    colorName?: string;
+    shade?: string;
     status?: string;
     onlyRemnants?: string;
     onlyUnverified?: string;
@@ -51,12 +53,15 @@ export default async function LotsPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
 
-  const [materials, locations, clients, productionRuns] = await Promise.all([
-    new MaterialRepository().findOptions(),
-    new LocationRepository().findOptions(),
-    new ClientRepository().findOptions(),
-    new ProductionRunRepository().findOptions(),
-  ]);
+  const [materials, locations, clients, productionRuns, filterOptions] =
+    await Promise.all([
+      new MaterialRepository().findOptions(),
+      new LocationRepository().findOptions(),
+      new ClientRepository().findOptions(),
+      new ProductionRunRepository().findOptions(),
+      // Colores y tonos que hay HOY en bodega, no el catálogo entero.
+      new LotRepository().findFilterOptions(),
+    ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,6 +94,8 @@ export default async function LotsPage({ searchParams }: PageProps) {
         materials={materials.map((m) => ({ id: m.id, label: m.name }))}
         locations={locations.map((l) => ({ id: l.id, label: `${l.code} · ${l.name}` }))}
         clients={clients.map((c) => ({ id: c.id, label: c.name }))}
+        colors={filterOptions.colors.map((c) => ({ id: c, label: c }))}
+        shades={filterOptions.shades.map((s) => ({ id: s, label: s }))}
       />
 
       <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
@@ -111,6 +118,8 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
     materialId: params.materialId,
     locationId: params.locationId,
     clientId: params.clientId,
+    colorName: params.colorName,
+    shade: params.shade,
     status: params.status as LotStatus | undefined,
     isRemnant: params.onlyRemnants === "true" ? true : undefined,
     verified: params.onlyUnverified === "true" ? false : undefined,

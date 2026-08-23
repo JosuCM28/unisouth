@@ -15,6 +15,17 @@ interface LotFiltersProps {
   materials: Option[];
   locations: Option[];
   clients: Option[];
+  /** Colores con existencia. Vacío = no se pinta el filtro. */
+  colors: Option[];
+  /** Tonos con existencia. */
+  shades: Option[];
+  /**
+   * Se está filtrando DENTRO de un material (la ficha de la pila).
+   *
+   * Ahí sobra el selector de material —ya lo eligió la pantalla— y ofrecerlo
+   * sólo invita a salirse de la ficha sin querer.
+   */
+  hideMaterial?: boolean;
 }
 
 /** Estados que el auxiliar filtra a diario; el resto vive en el select. */
@@ -39,7 +50,14 @@ const ARRIVAL_RANGES: { value: string; label: string; days: number }[] = [
  * obligaría a abrir un menú, apuntar y confirmar por cada filtro.
  * Desde md: se cambian por selects, que comparan mejor en pantalla grande.
  */
-export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
+export function LotFilters({
+  materials,
+  locations,
+  clients,
+  colors,
+  shades,
+  hideMaterial,
+}: LotFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -69,9 +87,14 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
   /* Cuántos filtros de detalle están puestos. Se muestra en el botón para que
      el auxiliar sepa que la lista está acotada aunque el panel esté cerrado:
      una lista corta sin explicación se lee como "no hay material". */
-  const advancedCount = ["materialId", "locationId", "clientId", "arrivedWithin"]
-    .filter((key) => searchParams.get(key))
-    .length;
+  const advancedCount = [
+    "materialId",
+    "locationId",
+    "clientId",
+    "colorName",
+    "shade",
+    "arrivedWithin",
+  ].filter((key) => searchParams.get(key)).length;
   const hasFilters = [...searchParams.keys()].some((key) => key !== "q");
 
   return (
@@ -149,15 +172,43 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
               />
             </MobileFilter>
 
-            <MobileFilter label="Material">
-              <FilterSelect
-                placeholder="Material"
-                value={searchParams.get("materialId")}
-                options={materials}
-                onChange={(v) => setParam("materialId", v)}
-                full
-              />
-            </MobileFilter>
+            {!hideMaterial && (
+              <MobileFilter label="Material">
+                <FilterSelect
+                  placeholder="Material"
+                  value={searchParams.get("materialId")}
+                  options={materials}
+                  onChange={(v) => setParam("materialId", v)}
+                  full
+                />
+              </MobileFilter>
+            )}
+
+            {/* Sólo si hay de dónde escoger: un desplegable con una sola
+                opción, o vacío, es un toque que no lleva a ningún lado. */}
+            {colors.length > 1 && (
+              <MobileFilter label="Color">
+                <FilterSelect
+                  placeholder="Color"
+                  value={searchParams.get("colorName")}
+                  options={colors}
+                  onChange={(v) => setParam("colorName", v)}
+                  full
+                />
+              </MobileFilter>
+            )}
+
+            {shades.length > 1 && (
+              <MobileFilter label="Tono">
+                <FilterSelect
+                  placeholder="Tono"
+                  value={searchParams.get("shade")}
+                  options={shades}
+                  onChange={(v) => setParam("shade", v)}
+                  full
+                />
+              </MobileFilter>
+            )}
 
             <MobileFilter label="Ubicación">
               <FilterSelect
@@ -197,10 +248,12 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
 
       {/* ── Escritorio: selects ── */}
       <div className="hidden flex-wrap gap-2 md:flex">
-        <FilterSelect
-          placeholder="Material" value={searchParams.get("materialId")}
-          options={materials} onChange={(v) => setParam("materialId", v)}
-        />
+        {!hideMaterial && (
+          <FilterSelect
+            placeholder="Material" value={searchParams.get("materialId")}
+            options={materials} onChange={(v) => setParam("materialId", v)}
+          />
+        )}
         <FilterSelect
           placeholder="Ubicación" value={searchParams.get("locationId")}
           options={locations} onChange={(v) => setParam("locationId", v)}
@@ -209,6 +262,18 @@ export function LotFilters({ materials, locations, clients }: LotFiltersProps) {
           placeholder="Cliente" value={searchParams.get("clientId")}
           options={clients} onChange={(v) => setParam("clientId", v)}
         />
+        {colors.length > 1 && (
+          <FilterSelect
+            placeholder="Color" value={searchParams.get("colorName")}
+            options={colors} onChange={(v) => setParam("colorName", v)}
+          />
+        )}
+        {shades.length > 1 && (
+          <FilterSelect
+            placeholder="Tono" value={searchParams.get("shade")}
+            options={shades} onChange={(v) => setParam("shade", v)}
+          />
+        )}
         <FilterSelect
           placeholder="Estado" value={status}
           options={Object.entries(LOT_STATUS_LABELS).map(([id, label]) => ({ id, label }))}

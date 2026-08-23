@@ -32,6 +32,22 @@ export interface LotFilters extends PaginationInput {
    * real del piso es "¿qué llegó esta semana?", no un rango arbitrario.
    */
   arrivedWithinDays?: number;
+  /**
+   * Color, mirando los DOS lados.
+   *
+   * El color vive en el catálogo (`Material.colorName`) pero el rollo puede
+   * traer el suyo capturado a mano (`Lot.colorText`) cuando la partida salió
+   * distinta a la ficha. Filtrar sólo por el catálogo escondería justo esos
+   * rollos, que son los que se andan buscando.
+   */
+  colorName?: string;
+  /**
+   * Tono o partida de tintura.
+   *
+   * Es exacto y no "contiene": el tono es una clave (A-42), y traer el A-420
+   * al pedir el A-42 sería ofrecer tela que no se puede tender junta.
+   */
+  shade?: string;
 }
 
 export interface AvailableForIssueParams {
@@ -101,6 +117,37 @@ export class LotRepository extends BaseRepository<
 
     if (filters.isRemnant !== undefined) where.isRemnant = filters.isRemnant;
     if (filters.verified !== undefined) where.verified = filters.verified;
+
+    /* El color va en un AND propio y NO en `where.OR`.
+       Ese OR ya lo ocupa el buscador de arriba; meter aquí otra rama lo
+       ensancharía en vez de acotarlo, y buscar "azul" con filtro de color
+       traería también los rollos de otro color cuyo folio dijera "azul". */
+    if (filters.colorName) {
+      const color = filters.colorName;
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { colorText: { equals: color, mode: "insensitive" } },
+            // Del catálogo sólo cuando el rollo no traiga el suyo: si lo
+            // trae, ése manda y el del material ya no describe esta pieza.
+            {
+              colorText: null,
+              material: { colorName: { equals: color, mode: "insensitive" } },
+            },
+          ],
+        },
+      ];
+    }
+
+    /* Igualdad exacta salvo por mayúsculas.
+       Exacta porque el tono es una clave: traer el A-420 al pedir el A-42
+       sería ofrecer tela que no se puede tender junta. Pero insensible a
+       mayúsculas porque en la base conviven "Blanco" y "BLANCO" según quién
+       capturó, y el desplegable ofrece una sola opción para los dos. */
+    if (filters.shade) {
+      where.shade = { equals: filters.shade, mode: "insensitive" };
+    }
 
     return this.paginate<Lot>(where, { receivedAt: "desc" }, filters, {
       material: {
@@ -276,5 +323,66 @@ export class LotRepository extends BaseRepository<
     const lot = await this.db.lot.findUnique({ where: { code } });
     if (!lot) throw new NotFoundError(this.entityName, code);
     return lot;
+  }
+
+  /**
+   * Colores y tonos que DE VERDAD hay en bodega.
+   *
+   * Se sacan de la existencia y no del catálogo a propósito: un desplegable
+   * con treinta colores de los que sólo quedan cuatro obliga a probar uno por
+   * uno para descubrir cuáles traen algo. Aquí, todo lo que aparece en la
+   * lista devuelve por lo menos un rollo.
+   *
+   * Acotado por material cuando se pide desde la ficha de una pila: ahí los
+   * tonos de otras telas no son una opción, son ruido.
+   */
+  async findFilterOptions(materialId?: string): Promise<{
+    colors: string[];
+    shades: string[];
+  }> {
+    const where = {
+      status: { in: [...STATUSES_PHYSICALLY_PRESENT] },
+      ...(materialId ? { materialId } : {}),
+    };
+
+    const rows = await this.db.lot.findMany({
+      where,
+      select: {
+        colorText: true,
+        shade: true,
+        material: { select: { colorName: true } },
+      },
+    });
+
+    /* Se agrupan sin distinguir mayúsculas.
+       En la base conviven "Blanco" y "BLANCO" según quién capturó el
+       material. El filtro ya es insensible, así que listarlos por separado
+       daría dos opciones que devuelven exactamente lo mismo. Se conserva la
+       primera forma vista, que es la que el auxiliar reconoce. */
+    const colors = new Map<string, string>();
+    const shades = new Map<string, string>();
+
+    for (const row of rows) {
+      // El del rollo gana sobre el del catálogo: si la partida salió de otro
+      // color, ése es el color que tiene la pieza enfrente.
+      const color = row.colorText?.trim() || row.material?.colorName?.trim();
+      if (color && !colors.has(color.toLowerCase())) {
+        colors.set(color.toLowerCase(), color);
+      }
+
+      const shade = row.shade?.trim();
+      if (shade && !shades.has(shade.toLowerCase())) {
+        shades.set(shade.toLowerCase(), shade);
+      }
+    }
+
+    return {
+      colors: [...colors.values()].sort((a, b) => a.localeCompare(b, "es-MX")),
+      // Los tonos son claves correlativas (A-42, A-43): el orden natural
+      // agrupa la misma serie, que es como se piden en el piso.
+      shades: [...shades.values()].sort((a, b) =>
+        a.localeCompare(b, "es-MX", { numeric: true }),
+      ),
+    };
   }
 }

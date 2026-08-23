@@ -79,6 +79,16 @@ export interface PileFilters {
   locationId?: string;
   /** Sólo lo que ocupa lugar físico. Por omisión, sí. */
   onlyPresent?: boolean;
+  /**
+   * Color y tono, para acotar la pila desde la ficha del material.
+   *
+   * El color se busca en los dos lados igual que en el inventario: el del
+   * rollo manda y el del catálogo sólo aplica cuando la pieza no trae el
+   * suyo. El tono es exacto —es una clave, y traer el A-420 al pedir el
+   * A-42 sería ofrecer tela que no se puede tender junta.
+   */
+  colorName?: string;
+  shade?: string;
 }
 
 /**
@@ -116,6 +126,24 @@ export async function getPileSheetData(
     materialId: filters.materialId,
     ...(filters.clientId ? { clientId: filters.clientId } : {}),
     ...(filters.locationId ? { locationId: filters.locationId } : {}),
+    // Insensible a mayúsculas: en la base conviven "Blanco" y "BLANCO" según
+    // quién capturó, y el desplegable ofrece una sola opción para los dos.
+    ...(filters.shade
+      ? { shade: { equals: filters.shade, mode: "insensitive" as const } }
+      : {}),
+    ...(filters.colorName
+      ? {
+          OR: [
+            { colorText: { equals: filters.colorName, mode: "insensitive" as const } },
+            {
+              colorText: null,
+              material: {
+                colorName: { equals: filters.colorName, mode: "insensitive" as const },
+              },
+            },
+          ],
+        }
+      : {}),
     // Un rollo agotado o dado de baja no está en la pila: contarlo haría que
     // la hoja prometiera tela que ya no existe.
     ...(filters.onlyPresent === false
@@ -232,4 +260,84 @@ function groupByShade(lots: PileLotRow[]): ShadeTotal[] {
 /** Valores distintos y sin vacíos, en el orden en que aparecieron. */
 function unique(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => Boolean(v)))];
+}
+
+/** Opciones para acotar la pila desde la ficha del material. */
+export interface PileFilterOptions {
+  clients: { id: string; label: string }[];
+  locations: { id: string; label: string }[];
+  colors: { id: string; label: string }[];
+  shades: { id: string; label: string }[];
+}
+
+/**
+ * Con qué se puede filtrar ESTA pila.
+ *
+ * Se saca de los rollos que hay, no de los catálogos: ofrecer los 40 clientes
+ * del sistema cuando la pila es de dos obligaría a probar uno por uno para
+ * descubrir cuáles traen algo. Todo lo que sale en estas listas devuelve al
+ * menos un rollo.
+ *
+ * El dueño y la ubicación van con su id porque así se filtran; el color y el
+ * tono son texto libre y se filtran por su valor.
+ */
+export async function getPileFilterOptions(
+  materialId: string,
+): Promise<PileFilterOptions> {
+  const lots = await prisma.lot.findMany({
+    where: {
+      materialId,
+      status: { in: [...STATUSES_PHYSICALLY_PRESENT] },
+    },
+    select: {
+      shade: true,
+      colorText: true,
+      client: { select: { id: true, name: true } },
+      location: { select: { id: true, code: true, name: true } },
+      material: { select: { colorName: true } },
+    },
+  });
+
+  const clients = new Map<string, string>();
+  const locations = new Map<string, string>();
+  /* Color y tono se agrupan sin distinguir mayúsculas: en la base conviven
+     "Blanco" y "BLANCO", el filtro ya es insensible, y listarlos aparte
+     daría dos opciones que devuelven lo mismo. */
+  const colors = new Map<string, string>();
+  const shades = new Map<string, string>();
+
+  for (const lot of lots) {
+    if (lot.client) clients.set(lot.client.id, lot.client.name);
+    if (lot.location) {
+      locations.set(lot.location.id, `${lot.location.code} · ${lot.location.name}`);
+    }
+
+    // El del rollo manda sobre el del catálogo: si la partida salió de otro
+    // color, ése es el color que tiene la pieza enfrente.
+    const color = lot.colorText?.trim() || lot.material?.colorName?.trim();
+    if (color && !colors.has(color.toLowerCase())) {
+      colors.set(color.toLowerCase(), color);
+    }
+
+    const shade = lot.shade?.trim();
+    if (shade && !shades.has(shade.toLowerCase())) {
+      shades.set(shade.toLowerCase(), shade);
+    }
+  }
+
+  const byLabel = (a: { label: string }, b: { label: string }) =>
+    a.label.localeCompare(b.label, "es-MX");
+
+  return {
+    clients: [...clients].map(([id, label]) => ({ id, label })).sort(byLabel),
+    locations: [...locations].map(([id, label]) => ({ id, label })).sort(byLabel),
+    colors: [...colors.values()]
+      .map((color) => ({ id: color, label: color }))
+      .sort(byLabel),
+    // Los tonos son claves correlativas (A-42, A-43): el orden natural
+    // agrupa la misma serie, que es como se piden en el piso.
+    shades: [...shades.values()]
+      .map((shade) => ({ id: shade, label: shade }))
+      .sort((a, b) => a.label.localeCompare(b.label, "es-MX", { numeric: true })),
+  };
 }
