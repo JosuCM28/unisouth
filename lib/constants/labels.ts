@@ -77,6 +77,22 @@ export const UNIT_SHORT_LABELS: Record<Unit, string> = {
   LITER: "L",
 };
 
+/**
+ * Unidades que de verdad se teclean al recibir tela, en orden de uso.
+ *
+ * La tela llega en metros, pero muy seguido el proveedor sólo pesa el rollo
+ * y la nota viene en kilos. Antes había que dar de alta el material otra vez
+ * para poder capturarlo; ahora se elige la unidad en el renglón, y estas
+ * cuatro van primero porque son el 99% de las cargas. El resto del catálogo
+ * sigue disponible más abajo en el selector.
+ */
+export const COMMON_RECEIPT_UNITS: Unit[] = [
+  "METER",
+  "KILOGRAM",
+  "YARD",
+  "PIECE",
+];
+
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   ROW: "Fila",
   RACK: "Rack",
@@ -198,6 +214,36 @@ export function toSelectOptions<K extends string>(
   return (Object.entries(labels) as [K, string][])
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label, "es-MX"));
+}
+
+/**
+ * Unidades partidas en dos: las de diario arriba, el resto abajo.
+ *
+ * Se ordena por USO y no alfabéticamente. Con el catálogo completo ordenado
+ * por nombre, "Kilogramo" cae entre "Gruesa" y "Litro" y hay que buscarlo
+ * con el pulgar; siendo la segunda unidad más tecleada de la bodega, tiene
+ * que estar a la vista sin desplazar.
+ *
+ * La etiqueta lleva la abreviatura porque es lo que el auxiliar coteja
+ * contra la nota del proveedor: "Kilogramo (kg)".
+ */
+export function unitSelectGroups(): {
+  common: SelectOption[];
+  rest: SelectOption[];
+} {
+  const withShort = (unit: Unit): SelectOption => ({
+    value: unit,
+    label: `${UNIT_LABELS[unit]} (${UNIT_SHORT_LABELS[unit]})`,
+  });
+
+  const common = COMMON_RECEIPT_UNITS.map(withShort);
+
+  const rest = (Object.keys(UNIT_LABELS) as Unit[])
+    .filter((unit) => !COMMON_RECEIPT_UNITS.includes(unit))
+    .map(withShort)
+    .sort((a, b) => a.label.localeCompare(b.label, "es-MX"));
+
+  return { common, rest };
 }
 
 export const PRODUCTION_RUN_STATUS_LABELS: Record<ProductionRunStatus, string> = {

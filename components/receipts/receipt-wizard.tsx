@@ -20,7 +20,11 @@ import { toast } from "sonner";
 import type { Unit } from "@prisma/client";
 import { createReceiptAction } from "@/app/actions/receipt.actions";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
-import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
+import {
+  UNIT_LABELS,
+  UNIT_SHORT_LABELS,
+  unitSelectGroups,
+} from "@/lib/constants/labels";
 import { cn, todayInputValue } from "@/lib/utils";
 import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
@@ -35,6 +39,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/* Se arma una sola vez para todo el módulo: son 14 unidades fijas y hay un
+   selector por renglón. Rearmarlas en cada tecla capturada, con veinte
+   rollos en pantalla, se siente en un celular de bodega. */
+const UNIT_GROUPS = unitSelectGroups();
 
 interface HeaderState {
   date: string;
@@ -490,39 +509,53 @@ export function ReceiptWizard({
                   />
                 </FormSelectField>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-[1fr_auto] gap-3">
                   <div className="flex flex-col gap-2">
                     <Label htmlFor={`quantity-row-${index}`}>Cantidad</Label>
-                    <div className="relative">
-                      <Input
-                        id={`quantity-row-${index}`}
-                        ref={index === rows.length - 1 ? lastQuantityRef : undefined}
-                        inputMode="decimal"
-                        placeholder="0"
-                        className="touch-target tabular pr-12 text-lg"
-                        value={row.quantity}
-                        onChange={(event) =>
-                          updateRow(index, { quantity: event.target.value })
-                        }
-                        onKeyDown={(event) => handleKeyDown(event, index)}
-                      />
-                      {row.unit && (
-                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                          {UNIT_SHORT_LABELS[row.unit]}
-                        </span>
-                      )}
-                    </div>
+                    <Input
+                      id={`quantity-row-${index}`}
+                      ref={index === rows.length - 1 ? lastQuantityRef : undefined}
+                      inputMode="decimal"
+                      placeholder="0"
+                      className="touch-target tabular text-lg"
+                      value={row.quantity}
+                      onChange={(event) =>
+                        updateRow(index, { quantity: event.target.value })
+                      }
+                      onKeyDown={(event) => handleKeyDown(event, index)}
+                    />
                   </div>
 
-                  <FormField
-                    id={`shade-row-${index}`}
-                    label="Tono"
-                    placeholder="A-42"
-                    className="tabular"
-                    value={row.shade}
-                    onChange={(event) => updateRow(index, { shade: event.target.value })}
+                  {/* La unidad se elige, no se impone. La tela viene en
+                      metros casi siempre, pero cuando el proveedor sólo pesó
+                      el rollo la nota trae kilos y hay que poder capturarla
+                      tal cual, sin inventar una conversión. */}
+                  <UnitPicker
+                    index={index}
+                    value={row.unit}
+                    onChange={(unit) => updateRow(index, { unit })}
                   />
                 </div>
+
+                {/* Aviso, no bloqueo: quien recibe tiene el rollo en la mano
+                    y sabe si de verdad viene en kilos. Sólo se le recuerda
+                    en qué unidad está dado de alta el material, por si el
+                    dedo resbaló en el selector. */}
+                <UnitMismatchNotice
+                  unit={row.unit}
+                  material={materialOptions.find(
+                    (item) => item.id === row.materialId,
+                  )}
+                />
+
+                <FormField
+                  id={`shade-row-${index}`}
+                  label="Tono"
+                  placeholder="A-42"
+                  className="tabular"
+                  value={row.shade}
+                  onChange={(event) => updateRow(index, { shade: event.target.value })}
+                />
 
                 <div className="grid grid-cols-2 gap-3">
                   <FormSelectField id={`location-row-${index}`} label="Ubicación">
@@ -663,6 +696,78 @@ export function ReceiptWizard({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/**
+ * Selector de unidad del renglón.
+ *
+ * Angosto a propósito: comparte fila con la cantidad, que es el campo que
+ * de verdad se teclea. Las unidades de diario van arriba y separadas del
+ * resto del catálogo para no obligar a desplazar por el metro y el kilo.
+ */
+function UnitPicker({
+  index,
+  value,
+  onChange,
+}: {
+  index: number;
+  value: Unit | "";
+  onChange: (unit: Unit) => void;
+}) {
+  return (
+    <FormSelectField id={`unit-row-${index}`} label="Unidad">
+      <Select value={value} onValueChange={(next) => onChange(next as Unit)}>
+        <SelectTrigger id={`unit-row-${index}`} className="touch-target w-28">
+          <SelectValue placeholder="—" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {UNIT_GROUPS.common.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+
+          <SelectSeparator />
+
+          <SelectGroup>
+            <SelectLabel>Otras unidades</SelectLabel>
+            {UNIT_GROUPS.rest.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </FormSelectField>
+  );
+}
+
+/**
+ * Avisa cuando el rollo se captura en una unidad distinta a la del material.
+ *
+ * No estorba el flujo: recibir en kilos algo dado de alta en metros es un
+ * caso REAL y frecuente. Pero también es lo que se ve cuando alguien se
+ * equivocó de renglón en el selector, y ese error llega hasta el kárdex.
+ */
+function UnitMismatchNotice({
+  unit,
+  material,
+}: {
+  unit: Unit | "";
+  material: MaterialOption | undefined;
+}) {
+  if (!unit || !material || unit === material.baseUnit) return null;
+
+  return (
+    <p className="text-xs text-state-reserved">
+      Este material se maneja en {UNIT_LABELS[material.baseUnit].toLowerCase()}{" "}
+      ({UNIT_SHORT_LABELS[material.baseUnit]}). Se guardará en{" "}
+      {UNIT_SHORT_LABELS[unit]} tal como llegó.
+    </p>
   );
 }
 

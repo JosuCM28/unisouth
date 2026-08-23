@@ -9,7 +9,11 @@ import { z } from "zod";
 import type { Unit } from "@prisma/client";
 import { submitOrQueue } from "@/lib/offline/submit";
 import { notifyQueueChanged } from "@/hooks/use-offline-queue";
-import { UNIT_LABELS, toSelectOptions } from "@/lib/constants/labels";
+import {
+  UNIT_LABELS,
+  UNIT_SHORT_LABELS,
+  unitSelectGroups,
+} from "@/lib/constants/labels";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
@@ -19,7 +23,10 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -45,7 +52,9 @@ const lotFormSchema = z.object({
 
 type LotFormValues = z.infer<typeof lotFormSchema>;
 
-const UNIT_OPTIONS = toSelectOptions(UNIT_LABELS);
+/* Por uso y no por orden alfabético: "Kilogramo" caía entre "Gruesa" y
+   "Litro", y es la segunda unidad más tecleada de la bodega. */
+const UNIT_GROUPS = unitSelectGroups();
 
 interface LotFormSheetProps {
   materials: MaterialOption[];
@@ -198,15 +207,40 @@ export function LotFormSheet({
                 <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
-                {UNIT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {UNIT_GROUPS.common.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+
+                <SelectSeparator />
+
+                <SelectGroup>
+                  <SelectLabel>Otras unidades</SelectLabel>
+                  {UNIT_GROUPS.rest.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </FormSelectField>
         </div>
+
+        {/* Aviso, no bloqueo: recibir en kilos algo dado de alta en metros
+            es un caso real y frecuente. Sólo se recuerda la unidad del
+            material, por si el dedo resbaló en el selector. */}
+        {selected && watch("unit") && watch("unit") !== selected.baseUnit && (
+          <p className="text-xs text-state-reserved">
+            Este material se maneja en{" "}
+            {UNIT_LABELS[selected.baseUnit].toLowerCase()} (
+            {UNIT_SHORT_LABELS[selected.baseUnit]}). Se guardará en{" "}
+            {UNIT_SHORT_LABELS[watch("unit") as Unit]} tal como llegó.
+          </p>
+        )}
 
         <FormSection title="Ubicación y dueño">
           <FormSelectField id="locationId" label="Ubicación">
