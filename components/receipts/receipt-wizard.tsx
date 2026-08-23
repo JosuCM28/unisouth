@@ -25,6 +25,10 @@ import { cn, todayInputValue } from "@/lib/utils";
 import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import {
+  UnsavedChangesGuard,
+  describeLoss,
+} from "@/components/shared/unsaved-changes-guard";
+import {
   SearchSelect,
   type SearchSelectOption,
 } from "@/components/shared/search-select";
@@ -114,6 +118,22 @@ export function ReceiptWizard({
 
   /** Fila que se va a borrar. `null` = el diálogo está cerrado. */
   const [rowToDelete, setRowToDelete] = useState<number | null>(null);
+
+  /* Rollos con algo capturado. La fecha del encabezado NO cuenta: viene
+     prellenada con la de hoy y preguntar por ella sería preguntar por nada. */
+  const capturedRows = rows.filter((row) => row.materialId || row.quantity).length;
+
+  const headerTouched =
+    Boolean(header.guideNumber) ||
+    Boolean(header.carrierId) ||
+    Boolean(header.origin) ||
+    Boolean(header.supplierId) ||
+    Boolean(header.clientId) ||
+    Boolean(header.invoiceRef);
+
+  /* Mientras se guarda ya no se avisa: el `router.push` del final es una
+     salida legítima y el diálogo se atravesaría justo al terminar. */
+  const hasUnsaved = !isSubmitting && (capturedRows > 0 || headerTouched);
 
   /* Las opciones se derivan una vez y no por renglón: con veinte rollos en
      pantalla, rearmar la lista de 200 materiales veinte veces por tecla
@@ -278,6 +298,17 @@ export function ReceiptWizard({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Veinte rollos tecleados de pie se van con un roce al "atrás" del
+          teléfono. Ésta es la única red: no hay borrador ni autoguardado. */}
+      <UnsavedChangesGuard
+        when={hasUnsaved}
+        description={
+          capturedRows > 0
+            ? describeLoss(capturedRows, "rollo", "rollos")
+            : "Perderás los datos de la guía que capturaste."
+        }
+      />
+
       <StepIndicator step={step} />
 
       {step === 1 ? (

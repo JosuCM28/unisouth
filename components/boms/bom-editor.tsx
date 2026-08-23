@@ -14,6 +14,7 @@ import { formatQuantity } from "@/lib/utils";
 import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { SubmitButton } from "@/components/shared/submit-button";
+import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,7 +70,8 @@ export function BomEditor({
     bom && bom.status === "ACTIVE" && bom.usedByCalculations > 0,
   );
 
-  const { register, control, handleSubmit, setValue, watch, formState: { isSubmitting } } =
+  const { register, control, handleSubmit, setValue, watch, reset,
+          formState: { isSubmitting, isDirty } } =
     useForm<FormValues>({
       defaultValues: {
         name: bom?.name ?? "",
@@ -138,11 +140,22 @@ export function BomEditor({
       toast.success("Ficha guardada");
     }
 
+    /* La pantalla no navega al guardar, se queda en la ficha. Sin este
+       reset el formulario seguiría "sucio" y el aviso de salida saltaría
+       aunque ya no haya nada pendiente. */
+    reset(values);
     router.refresh();
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Una ficha son varios materiales con su consumo y su merma; rehacerla
+          por un "atrás" accidental es media captura perdida. */}
+      <UnsavedChangesGuard
+        when={isDirty && !isSubmitting}
+        description="Perderás los cambios de la ficha técnica."
+      />
+
       {willVersion && (
         <div className="flex items-start gap-2 border border-state-reserved bg-state-reserved-muted p-3">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />

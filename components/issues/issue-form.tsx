@@ -21,6 +21,7 @@ import { runAction } from "@/lib/offline/run-action";
 import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SubmitButton } from "@/components/shared/submit-button";
+import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,6 +169,21 @@ export function IssueForm({
   const [pickerMaterialId, setPickerMaterialId] = useState("");
   const [pickerState, setPickerState] = useState<PickerState>({ kind: "idle" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* Foto del vale tal como se cargó, para saber después si se tocó algo.
+     Se calcula una sola vez: el documento no cambia mientras la pantalla
+     está abierta. */
+  const [originalSnapshot] = useState(() =>
+    snapshot(
+      document?.lines ?? [],
+      document?.cutLines ?? [],
+      document?.cutHeader ?? EMPTY_CUT_HEADER,
+      document?.concept ?? "",
+      document?.reference ?? "",
+      document?.receivedBy ?? "",
+      document?.notes ?? "",
+    ),
+  );
 
   /**
    * Cambiar de dueño invalida los renglones ya puestos.
@@ -417,6 +433,19 @@ export function IssueForm({
     lines.length > 0 ||
     cutLines.some((line) => line.sizeId && Number(line.quantity) > 0);
 
+  /* Trabajo que se perdería al salir.
+   *
+   * Al CORREGIR un borrador no basta con "tiene renglones": el vale ya venía
+   * con ellos y preguntar nada más por abrirlo y cerrarlo sería un estorbo.
+   * Se compara contra lo que se cargó, así que sólo molesta si de verdad se
+   * tocó algo. En un vale nuevo cualquier captura cuenta. */
+  const hasUnsaved =
+    !isSubmitting &&
+    (isEditing
+      ? snapshot(lines, cutLines, cutHeader, concept, reference, receivedBy, notes) !==
+        originalSnapshot
+      : hasSomething || Boolean(concept || reference || receivedBy || notes));
+
   /* Para el SELECTOR DE ROLLOS sólo se ofrecen materiales con existencia, y
      con dueño elegido sólo los suyos. Antes se listaba el catálogo entero y la
      mitad devolvía lista vacía: el auxiliar tenía que probar uno por uno para
@@ -432,6 +461,13 @@ export function IssueForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Armar un vale es elegir rollo por rollo de una lista: rehacerlo
+          porque el pulgar rozó "atrás" son varios minutos perdidos. */}
+      <UnsavedChangesGuard
+        when={hasUnsaved}
+        description={describeIssueLoss(lines.length, cutLines.length)}
+      />
+
       <div className="flat-surface flex flex-col gap-4 p-4">
         <FormSelectField
           id="issue-client"
@@ -776,4 +812,47 @@ function IssueLineRow({
       )}
     </li>
   );
+}
+
+/**
+ * Foto comparable del vale.
+ *
+ * Sólo se usa para saber si el usuario tocó algo desde que abrió el
+ * borrador. Serializar es más barato de mantener que comparar campo por
+ * campo, y son decenas de renglones, no miles.
+ */
+function snapshot(
+  lines: { lotId: string; quantity: string }[],
+  cutLines: CutLineDraft[],
+  cutHeader: CutHeaderDraft,
+  concept: string,
+  reference: string,
+  receivedBy: string,
+  notes: string,
+): string {
+  return JSON.stringify([
+    lines.map((line) => [line.lotId, line.quantity]),
+    cutLines,
+    cutHeader,
+    concept,
+    reference,
+    receivedBy,
+    notes,
+  ]);
+}
+
+/** Qué se pierde, dicho en rollos y tallas y no en "cambios". */
+function describeIssueLoss(lineCount: number, cutCount: number): string {
+  const partes: string[] = [];
+
+  if (lineCount > 0) {
+    partes.push(`${lineCount} ${lineCount === 1 ? "rollo" : "rollos"}`);
+  }
+  if (cutCount > 0) {
+    partes.push(`${cutCount} ${cutCount === 1 ? "talla" : "tallas"} del desglose`);
+  }
+
+  if (partes.length === 0) return "Perderás lo que llevas capturado del vale.";
+
+  return `Perderás ${partes.join(" y ")} que capturaste.`;
 }

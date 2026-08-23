@@ -11,6 +11,7 @@ import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { SubmitButton } from "@/components/shared/submit-button";
+import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -62,7 +63,7 @@ export function CalculatorForm({
     handleSubmit,
     setValue,
     watch,
-    formState: { isSubmitting },
+    formState: { isSubmitting, isDirty },
   } = useForm<FormValues>({
     defaultValues: {
       clientId: "",
@@ -126,8 +127,18 @@ export function CalculatorForm({
     toast.success(`Cálculo ${data.calculation.code} generado`);
   }
 
+  /* Ya corrido, el cálculo quedó guardado con su folio y salirse no pierde
+     nada: se puede volver a abrir desde el historial. El aviso sólo aplica a
+     los renglones tecleados que todavía no se calculan. */
+  const hasUnsaved = isDirty && !isSubmitting && requirements === null;
+
   return (
     <div className="flex flex-col gap-6">
+      <UnsavedChangesGuard
+        when={hasUnsaved}
+        description="Perderás los productos que capturaste sin calcular."
+      />
+
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           {fields.map((field, index) => (

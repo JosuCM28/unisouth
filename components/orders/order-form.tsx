@@ -14,6 +14,7 @@ import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SearchSelect } from "@/components/shared/search-select";
 import { SubmitButton } from "@/components/shared/submit-button";
+import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,23 @@ export function OrderForm({
   const [lines, setLines] = useState<LineDraft[]>(order?.lines ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /* Foto de la orden tal como se abrió, para no preguntar por nada al
+     corregir una existente que sólo se consultó. */
+  const [originalSnapshot] = useState(() =>
+    snapshot({
+      clientId: order?.clientId ?? defaults?.clientId ?? "",
+      folderId: order?.folderId ?? defaults?.folderId ?? "",
+      materialId: order?.materialId ?? "",
+      productionRunId: order?.productionRunId ?? "",
+      description: order?.description ?? "",
+      reference: order?.reference ?? "",
+      orderedAt: order?.orderedAt ?? todayInputValue(),
+      dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
+      notes: order?.notes ?? "",
+      lines: order?.lines ?? [],
+    }),
+  );
+
   function addLine() {
     setLines((current) => [
       ...current,
@@ -176,6 +194,24 @@ export function OrderForm({
     0,
   );
 
+  /* Trabajo que se perdería al salir. Se compara contra lo que se cargó para
+     que abrir una orden y cerrarla sin tocarla no dispare la pregunta. La
+     fecha de pedido no cuenta aparte: ya viene dentro de la foto. */
+  const hasUnsaved =
+    !isSubmitting &&
+    snapshot({
+      clientId,
+      folderId,
+      materialId,
+      productionRunId,
+      description,
+      reference,
+      orderedAt,
+      dueDate,
+      notes,
+      lines,
+    }) !== originalSnapshot;
+
   async function handleSubmit() {
     const valid = lines.filter(
       (line) => line.sizeId && Number(line.orderedQuantity) > 0,
@@ -225,6 +261,17 @@ export function OrderForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Una orden son diez o quince renglones de talla; salirse por error
+          obliga a recapturarlos todos. */}
+      <UnsavedChangesGuard
+        when={hasUnsaved}
+        description={
+          lines.length > 0
+            ? `Perderás ${lines.length} ${lines.length === 1 ? "talla capturada" : "tallas capturadas"}.`
+            : "Perderás los datos de la orden que capturaste."
+        }
+      />
+
       <div className="flat-surface flex flex-col gap-4 p-4">
         {/* El pedido va primero: cuando la orden es parte de uno, es el dato
             que el auxiliar ya trae en la cabeza al abrir el formulario. */}
@@ -490,4 +537,34 @@ export function OrderForm({
       </SubmitButton>
     </div>
   );
+}
+
+/**
+ * Foto comparable de la orden.
+ *
+ * La `key` del renglón se deja fuera a propósito: es un uuid que se genera al
+ * agregar la fila y no es un dato de la orden. Incluirla haría que dos
+ * órdenes idénticas nunca se vieran iguales.
+ */
+function snapshot(state: {
+  clientId: string;
+  folderId: string;
+  materialId: string;
+  productionRunId: string;
+  description: string;
+  reference: string;
+  orderedAt: string;
+  dueDate: string;
+  notes: string;
+  lines: LineDraft[];
+}): string {
+  return JSON.stringify({
+    ...state,
+    lines: state.lines.map((line) => [
+      line.sizeId,
+      line.orderedQuantity,
+      line.tagId,
+      line.notes,
+    ]),
+  });
 }
