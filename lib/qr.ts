@@ -42,11 +42,7 @@ export async function generateLotQrs(
  *
  * Apunta a la ficha y no a la lista filtrada porque parado frente a la estiba
  * lo que se quiere saber es QUÉ tela es —composición, ancho, tonos, cuánta
- * queda— y no sólo qué folios la componen. Desde la ficha se llega a los
- * rollos en un toque.
- *
- * Va por la liga corta `{APP_URL}/m/{código}`: cabe en un código menos denso,
- * que se lee mejor con la hoja arrugada, igual que el QR de cada rollo.
+ * queda— y no sólo qué folios la componen.
  */
 export async function generatePileQr(params: {
   materialCode: string;

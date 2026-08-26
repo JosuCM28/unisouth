@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/core/session";
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { CalculatorForm, type ProductOption } from "@/components/calculations/calculator-form";
@@ -7,6 +8,8 @@ import { CalculatorForm, type ProductOption } from "@/components/calculations/ca
 export const metadata: Metadata = { title: "Cálculo" };
 
 export default async function CalculationsPage() {
+  await requirePermission("calculation:run");
+
   const [products, sizes, clients] = await Promise.all([
     prisma.finishedProduct.findMany({
       where: { active: true, deletedAt: null },

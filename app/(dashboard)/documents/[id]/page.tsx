@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/core/session";
 import {
   CUT_TAG_COLORS, CUT_TAG_LABELS, CUT_VERSION_LABELS,
   DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES,
@@ -24,6 +25,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function DocumentDetailPage({ params }: PageProps) {
+  await requirePermission("inventory:browse");
+
   const { id } = await params;
 
   const document = await prisma.inventoryDocument.findUnique({

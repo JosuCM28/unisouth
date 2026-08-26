@@ -45,9 +45,9 @@ export interface LotWithMaterial extends Lot {
 }
 
 /**
- * POLIMORFISMO: InventoryService no pregunta de qué tipo es el movimiento.
- * Le pide a la estrategia su dirección, su signo y que valide, y cada
- * subclase responde a su manera.
+ * InventoryService no pregunta de qué tipo es el movimiento: le pide a la
+ * estrategia su dirección, su signo y que valide, y cada una responde a su
+ * manera. Agregar un tipo de movimiento no obliga a tocar el servicio.
  */
 export abstract class MovementStrategy {
   abstract readonly direction: MovementDirection;

@@ -3,18 +3,16 @@ import type { LotStatus } from "@prisma/client";
 /**
  * Agrupaciones de estados del rollo.
  *
- * Estaban repetidas en cuatro archivos con cuatro nombres distintos. El
- * riesgo no era la duplicación en sí, sino que alguien agregara un estado
- * nuevo al schema y lo sumara a tres de las cuatro listas: el tablero diría
+ * Viven aquí y no en cada consulta para que agregar un estado al schema no
+ * obligue a acordarse de sumarlo a cuatro listas distintas: el tablero diría
  * un número, el mapa de bodega otro, y nadie sabría cuál creer.
  */
 
 /**
  * El rollo sigue ocupando lugar en la bodega.
  *
- * Es lo que se cuenta cuando alguien pregunta "¿cuántos rollos hay?" o
- * "¿está llena la fila 3?". Excluye los agotados, los devueltos y los dados
- * de baja: siguen en la base por historial, pero ya no estorban.
+ * Excluye agotados, devueltos y dados de baja: siguen en la base por
+ * historial, pero ya no estorban.
  */
 export const STATUSES_PHYSICALLY_PRESENT: readonly LotStatus[] = [
   "AVAILABLE",
@@ -53,10 +51,7 @@ export const STATUSES_REMNANT_ELIGIBLE: readonly LotStatus[] = [
   "IN_USE",
 ] as const;
 
-/**
- * Versiones mutables para los `where` de Prisma, que no acepta `readonly`.
- * Se exponen ya listas para no escribir `[...LISTA]` en cada consulta.
- */
+/** Prisma no acepta `readonly` en un `where`, así que van ya desempacadas. */
 export const PHYSICALLY_PRESENT_FILTER = {
   in: [...STATUSES_PHYSICALLY_PRESENT],
 };

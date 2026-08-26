@@ -3,30 +3,22 @@ import type { NextRequest } from "next/server";
 import { materialPath } from "@/lib/material-url";
 
 /**
- * Redirección corta del QR de una PILA.
- *
- * El QR de la hoja de pila contiene {APP_URL}/m/{código}: una liga corta cabe
- * en un código menos denso, que se lee mejor con la hoja arrugada o sucia de
- * pelusa. Es el equivalente de `/r/{folio}` para rollos sueltos.
+ * Redirección corta del QR de una PILA. El equivalente de `/r/{folio}`.
  *
  * No exige sesión a propósito —el destino sí la exige, vía proxy.ts— para que
  * la app de cámara del sistema pueda abrirlo y el usuario caiga en el login
  * con su `?redirect` puesto.
  *
- * Es catch-all y no un segmento simple porque la clave de un material admite
- * "/" (TELA/AZUL). Con `[code]` esa hoja daba 404 al escanearla, aunque el
- * material existiera.
+ * Es catch-all porque la clave de un material admite "/" (TELA/AZUL): con
+ * `[code]` esa hoja daba 404 al escanearla, aunque el material existiera.
  */
 
 /**
- * Qué se acepta como clave de material.
+ * Lo mismo que valida `materialSchema`, menos "..", "\" y "//".
  *
- * Se permite lo mismo que valida `materialSchema`: hasta 40 caracteres sin
- * espacios. Lo que NO se permite es que la clave traiga "..", "\" o "//",
- * porque entonces `/m/..%2F..%2Fadmin` o una clave con una URL completa
- * adentro convertiría este endpoint en un redirector abierto: un atacante
- * mandaría ligas que empiezan con el dominio de la fábrica y terminan en su
- * propio sitio de phishing.
+ * Sin ese recorte, `/m/..%2F..%2Fadmin` o una clave con una URL adentro
+ * convertiría este endpoint en un redirector abierto: ligas que empiezan con
+ * el dominio de la fábrica y terminan en un sitio de phishing.
  */
 const VALID_CODE = /^[A-Za-z0-9][A-Za-z0-9._\-/]{0,39}$/;
 

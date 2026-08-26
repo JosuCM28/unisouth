@@ -12,6 +12,25 @@ import { Label } from "@/components/ui/label";
 type ScanTarget = { kind: "lot" | "material"; code: string };
 
 /**
+ * BarcodeDetector, que todavía no viene en los tipos del DOM.
+ *
+ * Se declara sólo lo que se usa —crear el detector y leer `rawValue`— en vez
+ * de silenciar el tipo con `any`: así el compilador sigue revisando esta
+ * parte, que corre en el celular del piso y no hay forma de probar en CI.
+ */
+interface BarcodeDetection {
+  rawValue: string;
+}
+
+interface BarcodeDetectorLike {
+  detect(source: CanvasImageSource): Promise<BarcodeDetection[]>;
+}
+
+type BarcodeDetectorConstructor = new (options: {
+  formats: string[];
+}) => BarcodeDetectorLike;
+
+/**
  * Traduce lo que devolvió la cámara a un destino de la app.
  *
  * Se aceptan los DOS códigos que se imprimen en bodega, porque el auxiliar
@@ -124,9 +143,17 @@ export function QrScanner() {
     await video.play();
     setState("scanning");
 
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any --
-       BarcodeDetector aún no está en los tipos de TypeScript. */
-    const Detector = (globalThis as any).BarcodeDetector;
+    const Detector = (
+      globalThis as unknown as {
+        BarcodeDetector?: BarcodeDetectorConstructor;
+      }
+    ).BarcodeDetector;
+
+    if (!Detector) {
+      setState("unsupported");
+      return;
+    }
+
     const detector = new Detector({ formats: ["qr_code"] });
 
     let active = true;

@@ -14,6 +14,7 @@ import {
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
+import { requirePermission } from "@/lib/core/session";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity, toPlainObject } from "@/lib/utils";
 import { StatusChip } from "@/components/lots/lot-card";
@@ -36,6 +37,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function LotDetailPage({ params }: PageProps) {
+  await requirePermission("inventory:browse");
+
   const { code } = await params;
 
   const [lot, locations, clients] = await Promise.all([

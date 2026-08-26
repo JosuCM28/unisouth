@@ -13,12 +13,11 @@ import type { NextRequest } from "next/server";
  */
 
 /**
- * Sólo se aceptan folios con el formato del sistema.
+ * Sólo folios con el formato del sistema.
  *
- * Sin esta validación, `/r/..%2F..%2Fadmin` o un folio con una URL completa
- * dentro convertiría este endpoint en un redirector abierto: un atacante
- * mandaría ligas que empiezan con el dominio de la fábrica y terminan en su
- * propio sitio de phishing.
+ * Sin esto, `/r/..%2F..%2Fadmin` o un folio con una URL adentro convertiría
+ * este endpoint en un redirector abierto: ligas que empiezan con el dominio
+ * de la fábrica y terminan en un sitio de phishing.
  */
 const VALID_CODE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 

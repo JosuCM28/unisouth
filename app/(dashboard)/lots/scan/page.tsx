@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { requirePermission } from "@/lib/core/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { QrScanner } from "@/components/lots/qr-scanner";
 
 export const metadata: Metadata = { title: "Escanear" };
 
-export default function ScanPage() {
+export default async function ScanPage() {
+  await requirePermission("inventory:read");
+
   return (
     <div className="flex flex-col gap-4">
       <PageHeader

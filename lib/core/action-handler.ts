@@ -37,30 +37,27 @@ export interface ActionConfig<TInput, TOutput> {
  * permiso, validación, revalidación y traducción de errores. Así las actions
  * quedan en tres líneas y no pueden saltarse la autorización por descuido.
  *
- * POLIMORFISMO: atrapa `DomainError` sin conocer la subclase concreta.
- * Cada error trae su propio `code` y su propio `field`, y aquí se tratan
- * todos igual.
+ * Atrapa cualquier `DomainError` sin conocer su subclase: cada uno trae su
+ * propio `code` y su propio `field`, y aquí se tratan todos igual.
  */
 export async function executeAction<TInput, TOutput>(
   rawInput: unknown,
   config: ActionConfig<TInput, TOutput>,
 ): Promise<ActionResult<TOutput>> {
   try {
-    // 1. Antes que nada, el límite de peticiones: frena el abuso automatizado
-    //    sin gastar una consulta a la base.
+    // El límite va primero: frena el abuso automatizado sin gastar una
+    // consulta a la base.
     await enforceRateLimit(
       `action:${config.permission}`,
       config.rateLimit ?? WRITE_LIMIT,
     );
 
-    // 2. El permiso: si no puede, ni se molesta en validar.
     const user = await requirePermission(config.permission);
 
-    // 3. Validación en servidor. El formulario ya validó, pero una action es
-    //    un endpoint HTTP: cualquiera puede llamarla sin pasar por la UI.
+    // El formulario ya validó, pero una action es un endpoint HTTP:
+    // cualquiera puede llamarla sin pasar por la interfaz.
     const input = config.schema.parse(rawInput);
 
-    // 4. La regla de negocio vive en el servicio, no aquí.
     const auditContext = await buildAuditContext(user);
     const output = await config.handler({
       input,
@@ -69,7 +66,6 @@ export async function executeAction<TInput, TOutput>(
       auditContext,
     });
 
-    // 5. Refrescar las pantallas afectadas.
     for (const path of config.revalidate ?? []) {
       revalidatePath(path);
     }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
+import { requirePermission } from "@/lib/core/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { BomEditor, type BomEditorLine } from "@/components/boms/bom-editor";
 
@@ -18,6 +19,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function BomPage({ params }: PageProps) {
+  await requirePermission("bom:write");
+
   const { id } = await params;
 
   const [product, materials, sizes] = await Promise.all([

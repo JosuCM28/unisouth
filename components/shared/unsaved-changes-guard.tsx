@@ -64,9 +64,17 @@ export function UnsavedChangesGuard({
   const [pending, setPending] = useState<PendingExit | null>(null);
 
   /* En refs porque los listeners se registran una sola vez: si dependieran
-     del estado habría que reinstalarlos en cada tecla capturada. */
+     del estado habría que reinstalarlos en cada tecla capturada.
+
+     La copia se hace en un efecto y no en el cuerpo del componente: escribir
+     una ref durante el render rompe el renderizado concurrente de React, que
+     puede descartar un render a medias y dejar la ref adelantada respecto de
+     lo que se pintó. */
   const whenRef = useRef(when);
-  whenRef.current = when;
+
+  useEffect(() => {
+    whenRef.current = when;
+  }, [when]);
 
   /** Se levanta al confirmar la salida, para no volver a preguntar. */
   const leavingRef = useRef(false);

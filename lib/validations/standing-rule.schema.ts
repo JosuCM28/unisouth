@@ -3,14 +3,11 @@ import { StandingRuleTopic } from "@prisma/client";
 import { optionalCuid, optionalText, requiredText } from "./common";
 
 /**
- * Una regla que SIEMPRE aplica.
+ * Una regla que SIEMPRE aplica. Sin empresa = regla de la casa.
  *
- * Sólo el texto de la regla es obligatorio. La empresa y el tema son
- * opcionales a propósito: si para registrar "la 38 siempre lleva refuerzo"
- * hubiera que elegir cliente y clasificarla, nadie la registraría y el dato
- * seguiría viviendo en la cabeza de una sola persona.
- *
- * Sin empresa = regla de la casa: aplica a todos los clientes.
+ * Sólo el texto es obligatorio: si para registrar "la 38 siempre lleva
+ * refuerzo" hubiera que elegir cliente y clasificarla, nadie la registraría y
+ * el dato seguiría viviendo en la cabeza de una sola persona.
  */
 export const standingRuleSchema = z.object({
   title: requiredText("La regla", 200),
@@ -27,9 +24,8 @@ export type StandingRuleInput = z.infer<typeof standingRuleSchema>;
 /**
  * El mismo contrato del lado del formulario.
  *
- * Los opcionales son `string` y no `string | undefined` porque un input
- * vacío entrega `""`: la conversión a `undefined` la hace el esquema del
- * servidor, que es el que escribe en la base.
+ * Los opcionales son `string` porque un input vacío entrega `""`: la
+ * conversión a `undefined` la hace el esquema del servidor.
  */
 export const standingRuleFormSchema = z.object({
   title: z.string().trim().min(1, "Escribe la regla").max(200),

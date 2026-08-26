@@ -1,14 +1,13 @@
 /**
  * Errores esperados del dominio.
  *
- * HERENCIA: toda falla previsible extiende DomainError. Eso permite que
- * executeAction distinga en un solo `catch` lo que el usuario debe leer
- * (una regla de negocio que no se cumplió) de lo que jamás debe ver
- * (un fallo de conexión, un bug). Los mensajes ya vienen en español y
- * listos para pintarse en pantalla.
+ * Toda falla previsible extiende DomainError, y eso es lo que permite que
+ * `executeAction` distinga en un solo `catch` lo que el usuario debe leer —una
+ * regla de negocio que no se cumplió— de lo que jamás debe ver: un fallo de
+ * conexión, un bug. Los mensajes ya vienen listos para pintarse en pantalla.
  *
- * POLIMORFISMO: `code` es abstracto. Quien atrapa el error lo trata como
- * DomainError y lee su `code` sin saber de qué subclase se trata.
+ * `code` es abstracto para que quien atrape el error lo lea sin saber de qué
+ * subclase se trata.
  */
 export abstract class DomainError extends Error {
   /** Identificador estable para el cliente. Nunca se traduce ni se muestra. */

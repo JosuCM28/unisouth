@@ -14,6 +14,30 @@ export interface CsvColumn<T> {
 }
 
 /**
+ * Con qué caracteres Excel decide que una celda es una FÓRMULA.
+ *
+ * El `@` entra porque Excel lo expande a funciones heredadas, y el tabulador
+ * y el retorno porque Excel los recorta antes de decidir: `\t=cmd` acaba
+ * siendo tan peligroso como `=cmd`.
+ */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+/**
+ * Neutraliza una celda que Excel ejecutaría como fórmula.
+ *
+ * Alguien puede dar de alta un material llamado `=cmd|'/c calc'!A1`, y al
+ * abrir el CSV exportado Excel lo EJECUTA en la máquina de quien lo abre. El
+ * ataque no entra por la app: entra por un campo cualquiera del catálogo y
+ * detona en la computadora de quien recibe el archivo.
+ *
+ * El apóstrofo es la forma que Excel entiende como "esto es texto literal", y
+ * no se ve al abrir el archivo.
+ */
+function neutralizeFormula(text: string): string {
+  return FORMULA_PREFIX.test(text) ? `'${text}` : text;
+}
+
+/**
  * Escapa una celda según RFC 4180.
  *
  * Sin esto, un material llamado 'Mezclilla 60", azul' rompería las columnas
@@ -22,7 +46,11 @@ export interface CsvColumn<T> {
 function escapeCell(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
 
-  const text = String(value);
+  // Los números salen tal cual: no pueden ser fórmula, y anteponerles un
+  // apóstrofo los volvería texto y Excel ya no los sumaría.
+  if (typeof value === "number") return String(value);
+
+  const text = neutralizeFormula(String(value));
   if (!/[",;\n\r]/.test(text)) return text;
 
   return `"${text.replace(/"/g, '""')}"`;

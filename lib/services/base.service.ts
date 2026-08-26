@@ -8,13 +8,9 @@ import { SequenceService } from "@/lib/core/sequence.service";
  * Aquí viven las REGLAS DEL NEGOCIO. Un servicio valida, decide, abre
  * transacciones y deja rastro; el repositorio de abajo sólo guarda.
  *
- * ENCAPSULAMIENTO: `db`, `audit` y `sequences` son protected. Nadie fuera de
- * la jerarquía instancia los servicios auxiliares ni toca Prisma por su
- * cuenta; ésa es la garantía de que todo cambio queda auditado y de que
- * ningún folio se genera fuera de SequenceService.
- *
- * HERENCIA: todos los servicios extienden esta clase, así que todos reciben
- * el mismo contexto y saben transaccionar igual.
+ * `db`, `audit` y `sequences` son protected: nadie fuera de la jerarquía toca
+ * Prisma por su cuenta, y ésa es la garantía de que todo cambio queda auditado
+ * y de que ningún folio se genera fuera de SequenceService.
  */
 export abstract class BaseService {
   protected readonly db: PrismaExecutor;

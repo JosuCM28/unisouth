@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/core/session";
 import { PURCHASE_STATUS_LABELS, PURCHASE_STATUS_STYLES } from "@/lib/constants/labels";
 import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,6 +18,8 @@ interface PageProps {
 }
 
 export default async function PurchaseRequestsPage({ searchParams }: PageProps) {
+  await requirePermission("purchase:request");
+
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
   /* "Cargar más" del celular: trae desde la primera fila hasta el final de

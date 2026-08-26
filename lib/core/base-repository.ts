@@ -4,11 +4,10 @@ import { NotFoundError } from "./errors";
 /**
  * Delegado genérico de Prisma (prisma.lot, prisma.material, …).
  *
- * ENCAPSULAMIENTO: éste es el ÚNICO `any` permitido en la capa de datos.
- * Prisma genera un tipo distinto e incompatible por cada modelo, así que no
- * hay forma de escribir un repositorio genérico sin borrar el tipo aquí. Se
- * aísla en este punto: las subclases recuperan la seguridad de tipos al
- * declarar sus parámetros TEntity / TCreate / TUpdate.
+ * Éste es el ÚNICO `any` de la capa de datos. Prisma genera un tipo distinto
+ * e incompatible por cada modelo, así que no hay forma de escribir un
+ * repositorio genérico sin borrar el tipo aquí. Se aísla en este punto: las
+ * subclases recuperan la seguridad al declarar TEntity / TCreate / TUpdate.
  */
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type PrismaDelegate = any;
@@ -50,21 +49,15 @@ const MAX_ACCUMULATED = 300;
 /**
  * Base de todo acceso a datos.
  *
- * ABSTRACCIÓN: expone `findById`, `paginate`, `delete` con nombres del
- * dominio y esconde por completo que debajo hay Prisma. Quien la usa no sabe
- * de `findUnique`, `deletedAt` ni de `skip`/`take`.
- *
- * HERENCIA: todos los repositorios de la app extienden esta clase, así que
- * el soft delete, la paginación y el "no encontrado" se comportan igual en
- * todas partes sin volver a escribirse.
+ * Esconde Prisma detrás de nombres del dominio: quien la usa no sabe de
+ * `findUnique`, `deletedAt` ni de `skip`/`take`. Como todos los repositorios
+ * la extienden, el soft delete, la paginación y el "no encontrado" se
+ * comportan igual en toda la app sin volver a escribirse.
  *
  * Cero reglas de negocio aquí: eso vive en los servicios.
  */
 export abstract class BaseRepository<TEntity, TCreate, TUpdate> {
-  /**
-   * ENCAPSULAMIENTO: `protected`. Nadie fuera de la jerarquía toca Prisma
-   * directamente; ése es justo el acoplamiento que esta clase evita.
-   */
+  /** `protected`: nadie fuera de la jerarquía toca Prisma directamente. */
   protected abstract get delegate(): PrismaDelegate;
 
   /** Nombre en español para los mensajes de error ("el rollo", "el material"). */
@@ -211,25 +204,17 @@ export abstract class BaseRepository<TEntity, TCreate, TUpdate> {
     const fullWhere = { ...where, ...this.notDeleted };
 
     /**
-     * Desempate obligatorio, y en el orden correcto.
+     * Desempate obligatorio: sin él la paginación PIERDE registros.
      *
-     * Sin desempate la paginación PIERDE registros. Los criterios del dominio
-     * no son únicos: `Receipt.date` es un DÍA —la fecha que se teclea en el
-     * formulario se ancla al inicio del día—, así que las quince recepciones
-     * de hoy quedan EMPATADAS. Ante un empate Postgres no garantiza ningún
-     * orden, y como cada página es una consulta aparte, puede devolver la
-     * misma fila en la página 1 y en la 2 mientras otra no sale en ninguna.
+     * Los criterios del dominio no son únicos —`Receipt.date` es un día, así
+     * que las quince recepciones de hoy quedan empatadas— y ante un empate
+     * Postgres no garantiza ningún orden. Como cada página es una consulta
+     * aparte, la misma fila puede salir en la 1 y en la 2 mientras otra no
+     * sale en ninguna.
      *
-     * Se desempata por `createdAt` descendente y NO por `id`: lo último que se
-     * capturó tiene que quedar hasta arriba. Con `{ id: "asc" }` pasaba lo
-     * contrario —de las recepciones de hoy salía primero la más vieja— porque
-     * `cuid()` no es cronológico: ordenarlo es un orden arbitrario, sólo que
-     * estable.
-     *
-     * El `id` se queda al final como último recurso: dos filas creadas en el
-     * mismo milisegundo (una carga con varios documentos en la misma
-     * transacción) siguen necesitando un criterio único o la paginación
-     * vuelve a perder filas.
+     * Se desempata por `createdAt` y no por `id` porque `cuid()` no es
+     * cronológico: con `id` lo más viejo del día salía primero. El `id` queda
+     * al final para dos filas creadas en el mismo milisegundo.
      */
     const requested = Array.isArray(orderBy) ? orderBy : [orderBy];
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import { HelperRepository } from "@/lib/repositories/helper.repository";
+import { requirePermission } from "@/lib/core/session";
 import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { HelperFormDialog } from "@/components/helpers/helper-form-dialog";
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = { title: "Ayudantes" };
 
 export default async function HelpersPage() {
+  await requirePermission("inventory:read");
+
   const helpers = await new HelperRepository().findAllWithWork();
 
   return (
