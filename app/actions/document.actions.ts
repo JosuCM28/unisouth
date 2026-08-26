@@ -10,6 +10,7 @@ const REVALIDATE = ["/documents", "/issues", "/lots", "/dashboard"];
 
 const updateDocumentSchema = z.object({ id: cuidSchema, data: documentSchema });
 const applySchema = z.object({ id: cuidSchema });
+const duplicateSchema = z.object({ id: cuidSchema });
 
 export async function createDocumentAction(input: unknown) {
   return executeAction(input, {
@@ -24,6 +25,18 @@ export async function updateDocumentAction(input: unknown) {
     schema: updateDocumentSchema, permission: "inventory:write", revalidate: REVALIDATE,
     successMessage: "Documento actualizado",
     handler: ({ input, auditContext }) => new DocumentService(auditContext).update(input.id, input.data),
+  });
+}
+
+/**
+ * Duplicar sólo CREA un borrador: no toca existencias, así que basta
+ * inventory:write, el mismo permiso que capturar la salida a mano.
+ */
+export async function duplicateDocumentAction(input: unknown) {
+  return executeAction(input, {
+    schema: duplicateSchema, permission: "inventory:write", revalidate: REVALIDATE,
+    successMessage: "Copia creada en borrador",
+    handler: ({ input, auditContext }) => new DocumentService(auditContext).duplicate(input.id),
   });
 }
 

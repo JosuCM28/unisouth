@@ -124,6 +124,102 @@ export class DocumentService extends BaseService {
     });
   }
 
+  /**
+   * Copia un documento —en el estado que sea— a un BORRADOR nuevo.
+   *
+   * Nace de la realidad del taller: dos cortes de la misma prenda salen casi
+   * iguales, y volver a teclear diez renglones de tallas a mano es el camino
+   * más corto a un error de captura. Se copia el vale completo y el auxiliar
+   * corrige sólo lo que cambia.
+   *
+   * NO copia nada que pertenezca al original y no a la copia: folio, estado,
+   * quién aplicó, quién canceló y su motivo se generan de cero. La copia nace
+   * en DRAFT aunque el original ya esté aplicado, así que no mueve una sola
+   * existencia hasta que alguien la aplique a propósito.
+   */
+  async duplicate(id: string): Promise<InventoryDocument> {
+    return this.transaction(async (tx) => {
+      const source = await tx.inventoryDocument.findUnique({
+        where: { id },
+        include: {
+          lines: { orderBy: { order: "asc" } },
+          cutLines: { orderBy: { order: "asc" } },
+        },
+      });
+
+      if (!source) throw new NotFoundError("el documento", id);
+
+      const series = SERIES_BY_TYPE[source.type];
+      const code = await this.sequencesWith(tx).next(series.key, series.prefix, 4);
+
+      const copy = await tx.inventoryDocument.create({
+        data: {
+          code,
+          type: source.type,
+          // Hoy, no la del original: la copia es un vale de esta salida, y
+          // heredar una fecha vieja la mandaría al periodo equivocado.
+          date: new Date(),
+          status: "DRAFT",
+          clientId: source.clientId,
+          productionRunId: source.productionRunId,
+          concept: source.concept,
+          reference: source.reference,
+          handedOverBy: source.handedOverBy,
+          receivedBy: source.receivedBy,
+          notes: source.notes,
+          cutDescription: source.cutDescription,
+          cutFabricId: source.cutFabricId,
+          cutFabricText: source.cutFabricText,
+          cutPattern: source.cutPattern,
+          cutVersion: source.cutVersion,
+          cutVersionNotes: source.cutVersionNotes,
+          cutNotes: source.cutNotes,
+          createdById: this.context.userId,
+          lines: {
+            create: source.lines.map((line, index) => ({
+              lotId: line.lotId,
+              quantity: line.quantity,
+              unit: line.unit,
+              fromLocationId: line.fromLocationId,
+              toLocationId: line.toLocationId,
+              notes: line.notes,
+              order: index,
+            })),
+          },
+          cutLines: {
+            create: source.cutLines.map((line, index) => ({
+              sizeId: line.sizeId,
+              quantity: line.quantity,
+              bundles: line.bundles,
+              tagId: line.tagId,
+              notes: line.notes,
+              order: index,
+            })),
+          },
+        },
+      });
+
+      await this.auditWith(tx).record({
+        entity: "InventoryDocument",
+        entityId: copy.id,
+        action: "CREATE",
+        reference: code,
+        newValue: {
+          code,
+          type: source.type,
+          lines: source.lines.length,
+          cutLines: source.cutLines.length,
+          // Deja el rastro de de dónde salió: si la copia sale mal, se puede
+          // ir al original a ver qué se cambió.
+          duplicatedFrom: source.code,
+        },
+        sensitivity: "LOW",
+      });
+
+      return copy;
+    });
+  }
+
   /** Sólo se puede editar mientras esté en borrador. */
   async update(id: string, input: DocumentInput): Promise<InventoryDocument> {
     return this.transaction(async (tx) => {

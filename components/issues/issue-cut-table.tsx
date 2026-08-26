@@ -77,22 +77,17 @@ export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
     onChange(lines.filter((line) => line.key !== key));
   }
 
-  // Las tallas ya usadas no se vuelven a ofrecer: dos renglones de la misma
-  // talla en la misma salida son un error de captura, no un caso real.
-  function optionsFor(currentSizeId: string) {
-    const used = new Set(
-      lines.map((line) => line.sizeId).filter((id) => id !== currentSizeId),
-    );
-
-    return sizes
-      .filter((size) => !used.has(size.id))
-      .map((size) => ({
-        value: size.id,
-        label: size.code,
-        hint: size.name,
-        keywords: size.group ?? undefined,
-      }));
-  }
+  /* Una talla SE PUEDE repetir entre renglones. En el taller es lo normal:
+     de la 38 salen 3 bultos de 60 y 2 bultos de 10, y eso son dos renglones
+     con la misma talla porque el bulto no lleva la misma cantidad. Filtrar
+     las tallas ya usadas obligaba a promediar a mano o a partir la salida en
+     dos vales, que es justo lo que la hoja de papel nunca exigió. */
+  const sizeOptions = sizes.map((size) => ({
+    value: size.id,
+    label: size.code,
+    hint: size.name,
+    keywords: size.group ?? undefined,
+  }));
 
   /* La cantidad es POR BULTO: 64 en 2 bultos son 128 prendas. Sumar la
      cantidad sin multiplicar dejaría el total en la mitad de lo que sale. */
@@ -126,7 +121,7 @@ export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <SearchSelect
-                  options={optionsFor(line.sizeId)}
+                  options={sizeOptions}
                   value={line.sizeId}
                   onChange={(value) => updateLine(line.key, { sizeId: value })}
                   placeholder="Talla"
@@ -197,7 +192,7 @@ export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
                   <tr key={line.key} className="border-b border-border">
                     <td className="p-2">
                       <SearchSelect
-                        options={optionsFor(line.sizeId)}
+                        options={sizeOptions}
                         value={line.sizeId}
                         onChange={(value) =>
                           updateLine(line.key, { sizeId: value })

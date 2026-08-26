@@ -3,10 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Check, Pencil, Printer } from "lucide-react";
+import { Ban, Check, Copy, Pencil, Printer } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentStatus } from "@prisma/client";
-import { applyDocumentAction, cancelDocumentAction } from "@/app/actions/document.actions";
+import {
+  applyDocumentAction,
+  cancelDocumentAction,
+  duplicateDocumentAction,
+} from "@/app/actions/document.actions";
 import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
@@ -45,6 +49,7 @@ export function DocumentActions({
   const canApply = lineCount > 0 || (isIssue === true && cutLineCount > 0);
 
   const [isApplying, setIsApplying] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -61,6 +66,35 @@ export function DocumentActions({
 
     toast.success(`${documentCode} aplicado: se movió el inventario`);
     router.refresh();
+  }
+
+  /**
+   * Copia el vale a un borrador nuevo y se va directo a corregirlo.
+   *
+   * Se abre la EDICIÓN y no la ficha porque duplicar nunca es el objetivo
+   * final: se duplica para cambiar dos tallas. Dejar al auxiliar en la ficha
+   * lo obligaría a un toque más para llegar a donde ya iba.
+   */
+  async function handleDuplicate() {
+    setIsDuplicating(true);
+    const result = await runAction(() =>
+      duplicateDocumentAction({ id: documentId }),
+    );
+    setIsDuplicating(false);
+
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
+
+    const copy = result.data;
+    toast.success(
+      `${copy.code} creado como borrador a partir de ${documentCode}`,
+    );
+
+    // Las salidas tienen pantalla de corrección; los demás tipos no, y ahí la
+    // ficha del borrador nuevo es lo más útil que se puede ofrecer.
+    router.push(isIssue ? `/issues/${copy.id}/edit` : `/documents/${copy.id}`);
   }
 
   async function handleCancel() {
@@ -91,6 +125,20 @@ export function DocumentActions({
           <Printer className="size-4" aria-hidden />
           Imprimir vale
         </a>
+      </Button>
+
+      {/* Disponible en CUALQUIER estado —borrador, aplicada o cancelada—:
+          la copia nace en borrador y no toca existencias, así que duplicar
+          una salida ya aplicada es tan inofensivo como capturarla de cero. */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleDuplicate}
+        disabled={isDuplicating}
+        className="touch-target"
+      >
+        <Copy className="size-4" aria-hidden />
+        {isDuplicating ? "Duplicando…" : "Duplicar"}
       </Button>
 
       {/* Editar SÓLO en borrador: una salida aplicada ya movió inventario y
