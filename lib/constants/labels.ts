@@ -12,6 +12,7 @@ import type {
   MovementType,
   ProductionRunStatus,
   PurchaseRequestStatus,
+  StandingRuleTopic,
   TaskStatus,
   Unit,
 } from "@prisma/client";
@@ -355,3 +356,37 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   IN_PROGRESS: "En curso",
   DONE: "Listas",
 };
+
+/**
+ * De qué parte del trabajo habla una regla fija.
+ *
+ * Son los pasos por los que pasa la prenda, en ese orden: primero se corta,
+ * luego se cose, se revisa, se empaca y se entrega. "Material" queda aparte
+ * porque no es un paso sino una condición de la tela, y "General" recoge lo
+ * que aplica a todo el trato con esa empresa.
+ */
+export const STANDING_RULE_TOPIC_LABELS: Record<StandingRuleTopic, string> = {
+  CUTTING: "Corte",
+  SEWING: "Costura",
+  QUALITY: "Calidad",
+  PACKAGING: "Empaque",
+  DELIVERY: "Entrega",
+  MATERIAL: "Material",
+  GENERAL: "General",
+};
+
+/**
+ * El orden en que se presentan los temas.
+ *
+ * Sigue el recorrido de la prenda por el taller, no el alfabeto: quien lee
+ * las reglas de un cliente las lee en el orden en que va a necesitarlas.
+ */
+export const STANDING_RULE_TOPIC_ORDER: StandingRuleTopic[] = [
+  "CUTTING",
+  "SEWING",
+  "QUALITY",
+  "MATERIAL",
+  "PACKAGING",
+  "DELIVERY",
+  "GENERAL",
+];

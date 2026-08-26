@@ -306,6 +306,7 @@ model Client {
   documents        InventoryDocument[]
   cuttingOrders    CuttingOrder[]
   orderFolders     OrderFolder[]
+  standingRules    StandingRule[]
 
   @@index([active])
   @@map("clients")
@@ -1846,4 +1847,57 @@ enum TaskStatus {
   PENDING
   IN_PROGRESS
   DONE
+}
+
+/// A standing rule: something that is ALWAYS true for a company and that the
+/// warehouse clerk must remember without being told ("Ternium cuts always
+/// carry a pocket and embroidery").
+///
+/// It is NOT a task and NOT a note. A task gets done and disappears; a note is
+/// about one shipment. A rule has no end date — it applies to every single job
+/// for that client until somebody retires it. That is why it lives in its own
+/// table instead of reusing Task: mixing them would let a rule drift into the
+/// DONE column and stop being shown.
+model StandingRule {
+  id    String            @id @default(cuid())
+  topic StandingRuleTopic @default(GENERAL)
+
+  /// The rule in one line, as it would be said out loud.
+  title  String
+  /// The long version: exceptions, measurements, who to ask.
+  detail String?
+
+  /// The company it applies to. NULL means it applies to EVERY company —
+  /// a house rule, not a client rule.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  /// Shown with a warning treatment and pinned to the top of its list.
+  /// For the rules whose cost of forgetting is a rejected garment.
+  critical Boolean @default(false)
+
+  /// Manual order inside its group. Lower shows first.
+  position Int @default(0)
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([clientId, active])
+  @@index([active, position])
+  @@map("standing_rules")
+}
+
+/// What part of the job a standing rule is about.
+enum StandingRuleTopic {
+  CUTTING
+  SEWING
+  QUALITY
+  PACKAGING
+  DELIVERY
+  MATERIAL
+  GENERAL
 }

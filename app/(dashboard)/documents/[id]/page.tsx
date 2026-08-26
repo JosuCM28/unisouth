@@ -12,6 +12,8 @@ import {
 import { cn, contrastText, formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { DocumentActions } from "@/components/documents/document-actions";
+import { RuleCard } from "@/components/rules/rule-card";
+import { StandingRuleRepository } from "@/lib/repositories/standing-rule.repository";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -58,6 +60,16 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
   if (!document) notFound();
 
+  /* Las reglas del cliente, para poder cotejarlas contra lo que dice el vale.
+     Sólo en las salidas: son reglas sobre cómo se corta y se entrega, y en una
+     recepción o un traspaso no significan nada. */
+  const rules =
+    document.type === "ISSUE"
+      ? await new StandingRuleRepository().findApplicable(
+          document.clientId ?? undefined,
+        )
+      : [];
+
   return (
     <div className="flex flex-col gap-4">
       <Link href="/documents" className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground">
@@ -101,6 +113,28 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         cutLineCount={document.cutLines.length}
         isIssue={document.type === "ISSUE"}
       />
+
+      {rules.length > 0 && (
+        <section className="flat-surface p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              Reglas que aplican a esta salida
+            </h2>
+            <Link
+              href="/rules"
+              className="touch-target text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Ver todas
+            </Link>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {rules.map((rule) => (
+              <RuleCard key={rule.id} rule={rule} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {document.cutLines.length > 0 && (
         <section className="flat-surface p-4">

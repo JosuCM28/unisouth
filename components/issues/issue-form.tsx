@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchSelect } from "@/components/shared/search-select";
+import { ApplicableRules } from "@/components/rules/applicable-rules";
 import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
 import { IssueRunningTotal } from "./issue-running-total";
 import {
@@ -494,6 +495,12 @@ export function IssueForm({
             clearLabel="Todos"
           />
         </FormSelectField>
+
+        {/* Las reglas de esa empresa, en cuanto se sabe cuál es. Van justo
+            debajo del selector y ANTES de elegir rollos: de nada sirve
+            enterarse de que el corte lleva bordado cuando el vale ya está
+            armado y firmado. */}
+        <ApplicableRules clientId={realClientId} />
 
         <div className="flex flex-wrap gap-2">
           <IssueFromCalculation

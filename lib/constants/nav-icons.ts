@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  BookOpen,
   Boxes,
   Building2,
   Calculator,
@@ -41,6 +42,7 @@ export const NAV_ICONS = {
   sizes: Ruler,
   cutTags: Tag,
   tasks: KanbanSquare,
+  rules: BookOpen,
   orders: ClipboardList,
   locations: MapPin,
   clients: Users,

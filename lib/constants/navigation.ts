@@ -62,6 +62,17 @@ export const NAVIGATION: NavSection[] = [
         icon: "tasks",
         permission: "inventory:read",
       },
+      {
+        /* Lo que SIEMPRE aplica: "el corte de Ternium lleva bolsa y bordado".
+           Va junto a Tareas y no en Catálogos porque no es una lista de la
+           que se elige al capturar, es algo que se consulta antes de trabajar.
+           Pide `inventory:read` y no `browse`: de nada sirve una regla que
+           Dirección o el de sólo lectura no pueden leer. */
+        href: "/rules",
+        label: "Reglas",
+        icon: "rules",
+        permission: "inventory:read",
+      },
     ],
   },
   {
