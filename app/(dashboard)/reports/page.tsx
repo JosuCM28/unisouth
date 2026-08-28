@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { AlertTriangle, Printer } from "lucide-react";
+import { AlertTriangle, FileText } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
 import { ReportService } from "@/lib/services/report.service";
 import { formatDate, formatQuantity } from "@/lib/utils";
@@ -33,11 +33,18 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         description="Cómo va la fábrica"
         action={
           <div className="flex flex-wrap gap-2">
-            <ExportButton href={`/api/export/reports?dias=${days}`} label="Excel" />
+            <ExportButton
+              href={`/api/export/reports?dias=${days}`}
+              label="Excel"
+              exact
+            />
+            {/* Se llama PDF y no "Imprimir" porque es lo que la gente busca
+                cuando quiere mandar el reporte: el diálogo del navegador
+                ofrece "Guardar como PDF" y de ahí sale el archivo. */}
             <Button asChild variant="outline" className="touch-target">
               <a href={`/print/reports?dias=${days}`} target="_blank" rel="noopener">
-                <Printer className="size-4" aria-hidden />
-                Imprimir
+                <FileText className="size-4" aria-hidden />
+                PDF
               </a>
             </Button>
           </div>

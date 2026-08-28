@@ -1,4 +1,5 @@
 import type {
+  AuditAction,
   CutTag,
   CutVersion,
   CuttingOrderStatus,
@@ -12,6 +13,7 @@ import type {
   MovementType,
   ProductionRunStatus,
   PurchaseRequestStatus,
+  Sensitivity,
   StandingRuleTopic,
   TaskStatus,
   Unit,
@@ -390,3 +392,32 @@ export const STANDING_RULE_TOPIC_ORDER: StandingRuleTopic[] = [
   "DELIVERY",
   "GENERAL",
 ];
+
+/**
+ * Qué hizo la persona, en el idioma en que se lee la bitácora.
+ *
+ * Vivían dentro de `audit-list.tsx`, pero el Excel de auditoría necesita las
+ * mismas palabras: con dos copias, un día la pantalla diría "Dio de baja" y el
+ * archivo "DELETE", y quien compara los dos no sabría si son lo mismo.
+ */
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  CREATE: "Creó",
+  UPDATE: "Modificó",
+  DELETE: "Dio de baja",
+  APPLY: "Aplicó",
+  CANCEL: "Canceló",
+  RECALCULATE: "Recalculó",
+  APPROVE: "Autorizó",
+  PRINT: "Imprimió",
+  EXPORT: "Exportó",
+  LOGIN: "Entró",
+  LOGIN_FAILED: "Intento fallido",
+  LOGOUT: "Salió",
+};
+
+export const SENSITIVITY_LABELS: Record<Sensitivity, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
+};

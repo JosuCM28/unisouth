@@ -4,30 +4,12 @@ import { useState } from "react";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 import type { AuditAction, Sensitivity } from "@prisma/client";
 import type { AuditLogWithUser } from "@/lib/repositories/audit.repository";
+import {
+  AUDIT_ACTION_LABELS as ACTION_LABELS,
+  SENSITIVITY_LABELS,
+} from "@/lib/constants/labels";
 import { cn, formatDateTime } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
-
-const ACTION_LABELS: Record<AuditAction, string> = {
-  CREATE: "Creó",
-  UPDATE: "Modificó",
-  DELETE: "Dio de baja",
-  APPLY: "Aplicó",
-  CANCEL: "Canceló",
-  RECALCULATE: "Recalculó",
-  APPROVE: "Autorizó",
-  PRINT: "Imprimió",
-  EXPORT: "Exportó",
-  LOGIN: "Entró",
-  LOGIN_FAILED: "Intento fallido",
-  LOGOUT: "Salió",
-};
-
-const SENSITIVITY_LABELS: Record<Sensitivity, string> = {
-  LOW: "Baja",
-  MEDIUM: "Media",
-  HIGH: "Alta",
-  CRITICAL: "Crítica",
-};
 
 /** Las HIGH y CRITICAL van con fondo sólido: son las que hay que revisar. */
 const SENSITIVITY_STYLES: Record<Sensitivity, string> = {

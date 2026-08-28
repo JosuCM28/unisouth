@@ -1,6 +1,10 @@
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
-import { csvResponse, toCsv, type CsvColumn } from "@/lib/csv";
+import {
+  toXlsxWithNotice,
+  xlsxResponse,
+  type XlsxColumn,
+} from "@/lib/export/xlsx";
 import { ReportService } from "@/lib/services/report.service";
 import { parseRangeDays } from "@/lib/constants/report-ranges";
 
@@ -19,11 +23,12 @@ interface ReportCsvRow {
   value: number;
 }
 
-const COLUMNS: CsvColumn<ReportCsvRow>[] = [
-  { header: "Sección", value: (row) => row.section },
-  { header: "Concepto", value: (row) => row.concept },
-  { header: "Detalle", value: (row) => row.detail },
-  { header: "Cantidad", value: (row) => row.value },
+const COLUMNS: XlsxColumn<ReportCsvRow>[] = [
+  { header: "Sección", value: (row) => row.section, width: 26 },
+  { header: "Concepto", value: (row) => row.concept, width: 30 },
+  { header: "Detalle", value: (row) => row.detail, width: 24 },
+  // Como número: el reporte se abre para sumar y comparar bloques.
+  { header: "Cantidad", value: (row) => row.value, kind: "number" },
 ];
 
 export async function GET(request: Request) {
@@ -96,5 +101,8 @@ export async function GET(request: Request) {
     })),
   ];
 
-  return csvResponse(toCsv(rows, COLUMNS), `reporte-${days}d`);
+  return xlsxResponse(
+    toXlsxWithNotice(rows, COLUMNS, `Reporte ${days}d`),
+    `reporte-${days}d`,
+  );
 }

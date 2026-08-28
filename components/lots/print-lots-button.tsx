@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Layers, Printer, QrCode } from "lucide-react";
+import { FileText, Layers, Printer, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,6 +38,21 @@ export function PrintLotsButton() {
     return query ? `/print/lots?${query}` : "/print/lots";
   }
 
+  /* El listado SÍ entiende todos los filtros, a diferencia de las hojas por
+     rollo: es la misma consulta del inventario, así que se le pasan tal cual
+     —menos los de paginación, que son de cómo se mira la lista y no de qué—. */
+  function buildListHref() {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of searchParams.entries()) {
+      if (["page", "all", "filas"].includes(key)) continue;
+      if (value) params.set(key, value);
+    }
+
+    const query = params.toString();
+    return query ? `/print/inventory?${query}` : "/print/inventory";
+  }
+
   /* La hoja de pila necesita UNA clave: agrupa un material y su desglose. Sin
      material elegido no hay pila que describir, así que se ofrece deshabilitada
      con la razón, en vez de esconderla y dejar al usuario buscándola. */
@@ -63,6 +78,19 @@ export function PrintLotsButton() {
 
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Imprimir lo que se ve</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+
+        {/* El listado va primero: es lo que se manda por correo o WhatsApp
+            —desde el diálogo del navegador, "Guardar como PDF"— mientras que
+            las etiquetas y las hojas por rollo son para la impresora del
+            almacén. */}
+        <DropdownMenuItem asChild>
+          <a href={buildListHref()} target="_blank" rel="noopener">
+            <FileText className="size-4" aria-hidden />
+            Listado (PDF)
+          </a>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem asChild>

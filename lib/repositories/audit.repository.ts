@@ -2,6 +2,7 @@ import type { AuditAction, AuditLog, Prisma, Sensitivity } from "@prisma/client"
 import {
   BaseRepository, type PaginatedResult, type PaginationInput, type PrismaDelegate,
 } from "@/lib/core/base-repository";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 
 export interface AuditFilters extends PaginationInput {
   userId?: string;
@@ -34,6 +35,35 @@ export class AuditRepository extends BaseRepository<
   }
 
   async search(filters: AuditFilters = {}): Promise<PaginatedResult<AuditLogWithUser>> {
+    return this.paginate<AuditLogWithUser>(
+      this.buildWhere(filters),
+      { createdAt: "desc" },
+      filters,
+      { user: { select: { id: true, name: true } } },
+    );
+  }
+
+  /**
+   * TODA la bitácora que cumple el filtro, sin paginar.
+   *
+   * Aparte de `search()` porque `paginate()` topa en 100 filas. En auditoría
+   * eso importa más que en ningún otro lado: el archivo se pide justo cuando
+   * hay que reconstruir qué pasó, y uno cortado en la fila 100 deja fuera
+   * precisamente el rastro que se anda buscando.
+   */
+  async findAllForExport(
+    filters: AuditFilters = {},
+  ): Promise<AuditLogWithUser[]> {
+    return this.db.auditLog.findMany({
+      where: this.buildWhere(filters),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: EXPORT_ROW_LIMIT,
+      include: { user: { select: { id: true, name: true } } },
+    });
+  }
+
+  /** El `where` de la bitácora. Compartido entre la lista y el Excel. */
+  private buildWhere(filters: AuditFilters): Prisma.AuditLogWhereInput {
     const where: Prisma.AuditLogWhereInput = {};
 
     if (filters.userId) where.userId = filters.userId;
@@ -56,12 +86,7 @@ export class AuditRepository extends BaseRepository<
       ];
     }
 
-    return this.paginate<AuditLogWithUser>(
-      where,
-      { createdAt: "desc" },
-      filters,
-      { user: { select: { id: true, name: true } } },
-    );
+    return where;
   }
 
   /** Entidades que ya tienen registros, para poblar el filtro. */

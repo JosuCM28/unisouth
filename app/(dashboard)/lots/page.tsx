@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
-import type { LotStatus } from "@prisma/client";
 import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
+import { parseLotFilters, parsePositiveInt } from "@/lib/export/lot-filters";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
 import { ProductionRunRepository } from "@/lib/repositories/production-run.repository";
 import { toPlainObject } from "@/lib/utils";
@@ -113,20 +113,11 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
     ? Number(params.filas)
     : PAGE_SIZE;
 
+  /* El MISMO parser que usan el Excel y la hoja impresa. Antes cada uno leía
+     la URL a su manera —de hecho el Excel no la leía— y el archivo descargado
+     no correspondía a lo que se estaba viendo. */
   const result = await new LotRepository().search({
-    search: params.q,
-    materialId: params.materialId,
-    locationId: params.locationId,
-    clientId: params.clientId,
-    colorName: params.colorName,
-    shade: params.shade,
-    status: params.status as LotStatus | undefined,
-    isRemnant: params.onlyRemnants === "true" ? true : undefined,
-    verified: params.onlyUnverified === "true" ? false : undefined,
-    includeCancelled: params.includeCancelled === "true",
-    // Viene de la URL y el usuario puede teclear cualquier cosa: un NaN
-    // colado en el where haría fallar la consulta entera.
-    arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
+    ...parseLotFilters(params),
     page,
     pageSize,
     // "Cargar más" del celular: trae desde la primera fila hasta ésta.
@@ -151,14 +142,6 @@ async function ListSection({ params }: { params: Awaited<PageProps["searchParams
       isFiltered={isFiltered}
     />
   );
-}
-
-/** Entero positivo o nada. Cualquier basura en la URL se ignora. */
-function parsePositiveInt(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
-  return parsed;
 }
 
 function ListSkeleton() {

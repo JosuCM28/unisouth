@@ -5,6 +5,7 @@ import { MaterialRepository } from "@/lib/repositories/material.repository";
 import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
+import { PrintLinkButton } from "@/components/shared/print-link-button";
 import { SearchInput } from "@/components/shared/search-input";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
 import { MaterialList } from "@/components/materials/material-list";
@@ -53,6 +54,7 @@ export default async function MaterialsPage({ searchParams }: PageProps) {
           className="flex-1 md:max-w-sm"
         />
         <ExportButton href="/api/export/materials" label="Excel" />
+        <PrintLinkButton href="/print/materials" />
       </div>
 
       <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>

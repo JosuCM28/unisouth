@@ -1,9 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
-import { csvResponse, toCsv, type CsvColumn } from "@/lib/csv";
+import {
+  toXlsxWithNotice,
+  xlsxResponse,
+  type XlsxColumn,
+} from "@/lib/export/xlsx";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
-import { cutProgress, formatDate } from "@/lib/utils";
+import { cutProgress } from "@/lib/utils";
 import {
   cuttingOrderWhere,
   parseCuttingOrderFilters,
@@ -34,29 +39,38 @@ interface Row {
   cut: number;
 }
 
-const COLUMNS: CsvColumn<Row>[] = [
-  { header: "Orden", value: (r) => r.code },
+const COLUMNS: XlsxColumn<Row>[] = [
+  { header: "Orden", value: (r) => r.code, width: 16 },
   { header: "Estado", value: (r) => CUTTING_ORDER_STATUS_LABELS[r.status] },
   // El pedido va junto a la orden para poder agrupar el Excel por pedido,
   // que es como el cliente pregunta por su trabajo.
-  { header: "Pedido", value: (r) => r.folder },
-  { header: "Cliente", value: (r) => r.client },
-  { header: "Descripción", value: (r) => r.description },
+  { header: "Pedido", value: (r) => r.folder, width: 26 },
+  { header: "Cliente", value: (r) => r.client, width: 22 },
+  { header: "Descripción", value: (r) => r.description, width: 28 },
   { header: "Orden del cliente", value: (r) => r.reference },
-  { header: "Material", value: (r) => r.material },
-  { header: "Pedido el", value: (r) => formatDate(r.orderedAt) },
-  { header: "Entrega", value: (r) => (r.dueDate ? formatDate(r.dueDate) : "") },
+  { header: "Material", value: (r) => r.material, width: 28 },
+  { header: "Pedido el", value: (r) => r.orderedAt, kind: "date" },
+  { header: "Entrega", value: (r) => r.dueDate, kind: "date" },
   { header: "Talla", value: (r) => r.sizeCode },
   { header: "Foleo", value: (r) => r.tag },
-  { header: "Pedidas", value: (r) => r.ordered },
-  { header: "Cortadas", value: (r) => r.cut },
-  { header: "Faltan", value: (r) => cutProgress(r.ordered, r.cut).pending },
-  { header: "Sobran", value: (r) => cutProgress(r.ordered, r.cut).surplus },
+  { header: "Pedidas", value: (r) => r.ordered, kind: "number" },
+  { header: "Cortadas", value: (r) => r.cut, kind: "number" },
+  {
+    header: "Faltan",
+    value: (r) => cutProgress(r.ordered, r.cut).pending,
+    kind: "number",
+  },
+  {
+    header: "Sobran",
+    value: (r) => cutProgress(r.ordered, r.cut).surplus,
+    kind: "number",
+  },
   {
     header: "Diferencia",
     // Con signo: en Excel se suma la columna y se ve el neto de la selección,
     // cosa que "faltan" y "sobran" por separado no permiten.
     value: (r) => r.cut - r.ordered,
+    kind: "number",
   },
 ];
 
@@ -80,9 +94,11 @@ export async function GET(request: Request) {
     /* Mismo desempate que la lista: el CSV debe salir en el orden que el
        usuario acaba de ver en pantalla. */
     orderBy: [{ orderedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-    // El tope es de órdenes, pero el archivo crece por tallas: 500 órdenes de
-    // seis tallas son 3,000 renglones, que Excel abre sin problema.
-    take: 500,
+    /* El tope es de ÓRDENES, pero el archivo crece por tallas. Se pide la
+       cuarta parte del tope de filas porque una orden trae del orden de cuatro
+       tallas: así el archivo se acerca al límite sin pasarlo, y si lo alcanza
+       la fila de aviso lo dice. */
+    take: Math.floor(EXPORT_ROW_LIMIT / 4),
     include: {
       client: { select: { name: true } },
       material: { select: { code: true, name: true } },
@@ -117,5 +133,5 @@ export async function GET(request: Request) {
     })),
   );
 
-  return csvResponse(toCsv(rows, COLUMNS), "ordenes");
+  return xlsxResponse(toXlsxWithNotice(rows, COLUMNS, "Órdenes"), "ordenes");
 }

@@ -10,6 +10,17 @@ import {
   type PaginationInput,
   type PrismaDelegate,
 } from "@/lib/core/base-repository";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
+
+/** Lo que se trae junto al movimiento, igual en la lista y en el archivo. */
+const MOVEMENT_INCLUDE = {
+  lot: { select: { id: true, code: true, shade: true } },
+  material: { select: { id: true, code: true, name: true } },
+  document: { select: { id: true, code: true } },
+  productionRun: { select: { id: true, code: true } },
+  fromLocation: { select: { code: true } },
+  toLocation: { select: { code: true } },
+} as const;
 
 export interface MovementFilters extends PaginationInput {
   direction?: MovementDirection;
@@ -59,6 +70,38 @@ export class MovementRepository extends BaseRepository<
   async search(
     filters: MovementFilters = {},
   ): Promise<PaginatedResult<MovementWithRelations>> {
+    return this.paginate<MovementWithRelations>(
+      this.buildWhere(filters),
+      /* Cronológico inverso: lo último que pasó es lo que se viene a mirar.
+         Desempata el folio, que es un correlativo con ceros a la izquierda:
+         es lo único que distingue dos movimientos del mismo instante, y son
+         comunes porque una sola transacción escribe varios. */
+      [{ createdAt: "desc" }, { code: "desc" }],
+      filters,
+      MOVEMENT_INCLUDE,
+    );
+  }
+
+  /**
+   * TODO el kárdex que cumple el filtro, sin paginar.
+   *
+   * Aparte de `search()` porque `paginate()` topa en 100 filas. El kárdex es
+   * la respuesta a "qué pasó con este rollo": exportarlo cortado en la fila
+   * 100 entrega justo la parte que no sirve para reconstruir nada.
+   */
+  async findAllForExport(
+    filters: MovementFilters = {},
+  ): Promise<MovementWithRelations[]> {
+    return this.db.movement.findMany({
+      where: this.buildWhere(filters),
+      orderBy: [{ createdAt: "desc" }, { code: "desc" }],
+      take: EXPORT_ROW_LIMIT,
+      include: MOVEMENT_INCLUDE,
+    });
+  }
+
+  /** El `where` del kárdex. Compartido entre la lista, el Excel y la hoja. */
+  private buildWhere(filters: MovementFilters): Prisma.MovementWhereInput {
     const where: Prisma.MovementWhereInput = {};
 
     if (filters.direction) where.direction = filters.direction;
@@ -84,23 +127,7 @@ export class MovementRepository extends BaseRepository<
       ];
     }
 
-    return this.paginate<MovementWithRelations>(
-      where,
-      /* Cronológico inverso: lo último que pasó es lo que se viene a mirar.
-         Desempata el folio, que es un correlativo con ceros a la izquierda:
-         es lo único que distingue dos movimientos del mismo instante, y son
-         comunes porque una sola transacción escribe varios. */
-      [{ createdAt: "desc" }, { code: "desc" }],
-      filters,
-      {
-        lot: { select: { id: true, code: true, shade: true } },
-        material: { select: { id: true, code: true, name: true } },
-        document: { select: { id: true, code: true } },
-        productionRun: { select: { id: true, code: true } },
-        fromLocation: { select: { code: true } },
-        toLocation: { select: { code: true } },
-      },
-    );
+    return where;
   }
 
   /**

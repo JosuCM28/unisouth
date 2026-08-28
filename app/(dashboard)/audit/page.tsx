@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import type { AuditAction, Sensitivity } from "@prisma/client";
 import { AuditRepository } from "@/lib/repositories/audit.repository";
 import { requirePermission } from "@/lib/core/session";
-import { fromDateInputValue, toPlainObject } from "@/lib/utils";
+import { parseAuditFilters } from "@/lib/export/audit-filters";
+import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { AuditFilters } from "@/components/audit/audit-filters";
 import { AuditList } from "@/components/audit/audit-list";
@@ -62,16 +62,10 @@ async function ListSection({
 }) {
   const page = parsePositiveInt(params.page) ?? 1;
 
+  /* El MISMO parser que usan el Excel y la hoja impresa: antes el archivo
+     ignoraba los filtros y bajaba los últimos 100 registros sin acotar. */
   const result = await new AuditRepository().search({
-    userId: params.userId,
-    entity: params.entity,
-    action: params.action as AuditAction | undefined,
-    sensitivity: params.sensitivity as Sensitivity | undefined,
-    /* Anclados a la zona de la fábrica: `new Date("2026-08-17")` es medianoche
-       UTC, que aquí son las 6 de la tarde del 16, así que el rango se corría
-       un día. Y "hasta el 16" incluye todo el 16, hasta las 23:59. */
-    from: params.from ? fromDateInputValue(params.from) : undefined,
-    to: params.to ? fromDateInputValue(params.to, "end") : undefined,
+    ...parseAuditFilters(params),
     page,
     pageSize: PAGE_SIZE,
     // "Cargar más" del celular: trae desde la primera fila hasta ésta.

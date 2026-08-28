@@ -6,6 +6,8 @@ import { DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES, DOCUMENT_TYPE_LABELS } 
 import { cn, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ExportButton } from "@/components/shared/export-button";
+import { PrintLinkButton } from "@/components/shared/print-link-button";
 import { Pager } from "@/components/shared/pager";
 import { requirePermission } from "@/lib/core/session";
 
@@ -54,7 +56,16 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Documentos" description="Vales de entrada y salida" />
+      <PageHeader
+        title="Documentos"
+        description="Vales de entrada y salida"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ExportButton href="/api/export/documents" label="Excel" exact />
+            <PrintLinkButton href="/print/documents" />
+          </div>
+        }
+      />
 
       {documents.length === 0 ? (
         <div className="flat-surface">

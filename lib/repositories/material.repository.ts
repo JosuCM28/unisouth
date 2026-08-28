@@ -1,5 +1,6 @@
 import type { Material, MaterialType, Prisma, Unit } from "@prisma/client";
 import { PHYSICALLY_PRESENT_FILTER } from "@/lib/constants/lot-status";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 import {
   BaseRepository,
   type PaginatedResult,
@@ -46,6 +47,35 @@ export class MaterialRepository extends BaseRepository<
   }
 
   async search(filters: MaterialFilters = {}): Promise<PaginatedResult<Material>> {
+    return this.paginate<Material>(
+      this.buildWhere(filters),
+      { name: "asc" },
+      filters,
+    );
+  }
+
+  /**
+   * TODOS los materiales que cumplen el filtro, sin paginar.
+   *
+   * Aparte de `search()` porque `paginate()` topa en 100 filas, y un catálogo
+   * exportado que corta ahí miente por omisión: quien lo recibe no tiene cómo
+   * saber que le faltan materiales.
+   */
+  async findAllForExport(filters: MaterialFilters = {}): Promise<Material[]> {
+    return this.db.material.findMany({
+      where: { ...this.buildWhere(filters), ...this.notDeleted },
+      orderBy: { name: "asc" },
+      take: EXPORT_ROW_LIMIT,
+    });
+  }
+
+  /**
+   * El `where` del catálogo.
+   *
+   * Compartido entre la lista y el Excel: si cada uno armara el suyo, el
+   * archivo descargado dejaría de corresponder a lo que se ve en pantalla.
+   */
+  private buildWhere(filters: MaterialFilters): Prisma.MaterialWhereInput {
     const where: Prisma.MaterialWhereInput = {};
 
     if (filters.search) {
@@ -62,7 +92,7 @@ export class MaterialRepository extends BaseRepository<
     if (filters.type) where.type = filters.type;
     if (filters.active !== undefined) where.active = filters.active;
 
-    return this.paginate<Material>(where, { name: "asc" }, filters);
+    return where;
   }
 
   /** Opciones para los <Select>. Trae 8 columnas, no la ficha completa. */

@@ -96,6 +96,7 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
             <ExportButton
               href={`/api/export/receipts/${receipt.code}`}
               label="Excel"
+              exact
             />
             <Button asChild variant="outline" className="touch-target">
               <a

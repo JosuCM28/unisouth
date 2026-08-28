@@ -1,6 +1,10 @@
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
-import { csvResponse, toCsv, type CsvColumn } from "@/lib/csv";
+import {
+  toXlsxWithNotice,
+  xlsxResponse,
+  type XlsxColumn,
+} from "@/lib/export/xlsx";
 import { ReceiptRepository } from "@/lib/repositories/receipt.repository";
 import { LOT_STATUS_LABELS, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatDate } from "@/lib/utils";
@@ -21,18 +25,23 @@ interface ReceiptCsvRow {
   concept: string;
   detail: string;
   color: string;
-  lots: string;
-  quantity: string;
+  /* Número, no texto: son las cifras que se suman para saber a quién se le
+     paga cuánto. Como cadena, Excel no suma la columna y quien recibe el
+     archivo tiene que convertirla a mano antes de poder usarla. La cadena
+     vacía sigue permitida para los renglones de encabezado, que no traen
+     cifra. */
+  lots: number | "";
+  quantity: number | "";
   unit: string;
 }
 
-const COLUMNS: CsvColumn<ReceiptCsvRow>[] = [
-  { header: "Sección", value: (row) => row.section },
-  { header: "Concepto", value: (row) => row.concept },
-  { header: "Detalle", value: (row) => row.detail },
+const COLUMNS: XlsxColumn<ReceiptCsvRow>[] = [
+  { header: "Sección", value: (row) => row.section, width: 22 },
+  { header: "Concepto", value: (row) => row.concept, width: 30 },
+  { header: "Detalle", value: (row) => row.detail, width: 26 },
   { header: "Color", value: (row) => row.color },
-  { header: "Rollos", value: (row) => row.lots },
-  { header: "Cantidad", value: (row) => row.quantity },
+  { header: "Rollos", value: (row) => row.lots, kind: "number" },
+  { header: "Cantidad", value: (row) => row.quantity, kind: "number" },
   { header: "Unidad", value: (row) => row.unit },
 ];
 
@@ -86,7 +95,10 @@ export async function GET(
     ...detailRows(lots),
   ];
 
-  return csvResponse(toCsv(rows, COLUMNS), `recepcion-${receipt.code}`);
+  return xlsxResponse(
+    toXlsxWithNotice(rows, COLUMNS, "Recepción"),
+    `recepcion-${receipt.code}`,
+  );
 }
 
 /** El encabezado: de dónde vino la carga. Va arriba como referencia. */
@@ -185,8 +197,8 @@ function detailRows(lots: LotRow[]): ReceiptCsvRow[] {
       .filter(Boolean)
       .join(" · "),
     color: lot.colorText ?? "",
-    lots: "1",
-    quantity: String(Number(lot.initialQuantity)),
+    lots: 1,
+    quantity: Number(lot.initialQuantity),
     unit: unitLabel(lot.unit),
   }));
 }
@@ -238,8 +250,8 @@ function bucketsToRows(buckets: Bucket[], section: string): ReceiptCsvRow[] {
       concept: bucket.label,
       detail: bucket.detail,
       color: "",
-      lots: String(bucket.lots),
-      quantity: String(quantity),
+      lots: bucket.lots,
+      quantity,
       unit,
     })),
   );

@@ -4,12 +4,35 @@ import {
   STATUSES_PHYSICALLY_PRESENT,
 } from "@/lib/constants/lot-status";
 import { NotFoundError } from "@/lib/core/errors";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 import {
   BaseRepository,
   type PaginatedResult,
   type PaginationInput,
   type PrismaDelegate,
 } from "@/lib/core/base-repository";
+
+/**
+ * Lo que se trae junto al rollo en la lista y en el Excel.
+ *
+ * Compartido a propósito: si el archivo trajera menos relaciones que la
+ * pantalla, columnas como la ubicación o el dueño saldrían vacías justo en el
+ * documento que alguien va a leer sin la app enfrente.
+ */
+const LOT_LIST_INCLUDE = {
+  material: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      baseUnit: true,
+      composition: true,
+      colorName: true,
+    },
+  },
+  location: { select: { id: true, code: true, name: true } },
+  client: { select: { id: true, name: true } },
+} as const;
 
 export interface LotFilters extends PaginationInput {
   search?: string;
@@ -80,6 +103,43 @@ export class LotRepository extends BaseRepository<
   }
 
   async search(filters: LotFilters = {}): Promise<PaginatedResult<Lot>> {
+    return this.paginate<Lot>(
+      this.buildWhere(filters),
+      { receivedAt: "desc" },
+      filters,
+      LOT_LIST_INCLUDE,
+    );
+  }
+
+  /**
+   * TODOS los rollos que cumplen el filtro, sin paginar.
+   *
+   * Existe aparte de `search()` porque `paginate()` topa en 100 filas, y un
+   * Excel de inventario que corta en la fila 100 miente por omisión: quien lo
+   * recibe no tiene forma de saber que le faltan rollos. Aquí el tope es
+   * propio, alto y explícito.
+   *
+   * El `where` es el MISMO que el de la lista —de ahí que se haya extraído a
+   * `buildWhere`—: el archivo tiene que traer exactamente lo que el usuario
+   * está viendo en pantalla, ni un rollo más.
+   */
+  async findAllForExport(filters: LotFilters = {}): Promise<Lot[]> {
+    return this.db.lot.findMany({
+      where: this.buildWhere(filters),
+      orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      take: EXPORT_ROW_LIMIT,
+      include: LOT_LIST_INCLUDE,
+    });
+  }
+
+  /**
+   * El `where` de la búsqueda de rollos.
+   *
+   * Vive aparte porque lo usan la lista paginada y el Excel. Si cada uno
+   * armara el suyo, un filtro agregado en un lado y olvidado en el otro haría
+   * que el archivo descargado no correspondiera a la pantalla.
+   */
+  private buildWhere(filters: LotFilters): Prisma.LotWhereInput {
     const where: Prisma.LotWhereInput = {};
 
     if (filters.search) {
@@ -149,19 +209,7 @@ export class LotRepository extends BaseRepository<
       where.shade = { equals: filters.shade, mode: "insensitive" };
     }
 
-    return this.paginate<Lot>(where, { receivedAt: "desc" }, filters, {
-      material: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          baseUnit: true,
-          composition: true,
-        },
-      },
-      location: { select: { id: true, code: true, name: true } },
-      client: { select: { id: true, name: true } },
-    });
+    return where;
   }
 
   /**

@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import type { MovementDirection, MovementType } from "@prisma/client";
 import { MovementRepository } from "@/lib/repositories/movement.repository";
+import { parseMovementFilters } from "@/lib/export/movement-filters";
 import { requirePermission } from "@/lib/core/session";
-import { fromDateInputValue, toPlainObject } from "@/lib/utils";
+import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { MovementFilters } from "@/components/movements/movement-filters";
 import { MovementList } from "@/components/movements/movement-list";
+import { ExportButton } from "@/components/shared/export-button";
+import { PrintLinkButton } from "@/components/shared/print-link-button";
 import { Pager } from "@/components/shared/pager";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -42,6 +44,13 @@ export default async function MovementsPage({ searchParams }: PageProps) {
 
       <MovementFilters materials={materials} />
 
+      {/* Los dos arrastran el filtro de arriba: el archivo tiene que traer lo
+          que se está viendo, no el kárdex completo. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ExportButton href="/api/export/movements" label="Excel" />
+        <PrintLinkButton href="/print/movements" />
+      </div>
+
       {/* La clave fuerza a Suspense a remontar al cambiar un filtro: sin
           ella, la lista anterior se queda pintada mientras llega la nueva. */}
       <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
@@ -58,16 +67,9 @@ async function ListSection({
 }) {
   const repository = new MovementRepository();
 
-  const filters = {
-    direction: params.direction as MovementDirection | undefined,
-    type: params.type as MovementType | undefined,
-    materialId: params.materialId,
-    /* Anclados a la zona de la fábrica: `new Date("2026-08-17")` es medianoche
-       UTC, que aquí son las 6 de la tarde del 16, así que el rango se corría
-       un día. Y "hasta el 16" incluye todo el 16, hasta las 23:59. */
-    from: params.from ? fromDateInputValue(params.from) : undefined,
-    to: params.to ? fromDateInputValue(params.to, "end") : undefined,
-  };
+  /* El MISMO parser que usan el Excel y la hoja impresa, para que el archivo
+     traiga exactamente lo que se está viendo. */
+  const filters = parseMovementFilters(params);
 
   const page = Math.max(1, Number(params.page ?? 1) || 1);
 

@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/shared/search-select";
+import { ExportButton } from "@/components/shared/export-button";
+import { PrintLinkButton } from "@/components/shared/print-link-button";
 
 const ACTIONS: { value: AuditAction; label: string }[] = [
   { value: "CREATE", label: "Creación" },
@@ -126,11 +128,14 @@ export function AuditFilters({ actors, entities }: Props) {
         </div>
       </div>
 
-      <Button asChild variant="outline" className="touch-target w-fit">
-        <a href="/api/export/audit" download>
-          Exportar a Excel
-        </a>
-      </Button>
+      {/* Los dos arrastran el filtro de arriba. Antes el enlace del Excel
+          era fijo y bajaba los últimos 100 registros sin filtrar: quien
+          acotaba por persona y fecha recibía un archivo que no tenía nada que
+          ver con lo que estaba buscando. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ExportButton href="/api/export/audit" label="Excel" />
+        <PrintLinkButton href="/print/audit" />
+      </div>
     </div>
   );
 }

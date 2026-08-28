@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/shared/search-select";
 import { ExportButton } from "@/components/shared/export-button";
+import { PrintLinkButton } from "@/components/shared/print-link-button";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const;
 
@@ -121,7 +122,8 @@ export function OrderFilters({ clients, showArchived }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <ExportButton href={exportHref} />
+        <ExportButton href={exportHref} exact />
+        <PrintLinkButton href="/print/orders" />
 
         {/* Los pedidos archivados se piden a propósito: son los entregados, y
             si salieran siempre la lista crecería sin parar con trabajo que ya
