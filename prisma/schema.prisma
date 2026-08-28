@@ -1555,6 +1555,24 @@ model CuttingOrder {
   /// The client's own order number, written on the paper.
   reference   String?
 
+  // ── Header of the CUTTING BREAKDOWN ──────────────────────────────────────
+  // The same boxes the issue voucher prints. They live HERE because the order
+  // is where they are known: whoever takes the client's call knows the pattern
+  // and the version, while the warehouse hand filling the voucher does not.
+  // `sendToIssue` copies them across so the voucher comes out already filled.
+  //
+  // `description` and `materialId` above are not repeated: they already are
+  // the garment and the fabric of the breakdown.
+
+  /// The fabric typed by hand, for cloth that never got a material record.
+  cutFabricText   String?
+  cutPattern      String?
+  cutVersion      CutVersion?
+  cutVersionNotes String?
+  /// Free notes as a NUMBERED LIST ("va sin serigrafiar"). An array because
+  /// the workshop ticks them off one by one on the printed sheet.
+  cutNotes        String[]    @default([])
+
   orderedAt DateTime  @default(now())
   dueDate   DateTime?
   closedAt  DateTime?

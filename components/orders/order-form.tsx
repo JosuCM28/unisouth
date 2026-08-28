@@ -14,6 +14,11 @@ import { FormSection } from "@/components/shared/form-section";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SearchSelect } from "@/components/shared/search-select";
 import { SubmitButton } from "@/components/shared/submit-button";
+import {
+  OrderCutHeader,
+  EMPTY_ORDER_CUT_HEADER,
+  type OrderCutHeaderDraft,
+} from "./order-cut-header";
 import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +66,7 @@ export interface EditableOrder {
   orderedAt: string;
   dueDate: string | null;
   notes: string | null;
+  cutHeader: OrderCutHeaderDraft;
   lines: LineDraft[];
 }
 
@@ -120,6 +126,9 @@ export function OrderForm({
     order?.dueDate ?? defaults?.dueDate ?? "",
   );
   const [notes, setNotes] = useState(order?.notes ?? "");
+  const [cutHeader, setCutHeader] = useState<OrderCutHeaderDraft>(
+    order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
+  );
   const [lines, setLines] = useState<LineDraft[]>(order?.lines ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -136,6 +145,7 @@ export function OrderForm({
       orderedAt: order?.orderedAt ?? todayInputValue(),
       dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
       notes: order?.notes ?? "",
+      cutHeader: order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
       lines: order?.lines ?? [],
     }),
   );
@@ -209,6 +219,7 @@ export function OrderForm({
       orderedAt,
       dueDate,
       notes,
+      cutHeader,
       lines,
     }) !== originalSnapshot;
 
@@ -234,6 +245,11 @@ export function OrderForm({
       orderedAt: orderedAt || undefined,
       dueDate: dueDate || undefined,
       notes: notes || undefined,
+      cutFabricText: cutHeader.cutFabricText || undefined,
+      cutPattern: cutHeader.cutPattern || undefined,
+      cutVersion: cutHeader.cutVersion || undefined,
+      cutVersionNotes: cutHeader.cutVersionNotes || undefined,
+      cutNotes: cutHeader.cutNotes,
       lines: valid.map((line) => ({
         sizeId: line.sizeId,
         orderedQuantity: Number(line.orderedQuantity),
@@ -461,6 +477,18 @@ export function OrderForm({
         </Button>
       </div>
 
+      {/* El encabezado del corte va DESPUÉS de las tallas y plegado: no es
+          obligatorio para dar de alta la orden, pero es lo que evita
+          recapturarlo todo cuando la orden se manda a salidas. */}
+      <div className="flat-surface p-4">
+        <FormSection
+          title="Encabezado del corte"
+          description="Molde, versión y notas del taller. Viajan al vale cuando mandes esta orden a salidas."
+        >
+          <OrderCutHeader value={cutHeader} onChange={setCutHeader} />
+        </FormSection>
+      </div>
+
       <div className="flat-surface p-4">
         <FormSection title="Detalles del pedido">
           <div className="flex flex-col gap-4">
@@ -556,6 +584,7 @@ function snapshot(state: {
   orderedAt: string;
   dueDate: string;
   notes: string;
+  cutHeader: OrderCutHeaderDraft;
   lines: LineDraft[];
 }): string {
   return JSON.stringify({

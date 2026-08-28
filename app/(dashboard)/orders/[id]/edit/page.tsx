@@ -48,6 +48,13 @@ export default async function EditOrderPage({ params }: PageProps) {
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
     notes: order.notes,
+    cutHeader: {
+      cutFabricText: order.cutFabricText ?? "",
+      cutPattern: order.cutPattern ?? "",
+      cutVersion: order.cutVersion ?? "",
+      cutVersionNotes: order.cutVersionNotes ?? "",
+      cutNotes: order.cutNotes,
+    },
     lines: order.lines.map((line) => ({
       key: line.id,
       sizeId: line.sizeId,

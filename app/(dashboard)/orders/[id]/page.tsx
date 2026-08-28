@@ -5,6 +5,7 @@ import { ArrowLeft, FolderOpen, Pencil, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
+  CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
@@ -106,6 +107,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
   // Sin nada cortado no hay nada que entregar y el botón no se ofrece: la
   // orden se manda cuando el taller ya cortó, no antes.
   const canSendToIssue = !isCancelled && issueSizes.length > 0;
+
+  // El encabezado del corte sólo se pinta si alguien lo llenó.
+  const hasCutHeader = Boolean(
+    order.cutFabricText ||
+      order.cutPattern ||
+      order.cutVersion ||
+      order.cutVersionNotes ||
+      order.cutNotes.length > 0,
+  );
 
   // Todos los avances de la orden, del más reciente al más viejo.
   const history = order.lines
@@ -287,6 +297,42 @@ export default async function OrderDetailPage({ params }: PageProps) {
           })}
         </ul>
       </section>
+
+      {/* El encabezado del corte se muestra sólo si trae algo: en una orden
+          que nunca lo llenó, una sección con cuatro renglones vacíos es ruido
+          que estorba en la pantalla del celular. */}
+      {hasCutHeader && (
+        <section className="flat-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold">Encabezado del corte</h2>
+          <dl className="grid gap-x-8 sm:grid-cols-2">
+            <Row label="Tela (a mano)" value={order.cutFabricText} />
+            <Row label="Molde" value={order.cutPattern} />
+            <Row
+              label="Versión"
+              value={
+                order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null
+              }
+            />
+            <Row
+              label="Descripción de la versión"
+              value={order.cutVersionNotes}
+            />
+          </dl>
+
+          {order.cutNotes.length > 0 && (
+            <ol className="mt-3 flex flex-col gap-1 border-t border-border pt-3">
+              {order.cutNotes.map((note, index) => (
+                <li key={index} className="flex gap-2 text-sm">
+                  <span className="tabular shrink-0 text-muted-foreground">
+                    {index + 1}.
+                  </span>
+                  <span className="min-w-0 break-words">{note}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">Datos del pedido</h2>

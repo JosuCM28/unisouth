@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
-import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
+import {
+  CUT_VERSION_LABELS,
+  CUTTING_ORDER_STATUS_LABELS,
+} from "@/lib/constants/labels";
 import { cutProgress, formatDate, formatDateTime } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
 
@@ -99,7 +102,32 @@ export default async function PrintOrderPage({ params }: PageProps) {
           }
         />
         <Field label="Capturó" value={order.createdBy?.name} />
+        {/* El encabezado del corte va en la MISMA rejilla y no en un bloque
+            aparte: en la hoja impresa el taller lee molde y versión junto a la
+            tela, no en otra parte de la página. */}
+        <Field label="Tela (a mano)" value={order.cutFabricText} />
+        <Field label="Molde" value={order.cutPattern} />
+        <Field
+          label="Versión"
+          value={order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null}
+        />
+        <Field label="Cambios de la versión" value={order.cutVersionNotes} />
       </dl>
+
+      {/* Numeradas, para irlas palomeando en el taller. */}
+      {order.cutNotes.length > 0 && (
+        <section className="border-b border-black py-3 text-sm">
+          <p className="font-semibold">Notas del corte</p>
+          <ol className="mt-1 flex flex-col gap-0.5">
+            {order.cutNotes.map((note, index) => (
+              <li key={index} className="flex gap-2">
+                <span className="tabular shrink-0">{index + 1}.</span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <table className="mt-4 w-full border-collapse text-sm">
         <thead>

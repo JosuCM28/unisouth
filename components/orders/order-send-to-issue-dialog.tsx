@@ -112,8 +112,9 @@ export function OrderSendToIssueDialog({
         )}
 
         <p className="text-xs text-muted-foreground">
-          Se copian el cliente, la tela y las tallas cortadas. Los rollos que se
-          descuentan y quién recibe se capturan en el vale.
+          Se copian el cliente, el encabezado del corte —prenda, tela, molde,
+          versión y notas— y las tallas cortadas. Los rollos que se descuentan y
+          quién recibe se capturan en el vale.
         </p>
 
         <Button

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CutVersion } from "@prisma/client";
 import { cuidSchema, localDate, optionalCuid, optionalText } from "./common";
 
 /** Un renglón: una talla y cuántas piezas pidieron de ella. */
@@ -24,6 +25,26 @@ export const cuttingOrderSchema = z.object({
   orderedAt: localDate.optional(),
   dueDate: localDate.optional(),
   notes: optionalText,
+
+  /* El encabezado del corte, el mismo que imprime el vale de salida.
+     `description` y `materialId` de arriba ya son la prenda y la tela: aquí
+     sólo van los campos que faltaban para no recapturarlos en la salida. */
+  cutFabricText: optionalText,
+  cutPattern: optionalText,
+  cutVersion: z
+    .union([z.nativeEnum(CutVersion), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+  cutVersionNotes: optionalText,
+  /* Los renglones vacíos se tiran aquí y no en el componente: una nota en
+     blanco saldría impresa como "3." sin texto, y en el taller eso se lee
+     como una instrucción que se borró. */
+  cutNotes: z
+    .array(z.string())
+    .optional()
+    .transform((values) =>
+      (values ?? []).map((note) => note.trim()).filter((note) => note.length > 0),
+    ),
   lines: z
     .array(cuttingOrderLineSchema)
     .min(1, "Agrega al menos una talla"),

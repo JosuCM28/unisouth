@@ -35,6 +35,11 @@ export class CuttingOrderService extends BaseService {
           orderedAt: input.orderedAt ?? new Date(),
           dueDate: input.dueDate,
           notes: input.notes,
+          cutFabricText: input.cutFabricText,
+          cutPattern: input.cutPattern,
+          cutVersion: input.cutVersion,
+          cutVersionNotes: input.cutVersionNotes,
+          cutNotes: input.cutNotes,
           createdById: this.context.userId,
           lines: {
             create: input.lines.map((line, index) => ({
@@ -150,6 +155,14 @@ export class CuttingOrderService extends BaseService {
           orderedAt: input.orderedAt ?? current.orderedAt,
           dueDate: input.dueDate,
           notes: input.notes,
+          /* `?? null` por la misma razón que la carpeta: vaciar el molde o la
+             versión llega como undefined y Prisma lo ignoraría, dejando el
+             dato viejo en una orden que el usuario acaba de limpiar. */
+          cutFabricText: input.cutFabricText ?? null,
+          cutPattern: input.cutPattern ?? null,
+          cutVersion: input.cutVersion ?? null,
+          cutVersionNotes: input.cutVersionNotes ?? null,
+          cutNotes: input.cutNotes,
         },
       });
 
@@ -341,13 +354,17 @@ export class CuttingOrderService extends BaseService {
         // tela a descontar si hace falta.
         lines: [],
         cutLines,
+        /* El encabezado viaja COMPLETO desde la orden: es donde se supo la
+           prenda, el molde y la versión. Antes sólo cruzaban la descripción y
+           la tela, y el auxiliar tenía que recapturar el resto en el vale
+           mirando el papel de la orden. */
         cutDescription: order.description ?? undefined,
         cutFabricId: order.materialId ?? undefined,
-        cutFabricText: undefined,
-        cutPattern: undefined,
-        cutVersion: undefined,
-        cutVersionNotes: undefined,
-        cutNotes: [],
+        cutFabricText: order.cutFabricText ?? undefined,
+        cutPattern: order.cutPattern ?? undefined,
+        cutVersion: order.cutVersion ?? undefined,
+        cutVersionNotes: order.cutVersionNotes ?? undefined,
+        cutNotes: order.cutNotes,
       });
 
       await this.auditWith(tx).record({

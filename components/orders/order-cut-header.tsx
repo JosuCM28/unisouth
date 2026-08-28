@@ -9,25 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** Un material del catálogo, ofrecido como tela del corte. */
-export interface CutFabricOption {
-  id: string;
-  code: string;
-  name: string;
-  /**
-   * Rollos surtibles hoy. Cero es válido: la tela puede venir ya cortada.
-   *
-   * Opcional porque el encabezado también se captura en la ORDEN, donde el
-   * dato no aplica: ahí todavía no se está surtiendo nada y decir "0 rollos"
-   * junto a la tela leería como que no hay material cuando sí lo hay.
-   */
-  lotCount?: number;
-}
-
-/** El encabezado del desglose, tal como se está capturando. */
-export interface CutHeaderDraft {
-  cutDescription: string;
-  cutFabricId: string;
+/** El encabezado del corte tal como se captura en la orden. */
+export interface OrderCutHeaderDraft {
   cutFabricText: string;
   cutPattern: string;
   cutVersion: string;
@@ -36,10 +19,8 @@ export interface CutHeaderDraft {
   cutNotes: string[];
 }
 
-/** Encabezado en blanco: el estado inicial de una salida nueva. */
-export const EMPTY_CUT_HEADER: CutHeaderDraft = {
-  cutDescription: "",
-  cutFabricId: "",
+/** Encabezado en blanco: el estado inicial de una orden nueva. */
+export const EMPTY_ORDER_CUT_HEADER: OrderCutHeaderDraft = {
   cutFabricText: "",
   cutPattern: "",
   cutVersion: "",
@@ -52,28 +33,24 @@ const VERSION_OPTIONS = (Object.keys(CUT_VERSION_LABELS) as CutVersion[]).map(
 );
 
 interface Props {
-  fabrics: CutFabricOption[];
-  value: CutHeaderDraft;
-  onChange: (value: CutHeaderDraft) => void;
+  value: OrderCutHeaderDraft;
+  onChange: (value: OrderCutHeaderDraft) => void;
 }
 
 /**
- * El encabezado de la hoja de corte: para quién, qué prenda y con qué tela.
+ * El encabezado de la hoja de corte, capturado desde la ORDEN.
  *
- * Estos datos son PROPIOS del vale y no se deducen de los rollos. Antes la
- * hoja impresa sacaba la empresa y la tela de los rollos que llevaba, así que
- * una salida sin rollos —prendas ya cortadas que se mandan al taller— salía
- * con esos renglones en blanco justo en el documento que el taller firma.
+ * Es el mismo bloque que imprime el vale de salida, y se llena aquí porque es
+ * aquí donde se sabe: quien toma el pedido conoce el molde y la versión, y el
+ * auxiliar que llena el vale no. Al mandar la orden a salidas estos datos
+ * viajan con ella, así que el vale sale escrito y no en blanco.
  *
- * La tela admite catálogo Y texto libre a propósito: lo normal es elegirla del
- * catálogo, pero cuando llega una tela que todavía nadie dio de alta el corte
- * no puede esperar a que exista la ficha del material.
- *
- * La fecha y el número de orden NO están aquí: son la fecha y la referencia
- * del vale, que ya amparan todas las tallas del desglose.
+ * La descripción y la tela del catálogo NO están en este bloque: ya son la
+ * `Descripción` y el `Material` de la orden, arriba. Repetirlas aquí abriría
+ * la puerta a que la orden y su vale digan prendas distintas.
  */
-export function IssueCutHeader({ fabrics, value, onChange }: Props) {
-  function patch(changes: Partial<CutHeaderDraft>) {
+export function OrderCutHeader({ value, onChange }: Props) {
+  function patch(changes: Partial<OrderCutHeaderDraft>) {
     onChange({ ...value, ...changes });
   }
 
@@ -97,42 +74,12 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* La tela a mano existe porque el pedido no puede esperar a que alguien
+          dé de alta el material: se apunta el nombre y se sigue. */}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="cut-description">Descripción</Label>
+        <Label htmlFor="order-cut-fabric-text">Tela (escrita a mano)</Label>
         <Input
-          id="cut-description"
-          placeholder="Blusa manga larga"
-          value={value.cutDescription}
-          onChange={(event) => patch({ cutDescription: event.target.value })}
-          className="touch-target"
-        />
-      </div>
-
-      <FormSelectField
-        id="cut-fabric"
-        label="Tela"
-        hint="Del catálogo. Si no está dada de alta, escríbela abajo."
-      >
-        <SearchSelect
-          id="cut-fabric"
-          options={fabrics.map((fabric) => ({
-            value: fabric.id,
-            label: fabric.name,
-            hint: fabricHint(fabric),
-            keywords: fabric.code,
-          }))}
-          value={value.cutFabricId}
-          onChange={(fabricId) => patch({ cutFabricId: fabricId })}
-          placeholder="Elige la tela"
-          searchPlaceholder="Buscar por código o nombre…"
-          clearLabel="Sin tela del catálogo"
-        />
-      </FormSelectField>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cut-fabric-text">Tela (escrita a mano)</Label>
-        <Input
-          id="cut-fabric-text"
+          id="order-cut-fabric-text"
           placeholder="Sólo si no está en el catálogo"
           value={value.cutFabricText}
           onChange={(event) => patch({ cutFabricText: event.target.value })}
@@ -142,9 +89,9 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="cut-pattern">Molde</Label>
+          <Label htmlFor="order-cut-pattern">Molde</Label>
           <Input
-            id="cut-pattern"
+            id="order-cut-pattern"
             placeholder="Opcional"
             value={value.cutPattern}
             onChange={(event) => patch({ cutPattern: event.target.value })}
@@ -152,9 +99,9 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
           />
         </div>
 
-        <FormSelectField id="cut-version" label="Versión">
+        <FormSelectField id="order-cut-version" label="Versión">
           <SearchSelect
-            id="cut-version"
+            id="order-cut-version"
             options={VERSION_OPTIONS}
             value={value.cutVersion}
             onChange={(version) => patch({ cutVersion: version })}
@@ -166,9 +113,11 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="cut-version-notes">Descripción de la versión</Label>
+        <Label htmlFor="order-cut-version-notes">
+          Descripción de la versión
+        </Label>
         <Input
-          id="cut-version-notes"
+          id="order-cut-version-notes"
           placeholder="Qué cambia respecto a la anterior"
           value={value.cutVersionNotes}
           onChange={(event) => patch({ cutVersionNotes: event.target.value })}
@@ -177,11 +126,9 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
       </div>
 
       {/* Las notas se capturan como LISTA y no como un párrafo: en la hoja se
-          imprimen numeradas y en el taller se van palomeando una por una. Un
-          bloque de texto corrido obliga a leerlo entero para saber si falta
-          alguna. */}
+          imprimen numeradas y en el taller se van palomeando una por una. */}
       <div className="flex flex-col gap-2">
-        <Label>Notas</Label>
+        <Label>Notas del corte</Label>
 
         {value.cutNotes.length === 0 && (
           <p className="text-xs text-muted-foreground">
@@ -228,12 +175,4 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
       </div>
     </div>
   );
-}
-
-/** Código de la tela y, si se conoce, cuántos rollos surtibles tiene hoy. */
-function fabricHint(fabric: CutFabricOption): string {
-  if (!fabric.lotCount) return fabric.code;
-
-  const rolls = fabric.lotCount === 1 ? "rollo" : "rollos";
-  return `${fabric.code} · ${fabric.lotCount} ${rolls}`;
 }
