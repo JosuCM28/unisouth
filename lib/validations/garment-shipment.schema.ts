@@ -22,6 +22,10 @@ export const garmentShipmentSchema = z.object({
   stageId: cuidSchema,
   sentAt: localDate.optional(),
   dueDate: localDate.optional(),
+  /* Qué partes de la prenda van: "tapas y delantero izquierdo". Opcional
+     porque lo habitual es escribirlo en las notas del vale, y pedirlo dos
+     veces sólo consigue que una de las dos quede mal. */
+  parts: optionalText,
   reference: optionalText,
   notes: optionalText,
   lines: z

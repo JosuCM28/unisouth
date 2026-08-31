@@ -1,4 +1,4 @@
-import type { GarmentShipment } from "@prisma/client";
+import type { CutVersion, GarmentShipment } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import type {
@@ -6,50 +6,67 @@ import type {
   GarmentShipmentInput,
 } from "@/lib/validations/garment-shipment.schema";
 import { BaseService } from "./base.service";
+import { DocumentService } from "./document.service";
 
-/**
- * El saldo de una talla dentro de una orden, en piezas.
- *
- * Es el equivalente en prendas del disponible de un rollo, y se calcula igual:
- * sumando la historia, nunca leyendo un campo que alguien tecleó.
- */
-export interface SizeBalance {
-  sizeId: string;
-  /** Piezas que salieron del corte. */
-  cut: number;
-  /** Todo lo que ha salido a talleres, sumando envíos vivos. */
+/** Lo que se ha mandado de una talla a UNA etapa. */
+export interface StageCount {
+  stageId: string;
+  stageName: string;
   sent: number;
-  /** Lo que ha vuelto bueno. */
   returned: number;
-  /** Lo que el taller perdió o echó a perder. No vuelve nunca. */
   scrap: number;
-  /** Piezas que ahora mismo están en un taller. */
-  atWorkshop: number;
-  /** Piezas aquí, listas para mandar a la siguiente etapa. */
-  available: number;
 }
 
 /**
- * Prendas ya cortadas que van y vienen de los talleres.
+ * Cómo va una talla de la orden, etapa por etapa.
  *
- * Cubre el tramo que antes se llevaba en la libreta: la tela deja de ser rollo
- * al cortarse y la prenda terminada todavía no existe, así que la pieza que
- * anda bordándose no estaba en ningún lado. Por eso "¿cuánto de la 54 ya mandé
- * a bordar y cuánto me queda aquí?" no tenía respuesta.
+ * NO hay un "disponible" global, y es la corrección más importante de este
+ * módulo: lo que sale a bordar son PANELES —las tapas y el delantero
+ * izquierdo—, no la prenda. Los demás paneles de esas mismas 100 camisas
+ * siguen en la bodega. Restarlas de un saldo único diría que ya no las tienes,
+ * y es falso: mandar a bordado no te impide mandar esas mismas piezas a armado.
  *
- * NO toca el kárdex, y es deliberado: la tela ya se descontó al cortar, y
- * volver a contar la prenda como existencia duplicaría el material.
+ * Por eso cada etapa lleva su propia cuenta contra lo cortado.
+ */
+export interface SizeBalance {
+  sizeId: string;
+  cut: number;
+  byStage: Map<string, StageCount>;
+}
+
+/**
+ * Prendas ya cortadas que salen a un taller a que les hagan un proceso.
  *
- * La regla que lo sostiene es la misma que la del almacén —no se surte por
- * encima del disponible—, traducida a piezas: no se manda a un taller más de
- * lo que hay aquí. Una prenda está en un solo lugar a la vez.
+ * Cubre el tramo que se llevaba en la libreta: la tela deja de ser rollo al
+ * cortarse y la prenda terminada todavía no existe, así que los paneles que
+ * andan bordándose no estaban en ningún lado.
+ *
+ * Dos hechos del negocio que definen el diseño:
+ *
+ * 1. Lo que sale casi nunca vuelve. El taller borda los paneles y los manda
+ *    directo a donde siguen. Por eso el retorno es la EXCEPCIÓN y no el paso
+ *    que cierra el ciclo: un envío se queda en "enviado" para siempre y eso
+ *    está bien.
+ * 2. Sale una parte de la prenda, no la prenda. De ahí que no exista un saldo
+ *    global de piezas y que cada etapa cuente aparte.
+ *
+ * NO toca el kárdex: la tela ya se descontó al cortar, y volver a contar la
+ * prenda como existencia duplicaría el material.
  */
 export class GarmentShipmentService extends BaseService {
+  /**
+   * Registra lo que salió y levanta su vale de salida.
+   *
+   * El vale nace en BORRADOR y con el mismo desglose por talla, porque ese
+   * papel ya se hacía a mano: generarlo aquí es lo que evita capturar dos
+   * veces el mismo renglón. No se aplica solo —eso es un acto deliberado del
+   * auxiliar— y no descuenta tela, porque lo que sale son prendas cortadas.
+   */
   async create(input: GarmentShipmentInput): Promise<GarmentShipment> {
     return this.transaction(async (tx) => {
       const order = await tx.cuttingOrder.findUnique({
         where: { id: input.orderId },
-        select: { id: true, code: true, status: true },
+        include: { lines: { select: { sizeId: true } } },
       });
       if (!order) throw new NotFoundError("la orden", input.orderId);
 
@@ -59,29 +76,30 @@ export class GarmentShipmentService extends BaseService {
         );
       }
 
-      const balances = await this.balancesFor(tx, input.orderId);
+      const [workshop, stage] = await Promise.all([
+        tx.workshop.findUnique({
+          where: { id: input.workshopId },
+          select: { name: true },
+        }),
+        tx.processStage.findUnique({
+          where: { id: input.stageId },
+          select: { name: true },
+        }),
+      ]);
+      if (!workshop) throw new NotFoundError("el taller", input.workshopId);
+      if (!stage) throw new NotFoundError("la etapa", input.stageId);
 
-      /* Se valida ANTES de escribir nada y contra el saldo recién leído: dos
-         envíos capturados a la vez del mismo corte no pueden llevarse las
-         mismas piezas. */
+      /* Lo ÚNICO que se valida de las cantidades es que la talla pertenezca a
+         la orden. No hay tope contra lo cortado a propósito: en el piso se
+         manda a bordar lo que hace falta y el conteo del corte no siempre está
+         capturado al día. Un bloqueo aquí pararía el camión por un dato que se
+         captura después. */
+      const orderSizes = new Set(order.lines.map((line) => line.sizeId));
+
       for (const line of input.lines) {
-        const balance = balances.get(line.sizeId);
-
-        if (!balance) {
+        if (!orderSizes.has(line.sizeId)) {
           throw new BusinessRuleError(
             "Esa talla no está en la orden. Agrégala a la orden antes de mandarla.",
-          );
-        }
-
-        if (balance.cut === 0) {
-          throw new BusinessRuleError(
-            `De esa talla todavía no se corta nada: no hay piezas que mandar.`,
-          );
-        }
-
-        if (line.sentQuantity > balance.available) {
-          throw new BusinessRuleError(
-            `Sólo quedan ${balance.available} piezas disponibles de esa talla: ${balance.cut} cortadas, ${balance.atWorkshop} en talleres. Registra el retorno antes de volver a mandarlas.`,
           );
         }
       }
@@ -92,14 +110,17 @@ export class GarmentShipmentService extends BaseService {
         4,
       );
 
+      const sentAt = input.sentAt ?? new Date();
+
       const shipment = await tx.garmentShipment.create({
         data: {
           code,
           orderId: input.orderId,
           workshopId: input.workshopId,
           stageId: input.stageId,
-          sentAt: input.sentAt ?? new Date(),
+          sentAt,
           dueDate: input.dueDate,
+          parts: input.parts,
           reference: input.reference,
           notes: input.notes,
           createdById: this.context.userId,
@@ -114,6 +135,21 @@ export class GarmentShipmentService extends BaseService {
         },
       });
 
+      const document = await this.buildVoucher(tx, {
+        shipmentCode: code,
+        sentAt,
+        stageName: stage.name,
+        workshopName: workshop.name,
+        parts: input.parts,
+        order,
+        lines: input.lines,
+      });
+
+      await tx.garmentShipment.update({
+        where: { id: shipment.id },
+        data: { documentId: document.id },
+      });
+
       await this.auditWith(tx).record({
         entity: "GarmentShipment",
         entityId: shipment.id,
@@ -121,7 +157,9 @@ export class GarmentShipmentService extends BaseService {
         reference: code,
         newValue: {
           orden: order.code,
-          tallas: input.lines.length,
+          etapa: stage.name,
+          taller: workshop.name,
+          vale: document.code,
           piezas: input.lines.reduce((sum, l) => sum + l.sentQuantity, 0),
         },
         sensitivity: "LOW",
@@ -132,12 +170,91 @@ export class GarmentShipmentService extends BaseService {
   }
 
   /**
+   * El vale de salida del envío, con la forma del que ya se hacía a mano.
+   *
+   * El encabezado viaja completo desde la orden —prenda, tela, molde, versión—
+   * porque es donde se supo, y la etapa y el taller se anotan arriba de las
+   * notas del corte: así es como el taller lee el papel que recibe.
+   */
+  private async buildVoucher(
+    tx: PrismaExecutor,
+    input: {
+      shipmentCode: string;
+      sentAt: Date;
+      stageName: string;
+      workshopName: string;
+      parts?: string;
+      order: {
+        code: string;
+        clientId: string | null;
+        productionRunId: string | null;
+        materialId: string | null;
+        description: string | null;
+        cutFabricText: string | null;
+        cutPattern: string | null;
+        cutVersion: CutVersion | null;
+        cutVersionNotes: string | null;
+        cutNotes: string[];
+      };
+      lines: { sizeId: string; sentQuantity: number; notes?: string }[];
+    },
+  ) {
+    const { order } = input;
+
+    /* La etapa y el taller encabezan las notas porque es lo primero que se
+       lee en el papel: "BORDADO SHAWCOR". Las partes van abajo cuando se
+       capturaron, y si no, el auxiliar las escribe a mano como siempre. */
+    const cutNotes = [
+      `${input.stageName.toUpperCase()} ${input.workshopName.toUpperCase()}`,
+      ...(input.parts ? [input.parts] : []),
+      ...order.cutNotes,
+    ];
+
+    return new DocumentService(this.context, tx).create({
+      type: "ISSUE",
+      date: input.sentAt,
+      clientId: order.clientId ?? undefined,
+      productionRunId: order.productionRunId ?? undefined,
+      concept: order.description ?? undefined,
+      // El folio de la orden, que es contra lo que el taller cotiza y cobra.
+      reference: order.code,
+      // Quien entrega se firma en el papel, no se teclea aquí.
+      handedOverBy: undefined,
+      receivedBy: input.workshopName,
+      notes: `Envío ${input.shipmentCode}`,
+      // Sin rollos: lo que sale son prendas cortadas, no tela por descontar.
+      lines: [],
+      cutLines: input.lines.map((line) => ({
+        sizeId: line.sizeId,
+        quantity: line.sentQuantity,
+        // Un bulto por talla: cuántos son de verdad se sabe al empacar y el
+        // auxiliar lo corrige en el vale. Poner cero sería mentir.
+        bundles: 1,
+        // El foleo se pone en el vale: al mandar a bordar todavía no se sabe
+        // con qué color va a viajar el bulto.
+        tagId: undefined,
+        notes: line.notes,
+      })),
+      cutDescription: order.description ?? undefined,
+      cutFabricId: order.materialId ?? undefined,
+      cutFabricText: order.cutFabricText ?? undefined,
+      cutPattern: order.cutPattern ?? undefined,
+      cutVersion: order.cutVersion ?? undefined,
+      cutVersionNotes: order.cutVersionNotes ?? undefined,
+      cutNotes,
+    });
+  }
+
+  /**
    * Registra lo que el taller devolvió de una talla.
    *
+   * Es la EXCEPCIÓN: lo normal es que el taller mande los paneles bordados a
+   * donde siguen y no vuelvan aquí. Existe porque de vez en cuando sí regresan
+   * —y porque cuando regresan mal hay que dejarlo escrito.
+   *
    * El acumulado se recalcula sumando la bitácora del renglón y NO se
-   * incrementa sobre el número guardado: si dos personas capturan retornos a
-   * la vez, sumar sobre un valor leído antes perdería uno de los dos. Es la
-   * misma razón por la que el saldo de un rollo se recalcula.
+   * incrementa sobre el número guardado: si dos personas capturan a la vez,
+   * sumar sobre un valor leído antes perdería uno de los dos.
    */
   async addReturn(input: GarmentReturnInput) {
     return this.transaction(async (tx) => {
@@ -174,15 +291,13 @@ export class GarmentShipmentService extends BaseService {
       const returned = totals._sum.quantity ?? 0;
       const scrap = totals._sum.scrapQuantity ?? 0;
 
-      /* Un retorno no puede dejar el renglón en negativo: sería devolver más
-         veces de las que se registraron, y sólo puede ser un error de captura. */
       if (returned < 0) {
         throw new BusinessRuleError(
           `El retorno dejaría la talla ${line.size.code} en negativo.`,
         );
       }
 
-      // Ni puede volver más de lo que salió: el taller no fabrica piezas.
+      // No puede volver más de lo que salió: el taller no fabrica piezas.
       if (returned + scrap > line.sentQuantity) {
         throw new BusinessRuleError(
           `De la talla ${line.size.code} salieron ${line.sentQuantity} piezas y estarías registrando ${returned + scrap}. Revisa el conteo.`,
@@ -217,21 +332,27 @@ export class GarmentShipmentService extends BaseService {
   /**
    * Cancela un envío que no debió existir.
    *
-   * Sólo mientras no tenga retornos. Con piezas ya devueltas, cancelar
-   * borraría el rastro de material que sí se movió; en ese caso lo correcto es
-   * cerrar el envío registrando lo que falta como merma, que es lo que de
-   * verdad pasó.
+   * Sólo mientras no tenga retornos: con piezas ya devueltas, cancelar
+   * borraría el rastro de material que sí se movió.
+   *
+   * El vale que generó NO se cancela solo. Es un documento con vida propia
+   * —pudo aplicarse ya— y decidir por él desde aquí sería moverle existencias
+   * a alguien por un motivo que no es suyo. Se avisa y se cancela aparte.
    */
   async cancel(id: string, reason: string): Promise<GarmentShipment> {
     return this.transaction(async (tx) => {
       const current = await tx.garmentShipment.findUnique({
         where: { id },
-        include: { lines: { select: { returnedQuantity: true, scrapQuantity: true } } },
+        include: {
+          lines: { select: { returnedQuantity: true, scrapQuantity: true } },
+        },
       });
       if (!current) throw new NotFoundError("el envío", id);
 
       if (current.status === "CANCELLED") {
-        throw new BusinessRuleError(`El envío ${current.code} ya está cancelado.`);
+        throw new BusinessRuleError(
+          `El envío ${current.code} ya está cancelado.`,
+        );
       }
 
       const moved = current.lines.some(
@@ -240,7 +361,7 @@ export class GarmentShipmentService extends BaseService {
 
       if (moved) {
         throw new BusinessRuleError(
-          `El envío ${current.code} ya tiene retornos capturados y no se puede cancelar. Si el taller no va a devolver el resto, ciérralo registrándolo como merma.`,
+          `El envío ${current.code} ya tiene retornos capturados y no se puede cancelar.`,
         );
       }
 
@@ -268,52 +389,34 @@ export class GarmentShipmentService extends BaseService {
     });
   }
 
-  /**
-   * El tablero de la orden: en qué anda cada talla.
-   *
-   * Público porque la ficha de la orden lo pinta tal cual. Se calcula sumando
-   * el corte y los envíos vivos; los cancelados no cuentan porque esas piezas
-   * nunca salieron.
-   */
+  /** El tablero de la orden: cuánto se ha mandado de cada talla a cada etapa. */
   async balances(orderId: string): Promise<Map<string, SizeBalance>> {
-    return this.balancesFor(this.db, orderId);
-  }
-
-  private async balancesFor(
-    tx: PrismaExecutor,
-    orderId: string,
-  ): Promise<Map<string, SizeBalance>> {
     const [lines, shipmentLines] = await Promise.all([
-      tx.cuttingOrderLine.findMany({
+      this.db.cuttingOrderLine.findMany({
         where: { orderId },
         select: { sizeId: true, cutQuantity: true },
       }),
-      tx.garmentShipmentLine.findMany({
-        where: {
-          shipment: { orderId, status: { not: "CANCELLED" } },
-        },
+      this.db.garmentShipmentLine.findMany({
+        where: { shipment: { orderId, status: { not: "CANCELLED" } } },
         select: {
           sizeId: true,
           sentQuantity: true,
           returnedQuantity: true,
           scrapQuantity: true,
+          shipment: {
+            select: { stageId: true, stage: { select: { name: true } } },
+          },
         },
       }),
     ]);
 
     const balances = new Map<string, SizeBalance>();
 
-    /* El mapa se siembra con las tallas DE LA ORDEN: si una talla no está
-       aquí, no se puede mandar, y esa es justamente la validación de arriba. */
     for (const line of lines) {
       balances.set(line.sizeId, {
         sizeId: line.sizeId,
         cut: line.cutQuantity,
-        sent: 0,
-        returned: 0,
-        scrap: 0,
-        atWorkshop: 0,
-        available: line.cutQuantity,
+        byStage: new Map(),
       });
     }
 
@@ -321,17 +424,21 @@ export class GarmentShipmentService extends BaseService {
       const balance = balances.get(line.sizeId);
       if (!balance) continue;
 
-      balance.sent += line.sentQuantity;
-      balance.returned += line.returnedQuantity;
-      balance.scrap += line.scrapQuantity;
-    }
+      const { stageId, stage } = line.shipment;
 
-    for (const balance of balances.values()) {
-      /* Una prenda está en un solo lugar a la vez: o en el taller, o aquí, o
-         se perdió. Lo que volvió vuelve a estar disponible —es justo lo que
-         permite mandarla a la siguiente etapa—, y la merma no vuelve nunca. */
-      balance.atWorkshop = balance.sent - balance.returned - balance.scrap;
-      balance.available = balance.cut - balance.sent + balance.returned;
+      const count = balance.byStage.get(stageId) ?? {
+        stageId,
+        stageName: stage.name,
+        sent: 0,
+        returned: 0,
+        scrap: 0,
+      };
+
+      count.sent += line.sentQuantity;
+      count.returned += line.returnedQuantity;
+      count.scrap += line.scrapQuantity;
+
+      balance.byStage.set(stageId, count);
     }
 
     return balances;
@@ -340,8 +447,8 @@ export class GarmentShipmentService extends BaseService {
   /**
    * El estado se deriva de los retornos, no se elige a mano.
    *
-   * Que alguien tenga que acordarse de marcar un envío como cerrado es
-   * garantía de que el tablero mienta.
+   * Un envío sin retornos se queda en SENT para siempre, y es lo correcto:
+   * significa "salió", no "está pendiente de volver".
    */
   private async syncStatus(tx: PrismaExecutor, shipmentId: string) {
     const lines = await tx.garmentShipmentLine.findMany({
@@ -363,12 +470,7 @@ export class GarmentShipmentService extends BaseService {
 
     await tx.garmentShipment.update({
       where: { id: shipmentId },
-      data: {
-        status,
-        // Se sella al cerrar y se limpia si vuelve a abrirse por una
-        // corrección: una fecha de cierre en un envío vivo confunde.
-        closedAt: status === "CLOSED" ? new Date() : null,
-      },
+      data: { status, closedAt: status === "CLOSED" ? new Date() : null },
     });
   }
 }

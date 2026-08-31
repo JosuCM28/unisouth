@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import type { GarmentShipmentStatus } from "@prisma/client";
 import { addGarmentReturnAction } from "@/app/actions/garment-shipment.actions";
@@ -34,22 +36,26 @@ export interface ShipmentView {
   stageName: string;
   sentAt: Date;
   reference: string | null;
+  parts: string | null;
+  /** El vale de salida que generó, para ir a imprimirlo o aplicarlo. */
+  document: { id: string; code: string } | null;
   lines: ShipmentLineView[];
 }
 
 /**
- * Los envíos de una orden y lo que falta por regresar de cada uno.
+ * Los envíos de una orden: qué salió, a qué etapa y con qué vale.
  *
- * Se listan del más nuevo al más viejo porque el que se consulta es el que
- * sigue abierto. Cada renglón enseña las tres cifras que importan —salieron,
- * regresaron, se perdieron— y lo que todavía está en el taller.
+ * Se listan del más nuevo al más viejo porque el que se consulta es el último.
+ * Lo normal es que un envío se quede en "enviado" para siempre: el taller
+ * borda los paneles y los manda a donde siguen, así que no vuelven aquí. El
+ * botón de retorno sólo aparece cuando de verdad hace falta capturar uno.
  */
 export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
   if (shipments.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Todavía no sale nada a taller. Cuando mandes prendas, aquí llevas la
-        cuenta de lo que falta por regresar.
+        Todavía no sale nada a taller. Cuando mandes prendas, aquí queda el
+        registro de qué salió, a qué etapa y con qué vale.
       </p>
     );
   }
@@ -78,13 +84,32 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
                 {formatDate(shipment.sentAt)}
                 {shipment.reference && ` · Ref. ${shipment.reference}`}
               </p>
+              {shipment.parts && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {shipment.parts}
+                </p>
+              )}
             </div>
+
+            {/* El vale que se imprime y se firma. Va aquí porque es el papel
+                que acompaña al bulto, no un detalle del registro. */}
+            {shipment.document && (
+              <Link
+                href={`/documents/${shipment.document.id}`}
+                className="touch-target flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"
+              >
+                <FileText className="size-4" aria-hidden />
+                <span className="tabular">{shipment.document.code}</span>
+              </Link>
+            )}
           </div>
 
           <ul className="flex flex-col gap-1">
             {shipment.lines.map((line) => {
               const pending =
                 line.sentQuantity - line.returnedQuantity - line.scrapQuantity;
+              const hasReturns =
+                line.returnedQuantity > 0 || line.scrapQuantity > 0;
 
               return (
                 <li
@@ -93,17 +118,23 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
                 >
                   <span className="tabular font-medium">{line.sizeCode}</span>
 
+                  {/* Sin retornos sólo se dice qué salió, que es el caso
+                      normal. Las otras cifras aparecen únicamente cuando
+                      alguien capturó una devolución, para no llenar el
+                      renglón de ceros que no significan nada. */}
                   <span className="tabular flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{line.sentQuantity} salieron</span>
-                    <span>{line.returnedQuantity} volvieron</span>
+                    {line.returnedQuantity > 0 && (
+                      <span>{line.returnedQuantity} volvieron</span>
+                    )}
                     {line.scrapQuantity > 0 && (
                       <span className="text-state-defective">
                         {line.scrapQuantity} merma
                       </span>
                     )}
-                    {pending > 0 && (
+                    {hasReturns && pending > 0 && (
                       <span className="font-medium text-foreground">
-                        {pending} en taller
+                        {pending} sin retorno
                       </span>
                     )}
                   </span>
@@ -186,7 +217,7 @@ function ReturnDialog({
       open={open}
       onOpenChange={setOpen}
       title={`Retorno de la talla ${sizeCode}`}
-      description={`Quedan ${pending} piezas en el taller.`}
+      description={`Salieron ${pending} piezas sin retorno. Captúralo sólo si el taller de verdad te las devolvió.`}
       trigger={
         <Button variant="outline" size="sm" className="touch-target shrink-0">
           Regresó

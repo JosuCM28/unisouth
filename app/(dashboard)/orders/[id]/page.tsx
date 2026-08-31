@@ -109,6 +109,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       include: {
         workshop: { select: { name: true } },
         stage: { select: { name: true } },
+        document: { select: { id: true, code: true } },
         lines: {
           orderBy: { position: "asc" },
           include: { size: { select: { code: true } } },
@@ -135,6 +136,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
     stageName: shipment.stage.name,
     sentAt: shipment.sentAt,
     reference: shipment.reference,
+    parts: shipment.parts,
+    document: shipment.document
+      ? { id: shipment.document.id, code: shipment.document.code }
+      : null,
     lines: shipment.lines.map((line) => ({
       id: line.id,
       sizeCode: line.size.code,
@@ -144,11 +149,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
     })),
   }));
 
-  const shippableSizes = order.lines.map((line) => ({
-    sizeId: line.sizeId,
-    sizeCode: line.size.code,
-    available: balances.get(line.sizeId)?.available ?? 0,
-  }));
+  const shippableSizes = order.lines.map((line) => {
+    const balance = balances.get(line.sizeId);
+
+    return {
+      sizeId: line.sizeId,
+      sizeCode: line.size.code,
+      cut: line.cutQuantity,
+      /* Lo ya mandado a cada etapa. El diálogo enseña el de la etapa elegida:
+         "de la 34 ya van 100 a bordado de 1330 cortadas". */
+      sentByStage: Object.fromEntries(
+        [...(balance?.byStage.values() ?? [])].map((stage) => [
+          stage.stageId,
+          stage.sent,
+        ]),
+      ),
+    };
+  });
 
   const ordered = order.lines.reduce((s, l) => s + l.orderedQuantity, 0);
   const cut = order.lines.reduce((s, l) => s + l.cutQuantity, 0);
@@ -313,7 +330,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
               done,
             } = cutProgress(line.orderedQuantity, line.cutQuantity);
 
-            const balance = balances.get(line.sizeId);
+            const stageCounts = [
+              ...(balances.get(line.sizeId)?.byStage.values() ?? []),
+            ];
 
             return (
               <li
@@ -344,15 +363,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     {lineSurplus > 0 && ` · sobran ${lineSurplus}`}
                   </p>
 
-                  {/* Dónde están las piezas ya cortadas. Sólo se pinta si algo
-                      salió: en una orden que nunca fue a taller, "0 en taller"
-                      es ruido en todos los renglones. */}
-                  {balance && balance.sent > 0 && (
+                  {/* A qué etapas ha salido esta talla. Una línea por etapa
+                      y no un "disponible": lo que sale a bordar son paneles, y
+                      la prenda sigue aquí para lo que falte. */}
+                  {stageCounts.length > 0 && (
                     <p className="tabular text-xs text-muted-foreground">
-                      {balance.available} aquí
-                      {balance.atWorkshop > 0 &&
-                        ` · ${balance.atWorkshop} en taller`}
-                      {balance.scrap > 0 && ` · ${balance.scrap} merma`}
+                      {stageCounts
+                        .map(
+                          (stage) =>
+                            `${stage.sent} a ${stage.stageName.toLowerCase()}`,
+                        )
+                        .join(" · ")}
                     </p>
                   )}
 

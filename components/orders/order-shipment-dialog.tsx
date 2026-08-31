@@ -18,8 +18,10 @@ import { Label } from "@/components/ui/label";
 export interface ShippableSize {
   sizeId: string;
   sizeCode: string;
-  /** Piezas aquí, listas para mandar. Es el tope del renglón. */
-  available: number;
+  /** Piezas que salieron del corte. La referencia contra la que se compara. */
+  cut: number;
+  /** Lo ya mandado a cada etapa, por id de etapa. */
+  sentByStage: Record<string, number>;
 }
 
 interface Props {
@@ -33,14 +35,17 @@ interface Props {
 /**
  * Manda prendas ya cortadas a un taller.
  *
- * Se capturan TODAS las tallas en una sola pantalla, con el disponible de cada
- * una enfrente, porque así es como sale el camión: se cargan los bultos que
- * caben y se anota qué se fue. Obligar a un envío por talla convertiría un
- * viaje en cinco capturas.
+ * Se capturan TODAS las tallas en una sola pantalla porque así es como sale el
+ * camión: se cargan los bultos que caben y se anota qué se fue. Obligar a un
+ * envío por talla convertiría un viaje en cinco capturas.
  *
- * El disponible que se muestra ya descuenta lo que anda en otros talleres: una
- * prenda está en un solo lugar a la vez, y por eso de las 1330 cortadas se
- * pueden mandar 800 hoy y las 530 que quedan mañana, pero no 1330 dos veces.
+ * Junto a cada talla se enseña lo ya mandado A ESA ETAPA, no un "disponible"
+ * global. Lo que sale a bordar son PANELES —tapas, delantero izquierdo— y los
+ * demás paneles de esas mismas prendas siguen en la bodega: descontarlas de un
+ * saldo único diría que ya no las tienes cuando sí. Por eso mandar 100 de la
+ * 34 a bordado no te impide mandar esas mismas 100 a armado.
+ *
+ * Y por eso tampoco hay tope: el contador informa, no bloquea.
  */
 export function OrderShipmentDialog({
   orderId,
@@ -54,12 +59,14 @@ export function OrderShipmentDialog({
   const [workshopId, setWorkshopId] = useState("");
   const [stageId, setStageId] = useState("");
   const [sentAt, setSentAt] = useState(todayInputValue());
+  const [parts, setParts] = useState("");
   const [reference, setReference] = useState("");
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  const shippable = sizes.filter((size) => size.available > 0);
-
+  /* Se ofrecen TODAS las tallas de la orden, incluso las que aún no tienen
+     corte capturado: el conteo del corte no siempre está al día y el camión no
+     espera a que alguien lo teclee. */
   const total = Object.values(quantities).reduce(
     (sum, value) => sum + (Number(value) || 0),
     0,
@@ -71,7 +78,7 @@ export function OrderShipmentDialog({
       return;
     }
 
-    const lines = shippable
+    const lines = sizes
       .map((size) => ({
         sizeId: size.sizeId,
         sentQuantity: Number(quantities[size.sizeId] ?? ""),
@@ -83,21 +90,6 @@ export function OrderShipmentDialog({
       return;
     }
 
-    /* Se avisa aquí y no sólo en el servidor: el auxiliar acaba de teclear el
-       número y lo puede corregir sin perder el resto de la captura. */
-    const excedida = lines.find((line) => {
-      const size = shippable.find((item) => item.sizeId === line.sizeId);
-      return size && line.sentQuantity > size.available;
-    });
-
-    if (excedida) {
-      const size = shippable.find((item) => item.sizeId === excedida.sizeId);
-      toast.error(
-        `De la talla ${size?.sizeCode} sólo hay ${size?.available} piezas aquí.`,
-      );
-      return;
-    }
-
     setIsSaving(true);
     const result = await runAction(() =>
       createGarmentShipmentAction({
@@ -105,6 +97,7 @@ export function OrderShipmentDialog({
         workshopId,
         stageId,
         sentAt,
+        parts: parts || undefined,
         reference: reference || undefined,
         lines,
       }),
@@ -116,10 +109,11 @@ export function OrderShipmentDialog({
       return;
     }
 
-    toast.success("Envío registrado");
+    toast.success("Envío registrado. Se creó su vale de salida en borrador.");
     setOpen(false);
     setQuantities({});
     setReference("");
+    setParts("");
     router.refresh();
   }
 
@@ -136,10 +130,9 @@ export function OrderShipmentDialog({
         </Button>
       }
     >
-      {shippable.length === 0 ? (
+      {sizes.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No hay piezas aquí para mandar. O todavía no se corta nada, o todo lo
-          cortado ya está en un taller: registra sus retornos primero.
+          Esta orden no tiene tallas capturadas todavía.
         </p>
       ) : (
         <div className="flex flex-col gap-4">
@@ -168,6 +161,20 @@ export function OrderShipmentDialog({
               searchPlaceholder="Buscar etapa…"
             />
           </FormSelectField>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="shipment-parts">Qué partes van</Label>
+            <Input
+              id="shipment-parts"
+              placeholder="Tapas y delantero izquierdo"
+              value={parts}
+              onChange={(event) => setParts(event.target.value)}
+              className="touch-target"
+            />
+            <p className="text-xs text-muted-foreground">
+              Opcional. Sale impreso en el vale, debajo del taller.
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
@@ -203,7 +210,12 @@ export function OrderShipmentDialog({
             </div>
 
             <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
-              {shippable.map((size) => (
+              {sizes.map((size) => {
+                const alreadySent = stageId
+                  ? (size.sentByStage[stageId] ?? 0)
+                  : 0;
+
+                return (
                 <li
                   key={size.sizeId}
                   className="flat-surface flex items-center gap-3 p-2"
@@ -212,8 +224,12 @@ export function OrderShipmentDialog({
                     <p className="tabular text-sm font-medium">
                       {size.sizeCode}
                     </p>
+                    {/* Contra lo CORTADO y sólo de esta etapa: es la pregunta
+                        real —"¿cuánto de la 34 me falta por mandar a
+                        bordado?"— y no cuántas prendas quedan en bodega. */}
                     <p className="tabular text-xs text-muted-foreground">
-                      {size.available} aquí
+                      {size.cut} cortadas
+                      {alreadySent > 0 && ` · ya van ${alreadySent}`}
                     </p>
                   </div>
 
@@ -231,7 +247,8 @@ export function OrderShipmentDialog({
                     className="tabular touch-target w-24 text-right"
                   />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
 

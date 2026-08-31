@@ -426,11 +426,13 @@ export const SENSITIVITY_LABELS: Record<Sensitivity, string> = {
 /**
  * Dónde anda un envío a taller.
  *
- * El estado no se elige: sale de sumar los retornos de sus renglones, igual
- * que el de una orden de corte sale de sus avances.
+ * "Enviado" y no "en el taller": lo normal es que el taller borde los paneles
+ * y los mande a donde siguen, así que el envío se queda ahí para siempre y eso
+ * es correcto. Los otros tres estados sólo aparecen si alguien captura un
+ * retorno, que es la excepción.
  */
 export const GARMENT_SHIPMENT_STATUS_LABELS: Record<GarmentShipmentStatus, string> = {
-  SENT: "En el taller",
+  SENT: "Enviado",
   PARTIAL: "Regresó a medias",
   CLOSED: "Cerrado",
   CANCELLED: "Cancelado",

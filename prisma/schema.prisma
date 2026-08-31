@@ -764,6 +764,7 @@ model InventoryDocument {
 
   lines       DocumentLine[]
   cutLines    DocumentCutLine[]
+  shipments   GarmentShipment[]
   movements   Movement[]
   attachments Attachment[]
 
@@ -1985,9 +1986,9 @@ model ProcessStage {
 }
 
 enum GarmentShipmentStatus {
-  /// The garments are at the workshop. A shipment is born here and not in a
-  /// draft: the vale gets filled as the bundles go into the truck, and a
-  /// two-step "create then send" only adds a tap to the most repeated action.
+  /// It left. Most shipments stay here forever and that is CORRECT: the shop
+  /// embroiders the panels and forwards them onward, so nothing comes back to
+  /// this warehouse. A return is the exception, not the closing step.
   SENT
   /// Some came back; the rest is still out there.
   PARTIAL
@@ -2020,6 +2021,23 @@ model GarmentShipment {
   dueDate  DateTime?
   closedAt DateTime?
 
+  /// Which PARTS of the garment travel: "tapas y delantero izquierdo".
+  ///
+  /// Free text and optional: what leaves for embroidery is usually a couple of
+  /// panels, not the garment, and naming them is what lets the shop know what
+  /// it received. Optional because it is often written in the voucher notes
+  /// instead, and forcing it twice would only get it typed wrong once.
+  parts String?
+
+  /// The issue voucher this shipment produced.
+  ///
+  /// The paper already existed before this feature and was captured by hand;
+  /// generating it from here is what stops the same breakdown from being typed
+  /// twice. SetNull and not Cascade: deleting the voucher must never erase the
+  /// record of what left the building.
+  documentId String?
+  document   InventoryDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
   /// The workshop's own paper number, when they hand one back.
   reference String?
   notes     String?
@@ -2037,6 +2055,7 @@ model GarmentShipment {
   @@index([orderId])
   @@index([workshopId, status])
   @@index([stageId])
+  @@index([documentId])
   @@map("garment_shipments")
 }
 
