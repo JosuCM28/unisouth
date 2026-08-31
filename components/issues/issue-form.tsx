@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchSelect } from "@/components/shared/search-select";
 import { ApplicableRules } from "@/components/rules/applicable-rules";
 import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
+import { IssueLotCorrectDialog } from "./issue-lot-correct-dialog";
 import { IssueRunningTotal } from "./issue-running-total";
 import {
   IssueCutTable,
@@ -107,6 +108,15 @@ interface Props {
   productionRuns: { id: string; code: string; name: string | null }[];
   /** Presente = se está corrigiendo un borrador, no creando uno nuevo. */
   document?: EditableIssue;
+  /**
+   * Si quien tiene la pantalla abierta puede ajustar saldos.
+   *
+   * Corregir el metraje de un rollo es un reconteo, y eso exige
+   * `inventory:adjust`, no el `inventory:write` que basta para armar el vale.
+   * Dirección tiene lo segundo y no lo primero, así que el botón se le
+   * esconde en vez de dejarlo tocar algo que el servidor va a rechazar.
+   */
+  canAdjust?: boolean;
 }
 
 /** Un renglón ya armado: el rollo concreto y cuánto se le quita. */
@@ -139,6 +149,7 @@ export function IssueForm({
   clients,
   productionRuns,
   document,
+  canAdjust = false,
 }: Props) {
   const router = useRouter();
   const isEditing = Boolean(document);
@@ -286,6 +297,34 @@ export function IssueForm({
 
   function removeLine(index: number) {
     setLines((current) => current.filter((_, position) => position !== index));
+  }
+
+  /**
+   * El rollo se acaba de recontar: el renglón se pone al día con lo que de
+   * verdad quedó.
+   *
+   * La cantidad a surtir se reajusta sólo si se había quedado por encima de
+   * lo que hay. Si el auxiliar ya había tecleado menos —está sacando un
+   * pedazo, no el rollo entero— pisarle el número le borraría la captura.
+   */
+  function handleCorrected(
+    index: number,
+    corrected: { available: number; unit: Unit },
+  ) {
+    setLines((current) =>
+      current.map((line, position) => {
+        if (position !== index) return line;
+
+        const excedia = Number(line.quantity) > corrected.available;
+
+        return {
+          ...line,
+          available: corrected.available,
+          unit: corrected.unit,
+          quantity: excedia ? String(corrected.available) : line.quantity,
+        };
+      }),
+    );
   }
 
   /**
@@ -577,6 +616,8 @@ export function IssueForm({
         totals={totals}
         onChangeQuantity={updateQuantity}
         onRemove={removeLine}
+        onCorrected={handleCorrected}
+        canAdjust={canAdjust}
       />
 
       <div className="flat-surface flex flex-col gap-2 p-4">
@@ -706,10 +747,22 @@ interface LinesProps {
   totals: IssueTotals;
   onChangeQuantity: (index: number, value: string) => void;
   onRemove: (index: number) => void;
+  onCorrected: (
+    index: number,
+    corrected: { available: number; unit: Unit },
+  ) => void;
+  canAdjust: boolean;
 }
 
 /** Los renglones del vale, cada uno con su rollo y su cantidad. */
-function IssueLines({ lines, totals, onChangeQuantity, onRemove }: LinesProps) {
+function IssueLines({
+  lines,
+  totals,
+  onChangeQuantity,
+  onRemove,
+  onCorrected,
+  canAdjust,
+}: LinesProps) {
   if (lines.length === 0) {
     return (
       <div className="flat-surface p-6 text-center">
@@ -745,6 +798,8 @@ function IssueLines({ lines, totals, onChangeQuantity, onRemove }: LinesProps) {
             index={index}
             onChangeQuantity={onChangeQuantity}
             onRemove={onRemove}
+            onCorrected={onCorrected}
+            canAdjust={canAdjust}
           />
         ))}
       </ul>
@@ -757,6 +812,11 @@ interface LineRowProps {
   index: number;
   onChangeQuantity: (index: number, value: string) => void;
   onRemove: (index: number) => void;
+  onCorrected: (
+    index: number,
+    corrected: { available: number; unit: Unit },
+  ) => void;
+  canAdjust: boolean;
 }
 
 function IssueLineRow({
@@ -764,6 +824,8 @@ function IssueLineRow({
   index,
   onChangeQuantity,
   onRemove,
+  onCorrected,
+  canAdjust,
 }: LineRowProps) {
   const excede = Number(line.quantity) > line.available;
   const unitLabel = UNIT_SHORT_LABELS[line.unit];
@@ -780,16 +842,30 @@ function IssueLineRow({
           </p>
         </div>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => onRemove(index)}
-          aria-label={`Quitar ${line.lotCode}`}
-          className="touch-target shrink-0"
-        >
-          <Trash2 className="size-4" aria-hidden />
-        </Button>
+        <div className="flex shrink-0 items-center">
+          {/* Va junto a quitar porque se usa en el mismo momento: con el rollo
+              en la mano, al descubrir que no mide lo que dice el sistema. */}
+          {canAdjust && (
+            <IssueLotCorrectDialog
+              lotId={line.lotId}
+              lotCode={line.lotCode}
+              available={line.available}
+              unit={line.unit}
+              onCorrected={(corrected) => onCorrected(index, corrected)}
+            />
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onRemove(index)}
+            aria-label={`Quitar ${line.lotCode}`}
+            className="touch-target shrink-0"
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -814,7 +890,11 @@ function IssueLineRow({
 
       {excede && (
         <p className="text-xs text-destructive">
-          Excede lo disponible en este rollo.
+          Excede lo disponible en este rollo. El vale no se puede aplicar por
+          encima del saldo
+          {canAdjust
+            ? ": si el rollo mide más de lo que dice el sistema, corrígelo con la regla de arriba."
+            : "; pide que recuenten el rollo si mide más de lo que dice el sistema."}
         </p>
       )}
     </li>

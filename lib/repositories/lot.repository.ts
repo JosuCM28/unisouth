@@ -257,6 +257,37 @@ export class LotRepository extends BaseRepository<
   }
 
   /**
+   * El estado del rollo para corregirlo: su saldo y si aún admite cambio de
+   * unidad.
+   *
+   * La unidad sólo se puede corregir mientras el rollo no tenga más
+   * movimiento que su entrada inicial, así que la respuesta depende del
+   * kárdex y no del rollo. Se resuelve aquí, en una consulta, para que la
+   * pantalla lo sepa ANTES de ofrecer el campo: enterarse de que no se puede
+   * hasta después de teclear el motivo es peor que no ofrecerlo.
+   */
+  async findForCorrection(id: string) {
+    const lot = await this.db.lot.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        unit: true,
+        currentQuantity: true,
+        reservedQuantity: true,
+        material: { select: { name: true } },
+        _count: {
+          select: { movements: { where: { type: { not: "RECEIPT_INITIAL" } } } },
+        },
+      },
+    });
+
+    if (!lot) throw new NotFoundError("el rollo", id);
+
+    return lot;
+  }
+
+  /**
    * Rollos de los que se puede surtir, en el orden en que deben ofrecerse.
    *
    * El orden NO es cosmético:

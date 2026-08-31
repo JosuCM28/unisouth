@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { getIssueFormOptions, FACTORY_OWNER } from "@/lib/issue-form-options";
 import { PageHeader } from "@/components/layout/page-header";
 import { IssueForm } from "@/components/issues/issue-form";
@@ -23,7 +24,12 @@ export const metadata: Metadata = { title: "Editar salida" };
  * ficha, donde las acciones disponibles son imprimir y cancelar.
  */
 export default async function EditIssuePage({ params }: PageProps) {
-  await requirePermission("inventory:write");
+  const user = await requirePermission("inventory:write");
+
+  /* Corregir el metraje de un rollo desde el vale es un reconteo, y eso pesa
+     más que armar la salida: se resuelve aquí, en el servidor, y el
+     formulario sólo recibe el sí o el no. */
+  const canAdjust = roleHasPermission(user.role, "inventory:adjust");
 
   const { id } = await params;
 
@@ -118,6 +124,7 @@ export default async function EditIssuePage({ params }: PageProps) {
         clients={options.clients}
         productionRuns={options.productionRuns}
         document={editable}
+        canAdjust={canAdjust}
       />
     </div>
   );

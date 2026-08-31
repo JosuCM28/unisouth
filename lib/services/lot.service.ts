@@ -201,6 +201,14 @@ export class LotService extends BaseService {
 
       const current = round4(Number(lot.currentQuantity));
       const counted = round4(input.countedQuantity);
+
+      /* Corregir la UNIDAD es otro problema que corregir la cantidad: no es
+         una diferencia contra el saldo, es que el saldo entero estaba escrito
+         en la medida equivocada. Se atiende aparte. */
+      if (input.unit && input.unit !== lot.unit) {
+        return this.recountIntoNewUnit(tx, lot, counted, input);
+      }
+
       const difference = round4(counted - current);
 
       // Coincide con el sistema: no hay nada que ajustar, sólo se deja
@@ -375,6 +383,95 @@ export class LotService extends BaseService {
 
       return cancelled;
     });
+  }
+
+  /**
+   * Reconteo que además corrige la unidad del rollo.
+   *
+   * Sólo mientras el rollo no tenga más movimiento que su entrada inicial. Un
+   * rollo que ya surtió tela lleva salidas escritas en la unidad vieja, y
+   * cambiársela dejaría su kárdex sumando metros con kilos: la columna de
+   * saldo dejaría de significar algo y no habría forma de repararla, porque
+   * los movimientos no se reescriben.
+   *
+   * Justamente por eso el movimiento viejo NO se toca. Se cierra el saldo en
+   * la unidad equivocada con un ISSUE_ADJUSTMENT y se vuelve a abrir en la
+   * buena con un RECEIPT_ADJUSTMENT. Así cada unidad cuadra por separado y en
+   * el kárdex queda escrito que hubo una corrección de captura, que es lo que
+   * de verdad pasó, y no una entrada de material que nadie recibió.
+   */
+  private async recountIntoNewUnit(
+    tx: PrismaExecutor,
+    lot: Lot,
+    counted: number,
+    input: RecountLotInput,
+  ): Promise<RecountResult> {
+    const moved = await tx.movement.count({
+      where: { lotId: lot.id, type: { not: "RECEIPT_INITIAL" } },
+    });
+
+    if (moved > 0) {
+      throw new BusinessRuleError(
+        `El rollo ${lot.code} ya tiene movimientos registrados en ${lot.unit}: su unidad ya no se puede cambiar sin descuadrar el kárdex. Recuéntalo en su unidad actual, o cancélalo y regístralo de nuevo con la correcta.`,
+      );
+    }
+
+    const current = round4(Number(lot.currentQuantity));
+
+    // Cierra el saldo en la unidad equivocada.
+    if (current > 0) {
+      await this.inventory.applyMovementWithin(tx, {
+        lotId: lot.id,
+        type: "ISSUE_ADJUSTMENT",
+        quantity: current,
+        reason: input.reason,
+      });
+    }
+
+    await tx.lot.update({
+      where: { id: lot.id },
+      data: {
+        unit: input.unit,
+        /* La cantidad inicial también estaba en la unidad equivocada: dejarla
+           haría que la ficha dijera "3 kg de 3 m". Se puede reescribir porque
+           no es kárdex —el kárdex son los Movement— y este rollo todavía no
+           tiene historia que contradecir. */
+        initialQuantity: counted,
+      },
+    });
+
+    // Y lo vuelve a abrir en la buena.
+    const movement =
+      counted > 0
+        ? await this.inventory.applyMovementWithin(tx, {
+            lotId: lot.id,
+            type: "RECEIPT_ADJUSTMENT",
+            quantity: counted,
+            reason: input.reason,
+          })
+        : null;
+
+    const verified = await tx.lot.update({
+      where: { id: lot.id },
+      data: {
+        verified: true,
+        verifiedAt: new Date(),
+        measurementSource: input.measurementSource,
+      },
+    });
+
+    await this.auditWith(tx).record({
+      entity: "Lot",
+      entityId: lot.id,
+      action: "UPDATE",
+      reference: movement?.code ?? lot.code,
+      oldValue: { unit: lot.unit, currentQuantity: current },
+      newValue: { unit: input.unit, currentQuantity: counted },
+      sensitivity: "HIGH",
+      reason: input.reason,
+    });
+
+    return { lot: verified, difference: round4(counted - current), movement };
   }
 
   private async requireLot(tx: PrismaExecutor, lotId: string): Promise<Lot> {

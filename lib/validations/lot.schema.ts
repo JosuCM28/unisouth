@@ -84,6 +84,16 @@ export const recountLotSchema = z.object({
     .refine((value) => Number.isFinite(value), "Escribe un número válido")
     .refine((value) => value >= 0, "La cantidad no puede ser negativa"),
   reason: requiredText("El motivo", 500),
+  /**
+   * La unidad REAL del rollo, cuando lo que se capturó mal fue eso.
+   *
+   * Opcional porque el reconteo normal no la toca. Sólo se acepta mientras el
+   * rollo no tenga más movimiento que su entrada inicial: cada `Movement`
+   * guarda la unidad con la que se registró, y cambiarla con salidas ya hechas
+   * dejaría un kárdex que suma metros con kilos. Esa regla la exige el
+   * servicio, que es quien puede ver el historial.
+   */
+  unit: z.nativeEnum(Unit).optional(),
   measurementSource: z
     .nativeEnum(MeasurementSource)
     .default(MeasurementSource.MEASURED),

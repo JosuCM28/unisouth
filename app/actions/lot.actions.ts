@@ -1,6 +1,10 @@
 "use server";
 
+import { z } from "zod";
+import type { Unit } from "@prisma/client";
 import { executeAction } from "@/lib/core/action-handler";
+import { cuidSchema } from "@/lib/validations/common";
+import { LotRepository } from "@/lib/repositories/lot.repository";
 import {
   cancelLotSchema,
   createLotSchema,
@@ -56,10 +60,48 @@ export async function recountLotAction(input: unknown) {
   return executeAction(input, {
     schema: recountLotSchema,
     permission: "inventory:adjust",
-    revalidate: REVALIDATE,
+    /* También /issues y /movements: el reconteo se dispara desde el vale de
+       salida, y el ajuste que genera tiene que aparecer en el kárdex sin que
+       nadie recargue a mano. */
+    revalidate: [...REVALIDATE, "/issues", "/movements"],
     successMessage: "Reconteo aplicado",
     handler: ({ input, auditContext }) =>
       new LotService(auditContext).recount(input),
+  });
+}
+
+/**
+ * Lo que hay que saber de un rollo para corregirlo desde otra pantalla.
+ *
+ * Es de lectura y por eso pide `inventory:read`: enseñar el saldo no es
+ * ajustarlo. El reconteo en sí sigue exigiendo `inventory:adjust`.
+ */
+export interface LotCorrectionInfo {
+  code: string;
+  materialName: string;
+  unit: Unit;
+  currentQuantity: number;
+  reservedQuantity: number;
+  /** Falso en cuanto el rollo tiene una salida o un ajuste encima. */
+  canChangeUnit: boolean;
+}
+
+export async function lotCorrectionInfoAction(input: unknown) {
+  return executeAction(input, {
+    schema: z.object({ lotId: cuidSchema }),
+    permission: "inventory:read",
+    handler: async ({ input }): Promise<LotCorrectionInfo> => {
+      const lot = await new LotRepository().findForCorrection(input.lotId);
+
+      return {
+        code: lot.code,
+        materialName: lot.material.name,
+        unit: lot.unit,
+        currentQuantity: Number(lot.currentQuantity),
+        reservedQuantity: Number(lot.reservedQuantity),
+        canChangeUnit: lot._count.movements === 0,
+      };
+    },
   });
 }
 

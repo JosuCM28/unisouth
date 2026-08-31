@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { getIssueFormOptions } from "@/lib/issue-form-options";
 import { PageHeader } from "@/components/layout/page-header";
 import { IssueForm } from "@/components/issues/issue-form";
@@ -12,7 +13,12 @@ export default async function NewIssuePage() {
   // Ocultar el enlace es comodidad visual, no seguridad: el registro de
   // salidas lo ven los roles de sólo lectura y desde ahí se alcanza esta
   // ruta escribiéndola. La barrera real es ésta.
-  await requirePermission("inventory:write");
+  const user = await requirePermission("inventory:write");
+
+  /* Corregir el metraje de un rollo desde el vale es un reconteo, y eso pesa
+     más que armar la salida: se resuelve aquí, en el servidor, y el
+     formulario sólo recibe el sí o el no. */
+  const canAdjust = roleHasPermission(user.role, "inventory:adjust");
 
   const options = await getIssueFormOptions();
 
@@ -39,6 +45,7 @@ export default async function NewIssuePage() {
         cutTags={options.cutTags}
         clients={options.clients}
         productionRuns={options.productionRuns}
+        canAdjust={canAdjust}
       />
     </div>
   );
