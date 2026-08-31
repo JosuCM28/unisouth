@@ -57,6 +57,7 @@ export default async function EditOrderPage({ params }: PageProps) {
     },
     lines: order.lines.map((line) => ({
       key: line.id,
+      id: line.id,
       sizeId: line.sizeId,
       orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",

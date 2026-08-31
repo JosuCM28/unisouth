@@ -4,6 +4,11 @@ import { cuidSchema, localDate, optionalCuid, optionalText } from "./common";
 
 /** Un renglón: una talla y cuántas piezas pidieron de ella. */
 export const cuttingOrderLineSchema = z.object({
+  /* Sólo viene en un renglón que YA existe en la base. Ahora que una talla se
+     puede repetir en varios renglones, `sizeId` dejó de identificar cuál es
+     cuál: sin este id, dos renglones de la 38 se confundirían al corregir la
+     orden y uno se pisaría con los datos del otro. */
+  id: optionalCuid,
   sizeId: cuidSchema,
   orderedQuantity: z.coerce
     .number({ message: "Escribe cuántas piezas" })

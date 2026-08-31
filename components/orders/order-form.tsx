@@ -47,6 +47,10 @@ export interface TagOption {
 /** Un renglón a medio teclear: talla y cuántas piden. */
 interface LineDraft {
   key: string;
+  /* Id real del renglón en la base, sólo si ya existe. Ahora que la misma
+     talla puede repetirse en dos renglones, es lo único que distingue "cuál
+     de los dos" al guardar una corrección. */
+  id?: string;
   sizeId: string;
   orderedQuantity: string;
   tagId: string;
@@ -182,22 +186,17 @@ export function OrderForm({
     setLines((current) => current.filter((item) => item.key !== key));
   }
 
-  // Las tallas ya usadas no se vuelven a ofrecer: dos renglones de la misma
-  // talla en una orden son un error de captura, no un caso real.
-  function optionsFor(currentSizeId: string) {
-    const used = new Set(
-      lines.map((line) => line.sizeId).filter((id) => id !== currentSizeId),
-    );
-
-    return sizes
-      .filter((size) => !used.has(size.id))
-      .map((size) => ({
-        value: size.id,
-        label: size.code,
-        hint: size.name,
-        keywords: size.group ?? undefined,
-      }));
-  }
+  /* Una talla SE PUEDE repetir entre renglones. El cliente puede pedir la
+     misma talla con distinto foleo o en dos remesas, y eso son dos renglones
+     con la misma talla porque cada uno lleva su propio dato. Filtrar las
+     tallas ya usadas obligaba a sumarlas a mano en un solo renglón, que es
+     justo lo que el papel nunca exigió. */
+  const sizeOptions = sizes.map((size) => ({
+    value: size.id,
+    label: size.code,
+    hint: size.name,
+    keywords: size.group ?? undefined,
+  }));
 
   const total = lines.reduce(
     (sum, line) => sum + (Number(line.orderedQuantity) || 0),
@@ -251,6 +250,7 @@ export function OrderForm({
       cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
       lines: valid.map((line) => ({
+        id: line.id,
         sizeId: line.sizeId,
         orderedQuantity: Number(line.orderedQuantity),
         tagId: line.tagId || undefined,
@@ -382,7 +382,7 @@ export function OrderForm({
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
                   <SearchSelect
-                    options={optionsFor(line.sizeId)}
+                    options={sizeOptions}
                     value={line.sizeId}
                     onChange={(value) => updateLine(line.key, { sizeId: value })}
                     placeholder="Talla"

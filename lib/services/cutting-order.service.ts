@@ -90,11 +90,14 @@ export class CuttingOrderService extends BaseService {
       const withProgress = current.lines.filter(
         (line) => line._count.progress > 0,
       );
-      const keptSizeIds = new Set(withProgress.map((line) => line.sizeId));
+      /* Se empareja por `id`, no por `sizeId`: una talla ahora puede repetirse
+         en dos renglones, así que el tamaño ya no identifica cuál renglón es
+         cuál. El id es el único dato que sigue siendo único por fila. */
+      const keptIds = new Set(withProgress.map((line) => line.id));
 
       const removed = input.lines.length
         ? withProgress.filter(
-            (line) => !input.lines.some((next) => next.sizeId === line.sizeId),
+            (line) => !input.lines.some((next) => next.id === line.id),
           )
         : withProgress;
 
@@ -107,13 +110,13 @@ export class CuttingOrderService extends BaseService {
       // Los renglones sin avance se borran y se recrean; los que ya llevan
       // corte sólo se actualizan, conservando su historial.
       await tx.cuttingOrderLine.deleteMany({
-        where: { orderId: id, sizeId: { notIn: [...keptSizeIds] } },
+        where: { orderId: id, id: { notIn: [...keptIds] } },
       });
 
       for (const [index, line] of input.lines.entries()) {
-        const existing = withProgress.find(
-          (kept) => kept.sizeId === line.sizeId,
-        );
+        const existing = line.id
+          ? withProgress.find((kept) => kept.id === line.id)
+          : undefined;
 
         if (existing) {
           await tx.cuttingOrderLine.update({
