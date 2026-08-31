@@ -18,6 +18,7 @@ import {
 } from "@/lib/utils";
 import { Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { ExportButton } from "@/components/shared/export-button";
 import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
 import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
@@ -148,6 +149,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   Imprimir
                 </a>
               </Button>
+              {/* La misma hoja que Imprimir, pero en Excel: es lo que se
+                  manda por correo sin tener que escanear el papel. Va
+                  `exact` porque los filtros de la lista no significan nada
+                  dentro de una orden. */}
+              <ExportButton
+                href={`/api/export/orders/${order.id}`}
+                label="Excel"
+                exact
+              />
               <Button asChild variant="outline" className="touch-target">
                 <Link href={`/orders/${order.id}/edit`}>
                   <Pencil className="size-4" aria-hidden />

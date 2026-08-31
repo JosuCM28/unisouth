@@ -21,7 +21,7 @@ import { todayInputValue } from "@/lib/utils";
  */
 
 /** Cómo se escribe una celda en la hoja. */
-export type CellKind = "text" | "number" | "date";
+export type CellKind = "text" | "number" | "date" | "datetime";
 
 export interface XlsxColumn<T> {
   header: string;
@@ -87,6 +87,7 @@ function excelSerialDate(date: Date): number {
 const STYLE_HEADER = 1;
 const STYLE_DATE = 2;
 const STYLE_NUMBER = 3;
+const STYLE_DATETIME = 4;
 
 function renderCell(
   reference: string,
@@ -99,6 +100,13 @@ function renderCell(
 
   if (kind === "date" && value instanceof Date) {
     return `<c r="${reference}" s="${STYLE_DATE}"><v>${excelSerialDate(value)}</v></c>`;
+  }
+
+  /* La hora importa en una bitácora: dos avances del mismo día se ven iguales
+     con formato de fecha corta y se pierde el orden entre ellos, que es justo
+     lo que se va a revisar. El número de serie es el mismo; cambia el formato. */
+  if (kind === "datetime" && value instanceof Date) {
+    return `<c r="${reference}" s="${STYLE_DATETIME}"><v>${excelSerialDate(value)}</v></c>`;
   }
 
   if (kind === "number") {
@@ -198,11 +206,12 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <border><left/><right/><top/><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="4">
+<cellXfs count="5">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
 <xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 </cellXfs>
 </styleSheet>`;
 
