@@ -88,6 +88,16 @@ const STYLE_HEADER = 1;
 const STYLE_DATE = 2;
 const STYLE_NUMBER = 3;
 const STYLE_DATETIME = 4;
+const STYLE_INTEGER = 5;
+const STYLE_TITLE = 6;
+const STYLE_TITLE_RIGHT = 7;
+const STYLE_BOLD = 8;
+const STYLE_SECTION = 9;
+const STYLE_TABLE_HEADER = 10;
+const STYLE_TABLE_HEADER_RIGHT = 11;
+const STYLE_TOTAL = 12;
+const STYLE_TOTAL_NUMBER = 13;
+const STYLE_RIGHT = 14;
 
 function renderCell(
   reference: string,
@@ -115,7 +125,12 @@ function renderCell(
        como error; es preferible dejarla caer a texto y que se lea el valor
        original, que al menos dice qué se capturó. */
     if (Number.isFinite(numeric)) {
-      return `<c r="${reference}" s="${STYLE_NUMBER}"><v>${numeric}</v></c>`;
+      /* Entero y decimal llevan formato DISTINTO. Con `#,##0.##` para todo,
+         Excel le deja el punto colgando a los enteros —610 se lee "610."— y
+         una columna de piezas sale entera así. Las piezas se cuentan enteras
+         y los metros no, y cada uno necesita el suyo. */
+      const style = Number.isInteger(numeric) ? STYLE_INTEGER : STYLE_NUMBER;
+      return `<c r="${reference}" s="${style}"><v>${numeric}</v></c>`;
     }
   }
 
@@ -184,34 +199,50 @@ function buildSheet<T>(rows: T[], columns: XlsxColumn<T>[]): string {
 /**
  * Los estilos del libro.
  *
- * Tres nada más: encabezado en negritas sobre gris, fecha y número con
- * separador de miles. El formato 14 es el de fecha corta LOCAL, así que
- * respeta la configuración de quien abre el archivo en vez de imponerle el
- * orden mexicano a una máquina en inglés.
+ * Los de la tabla —encabezado en negritas sobre gris, fecha, número— y los
+ * que necesita una hoja con forma de documento: título, encabezado de
+ * sección, encabezado de tabla y renglón de totales.
+ *
+ * El formato 14 es el de fecha corta LOCAL y el 22 el de fecha con hora, así
+ * que respetan la configuración de quien abre el archivo en vez de imponerle
+ * el orden mexicano a una máquina en inglés.
  */
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.##"/></numFmts>
-<fonts count="2">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.##"/><numFmt numFmtId="165" formatCode="#,##0"/></numFmts>
+<fonts count="3">
 <font><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="14"/><name val="Calibri"/></font>
 </fonts>
 <fills count="3">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
-<borders count="2">
+<borders count="4">
 <border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left/><right/><top/><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border>
+<border><left/><right/><top/><bottom style="medium"><color rgb="FF0F172A"/></bottom><diagonal/></border>
+<border><left/><right/><top style="thin"><color rgb="FF0F172A"/></top><bottom/><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5">
+<cellXfs count="15">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
 <xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1"/>
+<xf numFmtId="165" fontId="1" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right"/></xf>
 </cellXfs>
 </styleSheet>`;
 
@@ -225,6 +256,11 @@ export function toXlsx<T>(
   columns: XlsxColumn<T>[],
   tabName = "Datos",
 ): Buffer {
+  return packageWorkbook(buildSheet(rows, columns), tabName);
+}
+
+/** Mete la hoja en el .xlsx. Lo de alrededor es igual para toda hoja. */
+function packageWorkbook(sheetXml: string, tabName: string): Buffer {
   return createZip([
     {
       name: "[Content_Types].xml",
@@ -260,8 +296,134 @@ export function toXlsx<T>(
 </Relationships>`,
     },
     { name: "xl/styles.xml", content: STYLES_XML },
-    { name: "xl/worksheets/sheet1.xml", content: buildSheet(rows, columns) },
+    { name: "xl/worksheets/sheet1.xml", content: sheetXml },
   ]);
+}
+
+/** Estilos con nombre para una hoja con forma de documento. */
+export type SheetStyle =
+  | "title"
+  | "titleRight"
+  | "right"
+  | "label"
+  | "section"
+  | "tableHeader"
+  | "tableHeaderRight"
+  | "total"
+  | "totalNumber";
+
+const SHEET_STYLES: Record<SheetStyle, number> = {
+  title: STYLE_TITLE,
+  titleRight: STYLE_TITLE_RIGHT,
+  right: STYLE_RIGHT,
+  label: STYLE_BOLD,
+  section: STYLE_SECTION,
+  tableHeader: STYLE_TABLE_HEADER,
+  tableHeaderRight: STYLE_TABLE_HEADER_RIGHT,
+  total: STYLE_TOTAL,
+  totalNumber: STYLE_TOTAL_NUMBER,
+};
+
+export interface SheetCell {
+  /** Columna 1-based. Sin ella, la siguiente a la de la celda anterior. */
+  at?: number;
+  value?: string | number | Date | null;
+  kind?: CellKind;
+  style?: SheetStyle;
+}
+
+/** Un renglón del documento. Vacío = renglón en blanco, que separa bloques. */
+export type SheetRow = SheetCell[];
+
+/**
+ * Una hoja con forma de DOCUMENTO, no de tabla.
+ *
+ * `toXlsx` sirve para una lista: una rejilla con su encabezado, su filtro y su
+ * panel congelado, que es lo que se quiere para pivotear. Pero un vale o una
+ * orden no son una lista —son una hoja con bloques: un título, unos datos
+ * apareados, una tabla con su total y una bitácora abajo— y aplanarlos a
+ * rejilla obliga a inventar una columna "Sección" que en el papel no existe.
+ *
+ * Aquí cada renglón dice qué celdas lleva y en qué columna, así que la hoja
+ * sale con la misma forma con la que se imprime.
+ *
+ * No lleva autofiltro ni panel congelado a propósito: filtrar un documento por
+ * una de sus columnas lo desarma.
+ */
+export function toXlsxDocument(
+  rows: SheetRow[],
+  widths: number[],
+  tabName = "Datos",
+): Buffer {
+  return packageWorkbook(buildDocumentSheet(rows, widths), tabName);
+}
+
+function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
+  const cols = widths
+    .map(
+      (width, index) =>
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+    )
+    .join("");
+
+  const body = rows
+    .map((cells, rowIndex) => {
+      const reference = rowIndex + 1;
+      if (cells.length === 0) return `<row r="${reference}"/>`;
+
+      let column = 0;
+      const rendered = cells
+        .map((cell) => {
+          column = cell.at ?? column + 1;
+          return renderSheetCell(`${columnName(column)}${reference}`, cell);
+        })
+        .join("");
+
+      return `<row r="${reference}">${rendered}</row>`;
+    })
+    .join("");
+
+  const lastColumn = columnName(Math.max(widths.length, 1));
+  const lastRow = Math.max(rows.length, 1);
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<dimension ref="A1:${lastColumn}${lastRow}"/>
+<sheetViews><sheetView workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>${cols}</cols>
+<sheetData>${body}</sheetData>
+</worksheet>`;
+}
+
+/**
+ * Sin estilo se delega en `renderCell`, que ya sabe elegir formato por tipo.
+ * Con estilo manda el estilo: el renglón de totales va en negritas aunque la
+ * celda sea un número, y ese estilo ya trae su propio formato numérico.
+ */
+function renderSheetCell(reference: string, cell: SheetCell): string {
+  const kind = cell.kind ?? "text";
+  if (!cell.style) return renderCell(reference, cell.value, kind);
+
+  const style = SHEET_STYLES[cell.style];
+  const { value } = cell;
+
+  if (value === null || value === undefined || value === "") {
+    return `<c r="${reference}" s="${style}"/>`;
+  }
+
+  if (value instanceof Date) {
+    return `<c r="${reference}" s="${style}"><v>${excelSerialDate(value)}</v></c>`;
+  }
+
+  if (kind === "number") {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      return `<c r="${reference}" s="${style}"><v>${numeric}</v></c>`;
+    }
+  }
+
+  return `<c r="${reference}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(String(value))}</t></is></c>`;
 }
 
 /** Respuesta de descarga con el nombre y la fecha del día. */

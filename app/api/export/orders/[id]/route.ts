@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
 import {
-  toXlsxWithNotice,
+  toXlsxDocument,
   xlsxResponse,
-  type XlsxColumn,
+  type SheetRow,
 } from "@/lib/export/xlsx";
 import {
   CUT_VERSION_LABELS,
@@ -14,52 +14,34 @@ import {
 import { cutProgress, formatDate } from "@/lib/utils";
 
 /**
- * Una orden en Excel, con la MISMA estructura de la hoja impresa.
+ * Una orden en Excel, con la misma forma de la hoja impresa.
  *
  * No es el reporte de órdenes: aquél lleva una fila por talla de muchas
- * órdenes para pivotear. Éste es UNA orden completa —encabezado, notas del
- * corte, desglose por talla e historial—, que es lo que se manda por correo a
- * quien pregunta por su trabajo. Hasta ahora la única forma de darlo era
- * imprimir la hoja y escanearla.
+ * órdenes para pivotear. Éste es UNA orden completa —título, datos, desglose
+ * por talla con su total e historial— porque es lo que se manda por correo a
+ * quien pregunta por su trabajo, y antes había que imprimir y escanear.
  *
- * Las secciones caben en una sola tabla porque Excel abre UN archivo. La
- * columna "Sección" las separa: se filtra por ella para quedarse con el
- * desglose, o se deja completa para leerla como la hoja de papel.
+ * Se escribe como documento y no como tabla: una hoja con bloques aplanada a
+ * rejilla obliga a inventar una columna "Sección" que en el papel no existe, y
+ * quien la abre ya no reconoce el vale que tiene en la mano.
+ *
+ * Las dos tablas comparten la rejilla porque en una hoja las columnas son las
+ * mismas para todo. El ancho se elige para que sirva a las dos:
+ *
+ *   A            B         C        D         E       F
+ *   Talla        Foleo     Pedidas  Cortadas  Faltan  Sobran
+ *   Fecha        Talla     Piezas   Quién     Notas
  */
-interface Row {
-  section: string;
-  concept: string;
-  detail: string;
-  /* Sólo la usa el historial. Va como fecha de verdad y no como texto para
-     poder ordenar por ella, que es para lo que se abre el historial. */
-  date: Date | null;
-  ordered: number | "";
-  cut: number | "";
-  pending: number | "";
-  surplus: number | "";
-  /* El avance de UN registro, con signo. Va aparte de "Cortadas" a propósito:
-     el historial de una talla suma exactamente su acumulado, así que en la
-     misma columna el total de la hoja saldría al doble. */
-  delta: number | "";
-  who: string;
-  notes: string;
-}
+const WIDTHS = [24, 22, 12, 16, 18, 12];
 
-const COLUMNS: XlsxColumn<Row>[] = [
-  { header: "Sección", value: (r) => r.section, width: 22 },
-  { header: "Concepto", value: (r) => r.concept, width: 26 },
-  { header: "Detalle", value: (r) => r.detail, width: 32 },
-  { header: "Fecha", value: (r) => r.date, kind: "datetime", width: 18 },
-  { header: "Pedidas", value: (r) => r.ordered, kind: "number" },
-  { header: "Cortadas", value: (r) => r.cut, kind: "number" },
-  { header: "Faltan", value: (r) => r.pending, kind: "number" },
-  { header: "Sobran", value: (r) => r.surplus, kind: "number" },
-  { header: "Avance", value: (r) => r.delta, kind: "number" },
-  { header: "Quién", value: (r) => r.who, width: 20 },
-  { header: "Notas", value: (r) => r.notes, width: 34 },
-];
+/** Columnas, por nombre, para no contar posiciones al leer el armado. */
+const A = 1;
+const B = 2;
+const C = 3;
+const D = 4;
+const E = 5;
+const F = 6;
 
-/** Lo que la hoja necesita de la orden. Prisma devuelve más; sobra y no estorba. */
 interface OrderSheet {
   code: string;
   status: CuttingOrderStatus;
@@ -67,10 +49,12 @@ interface OrderSheet {
   dueDate: Date | null;
   description: string | null;
   reference: string | null;
+  notes: string | null;
   cutFabricText: string | null;
   cutPattern: string | null;
   cutVersion: CutVersion | null;
   cutVersionNotes: string | null;
+  cutNotes: string[];
   client: { name: string } | null;
   material: { code: string; name: string } | null;
   productionRun: { code: string; name: string | null } | null;
@@ -89,23 +73,6 @@ interface Line {
     createdAt: Date;
     user: { name: string } | null;
   }[];
-}
-
-/** Fila vacía salvo lo que se le pase. Evita repetir once campos por renglón. */
-function row(partial: Partial<Row> & { section: string }): Row {
-  return {
-    concept: "",
-    detail: "",
-    date: null,
-    ordered: "",
-    cut: "",
-    pending: "",
-    surplus: "",
-    delta: "",
-    who: "",
-    notes: "",
-    ...partial,
-  };
 }
 
 export async function GET(
@@ -141,33 +108,31 @@ export async function GET(
 
   if (!order) return new Response("Orden no encontrada", { status: 404 });
 
-  const rows: Row[] = [
+  const rows: SheetRow[] = [
     ...headerRows(order),
     ...cutNoteRows(order.cutNotes),
     ...sizeRows(order.lines),
     ...historyRows(order.lines),
-    ...orderNoteRows(order.notes),
+    ...notesRows(order.notes),
   ];
 
   return xlsxResponse(
-    toXlsxWithNotice(rows, COLUMNS, "Orden"),
+    toXlsxDocument(rows, WIDTHS, "Orden"),
     `orden-${order.code}`,
   );
 }
 
 /**
- * El encabezado, en el mismo orden en que se lee impreso.
+ * El membrete y los datos apareados, como en la hoja.
  *
- * A diferencia del papel —que esconde los campos vacíos— aquí salen todos con
- * un guion: en una hoja de cálculo la forma estable vale más que la corta,
- * porque quien la recibe compara dos órdenes poniéndolas una junto a otra y
- * los renglones tienen que caer a la misma altura.
+ * Los campos van en dos columnas de "etiqueta: valor" igual que impresos, y a
+ * diferencia del papel —que esconde los vacíos— aquí salen todos con un guion:
+ * en una hoja de cálculo la forma estable vale más que la corta, porque quien
+ * la recibe compara dos órdenes poniéndolas una junto a otra y los renglones
+ * tienen que caer a la misma altura.
  */
-function headerRows(order: OrderSheet): Row[] {
-  const meta: [string, string][] = [
-    ["Folio", order.code],
-    ["Fecha", formatDate(order.orderedAt)],
-    ["Estado", CUTTING_ORDER_STATUS_LABELS[order.status]],
+function headerRows(order: OrderSheet): SheetRow[] {
+  const pairs: [string, string][] = [
     ["Cliente", order.client?.name ?? "Fábrica"],
     ["Descripción", order.description ?? "—"],
     ["Orden del cliente", order.reference ?? "—"],
@@ -176,70 +141,127 @@ function headerRows(order: OrderSheet): Row[] {
       "Material",
       order.material ? `${order.material.code} · ${order.material.name}` : "—",
     ],
+    ["Capturó", order.createdBy?.name ?? "—"],
     [
       "Producción",
       order.productionRun
         ? `${order.productionRun.code} · ${order.productionRun.name ?? ""}`
         : "—",
     ],
-    ["Capturó", order.createdBy?.name ?? "—"],
     ["Tela (a mano)", order.cutFabricText ?? "—"],
     ["Molde", order.cutPattern ?? "—"],
     ["Versión", order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : "—"],
     ["Cambios de la versión", order.cutVersionNotes ?? "—"],
   ];
 
-  return meta.map(([concept, detail]) =>
-    row({ section: "Orden", concept, detail }),
-  );
+  /* De dos en dos, para que se lean en dos columnas como en el papel. El
+     último par puede venir sin pareja y esa mitad se queda vacía. */
+  const grid: SheetRow[] = [];
+
+  for (let index = 0; index < pairs.length; index += 2) {
+    const left = pairs[index];
+    const right = pairs[index + 1];
+    if (!left) continue;
+
+    const row: SheetRow = [
+      { at: A, value: `${left[0]}:`, style: "label" },
+      { at: B, value: left[1] },
+    ];
+
+    if (right) {
+      row.push(
+        { at: D, value: `${right[0]}:`, style: "label" },
+        { at: E, value: right[1] },
+      );
+    }
+
+    grid.push(row);
+  }
+
+  return [
+    [
+      { at: A, value: "UNISOUTH", style: "title" },
+      { at: F, value: order.code, style: "titleRight" },
+    ],
+    [
+      { at: A, value: "Orden de corte" },
+      { at: F, value: formatDate(order.orderedAt), style: "right" },
+    ],
+    [{ at: F, value: CUTTING_ORDER_STATUS_LABELS[order.status], style: "right" }],
+    [],
+    ...grid,
+  ];
 }
 
 /** Numeradas igual que en el papel, para irlas palomeando en el taller. */
-function cutNoteRows(notes: string[]): Row[] {
-  return notes.map((note, index) =>
-    row({ section: "Notas del corte", concept: `${index + 1}.`, detail: note }),
-  );
+function cutNoteRows(notes: string[]): SheetRow[] {
+  if (notes.length === 0) return [];
+
+  return [
+    [],
+    [{ at: A, value: "Notas del corte", style: "section" }],
+    ...notes.map(
+      (note, index): SheetRow => [
+        { at: A, value: `${index + 1}.` },
+        { at: B, value: note },
+      ],
+    ),
+  ];
 }
 
-/** El desglose por talla: la tabla principal de la hoja. */
-function sizeRows(lines: Line[]): Row[] {
-  const rows = lines.map((line) => {
+/** El desglose por talla: la tabla principal, con su total abajo. */
+function sizeRows(lines: Line[]): SheetRow[] {
+  const body = lines.map((line): SheetRow => {
     const { pending, surplus } = cutProgress(
       line.orderedQuantity,
       line.cutQuantity,
     );
 
-    return row({
-      section: "Tallas",
-      concept: line.size.code,
-      detail: line.cutTag?.name ?? "",
-      ordered: line.orderedQuantity,
-      cut: line.cutQuantity,
-      // El cero se deja vacío como en el papel: una columna de ceros esconde
-      // los dos renglones que de verdad deben algo.
-      pending: pending > 0 ? pending : "",
-      surplus: surplus > 0 ? surplus : "",
-      notes: line.notes ?? "",
-    });
+    return [
+      { at: A, value: line.size.code },
+      { at: B, value: line.cutTag?.name ?? "" },
+      { at: C, value: line.orderedQuantity, kind: "number" },
+      { at: D, value: line.cutQuantity, kind: "number" },
+      // Cero se deja vacío como en el papel: una columna de ceros esconde los
+      // dos renglones que de verdad deben algo.
+      { at: E, value: pending > 0 ? pending : "", kind: "number" },
+      { at: F, value: surplus > 0 ? surplus : "", kind: "number" },
+    ];
   });
 
   const ordered = lines.reduce((sum, line) => sum + line.orderedQuantity, 0);
   const cut = lines.reduce((sum, line) => sum + line.cutQuantity, 0);
   const total = cutProgress(ordered, cut);
 
-  /* El total va en su PROPIA sección y no dentro de "Tallas": en el papel es
-     el renglón de abajo, pero en Excel una fila de totales mezclada con los
-     datos se vuelve a sumar sin que nadie lo note. */
   return [
-    ...rows,
-    row({
-      section: "Total",
-      concept: "Total",
-      ordered,
-      cut,
-      pending: total.pending > 0 ? total.pending : "",
-      surplus: total.surplus > 0 ? total.surplus : "",
-    }),
+    [],
+    [
+      { at: A, value: "Talla", style: "tableHeader" },
+      { at: B, value: "Foleo", style: "tableHeader" },
+      { at: C, value: "Pedidas", style: "tableHeaderRight" },
+      { at: D, value: "Cortadas", style: "tableHeaderRight" },
+      { at: E, value: "Faltan", style: "tableHeaderRight" },
+      { at: F, value: "Sobran", style: "tableHeaderRight" },
+    ],
+    ...body,
+    [
+      { at: A, value: "Total", style: "total" },
+      { at: B, value: "", style: "total" },
+      { at: C, value: ordered, kind: "number", style: "totalNumber" },
+      { at: D, value: cut, kind: "number", style: "totalNumber" },
+      {
+        at: E,
+        value: total.pending > 0 ? total.pending : "",
+        kind: "number",
+        style: "totalNumber",
+      },
+      {
+        at: F,
+        value: total.surplus > 0 ? total.surplus : "",
+        kind: "number",
+        style: "totalNumber",
+      },
+    ],
   ];
 }
 
@@ -250,27 +272,44 @@ function sizeRows(lines: Line[]): Row[] {
  * archiva: meses después la pregunta no es "cuántas se cortaron" sino "quién
  * cortó estas y cuándo", y un total no puede responderla.
  */
-function historyRows(lines: Line[]): Row[] {
-  return lines
+function historyRows(lines: Line[]): SheetRow[] {
+  const entries = lines
     .flatMap((line) =>
       line.progress.map((entry) => ({ entry, sizeCode: line.size.code })),
     )
-    .sort((a, b) => a.entry.createdAt.getTime() - b.entry.createdAt.getTime())
-    .map(({ entry, sizeCode }) =>
-      row({
-        section: "Historial de cortes",
-        concept: sizeCode,
-        date: entry.createdAt,
-        delta: entry.quantity,
-        who: entry.user?.name ?? "",
-        notes: entry.notes ?? "",
-      }),
-    );
+    .sort((a, b) => a.entry.createdAt.getTime() - b.entry.createdAt.getTime());
+
+  if (entries.length === 0) return [];
+
+  return [
+    [],
+    [{ at: A, value: "Historial de cortes", style: "section" }],
+    [
+      { at: A, value: "Fecha", style: "tableHeader" },
+      { at: B, value: "Talla", style: "tableHeader" },
+      { at: C, value: "Piezas", style: "tableHeaderRight" },
+      { at: D, value: "Quién", style: "tableHeader" },
+      { at: E, value: "Notas", style: "tableHeader" },
+    ],
+    ...entries.map(
+      ({ entry, sizeCode }): SheetRow => [
+        { at: A, value: entry.createdAt, kind: "datetime" },
+        { at: B, value: sizeCode },
+        { at: C, value: entry.quantity, kind: "number" },
+        { at: D, value: entry.user?.name ?? "" },
+        { at: E, value: entry.notes ?? "" },
+      ],
+    ),
+  ];
 }
 
 /** Las notas de la orden, que en el papel van al pie. */
-function orderNoteRows(notes: string | null): Row[] {
+function notesRows(notes: string | null): SheetRow[] {
   if (!notes) return [];
 
-  return [row({ section: "Notas", detail: notes })];
+  return [
+    [],
+    [{ at: A, value: "Notas", style: "section" }],
+    [{ at: A, value: notes }],
+  ];
 }
