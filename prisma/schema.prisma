@@ -74,6 +74,8 @@ model User {
   purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
   cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
   cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
+  garmentReturns            GarmentReturn[]     @relation("GarmentReturnBy")
+  garmentShipments          GarmentShipment[]   @relation("GarmentShipmentCreatedBy")
   orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
 
   @@index([active, role])
@@ -1161,6 +1163,7 @@ model Size {
   productionOrderLines ProductionOrderLine[]
   documentCutLines     DocumentCutLine[]
   cuttingOrderLines    CuttingOrderLine[]
+  shipmentLines        GarmentShipmentLine[]
 
   @@index([group, order])
   @@map("sizes")
@@ -1584,7 +1587,8 @@ model CuttingOrder {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  lines CuttingOrderLine[]
+  lines     CuttingOrderLine[]
+  shipments GarmentShipment[]
 
   @@index([status, orderedAt])
   @@index([clientId])
@@ -1918,4 +1922,175 @@ enum StandingRuleTopic {
   DELIVERY
   MATERIAL
   GENERAL
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRENDAS EN PROCESO
+//
+// Entre "se cortó" y "se entregó terminado" había un hueco: la tela deja de ser
+// rollo al cortarse y la prenda todavía no es nada. Ese tramo —la pieza que
+// anda en un taller bordándose— se llevaba en la libreta, y por eso "¿cuánto de
+// la 54 ya mandé a bordar y cuánto me queda?" no tenía respuesta en el sistema.
+//
+// NO toca el kárdex a propósito. La tela ya se descontó al cortar; contar la
+// prenda otra vez como existencia duplicaría el material. Esto es control de
+// piezas, no inventario.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// An outside shop that performs one process on already-cut garments.
+///
+/// Deliberately NOT a Supplier (that one sells fabric) nor a Carrier (that one
+/// hauls it): the shop that embroiders is neither, and squeezing it into either
+/// left "who is holding my garments" unanswerable.
+model Workshop {
+  id      String  @id @default(cuid())
+  code    String? @unique
+  name    String  @unique
+  contact String?
+  phone   String?
+  address String?
+  notes   String?
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  shipments GarmentShipment[]
+
+  @@map("workshops")
+}
+
+/// A step garments go through after the cut: embroidery, assembly, washing.
+///
+/// A catalogue and not an enum: every client asks for different processes, and
+/// adding "Planchado" must never need a deploy.
+model ProcessStage {
+  id   String @id @default(cuid())
+  code String @unique
+  name String @unique
+
+  /// Reading order on the board. A HINT, not a route: each shipment picks its
+  /// stage freely, because a size may skip embroidery altogether.
+  position Int @default(0)
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  shipments GarmentShipment[]
+
+  @@map("process_stages")
+}
+
+enum GarmentShipmentStatus {
+  /// The garments are at the workshop. A shipment is born here and not in a
+  /// draft: the vale gets filled as the bundles go into the truck, and a
+  /// two-step "create then send" only adds a tap to the most repeated action.
+  SENT
+  /// Some came back; the rest is still out there.
+  PARTIAL
+  /// Everything that left is accounted for: returned or written off.
+  CLOSED
+  CANCELLED
+}
+
+/// A batch of already-cut garments handed to one workshop for one process.
+///
+/// Hangs off the cutting order because that is where the pieces were born and
+/// where the question gets asked. One order spawns many shipments: the first
+/// cut only yielded two sizes, and of those only the part that goes to
+/// embroidery left — the rest stayed on the rack.
+model GarmentShipment {
+  id     String                @id @default(cuid())
+  code   String                @unique
+  status GarmentShipmentStatus @default(SENT)
+
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  workshopId String
+  workshop   Workshop @relation(fields: [workshopId], references: [id])
+
+  stageId String
+  stage   ProcessStage @relation(fields: [stageId], references: [id])
+
+  sentAt   DateTime  @default(now())
+  dueDate  DateTime?
+  closedAt DateTime?
+
+  /// The workshop's own paper number, when they hand one back.
+  reference String?
+  notes     String?
+
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  createdById String?
+  createdBy   User?    @relation("GarmentShipmentCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines GarmentShipmentLine[]
+
+  @@index([orderId])
+  @@index([workshopId, status])
+  @@index([stageId])
+  @@map("garment_shipments")
+}
+
+model GarmentShipmentLine {
+  id         String          @id @default(cuid())
+  shipmentId String
+  shipment   GarmentShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  sizeId String
+  size   Size   @relation(fields: [sizeId], references: [id])
+
+  /// Garments that left for this size.
+  sentQuantity Int
+
+  /// Live counters. ONLY written in the same transaction as the GarmentReturn
+  /// that justifies them, exactly like Lot.currentQuantity and its Movement.
+  /// Never edited by hand, or the board stops matching its own history.
+  returnedQuantity Int @default(0)
+  scrapQuantity    Int @default(0)
+
+  notes    String?
+  position Int     @default(0)
+
+  returns GarmentReturn[]
+
+  @@index([shipmentId])
+  @@index([sizeId])
+  @@map("garment_shipment_lines")
+}
+
+/// One delivery back from the workshop, for one size.
+///
+/// Append-only like Movement: a miscount is corrected with ANOTHER return,
+/// negative if need be, never by editing this row. Otherwise "the shop returned
+/// 300 on Tuesday" stops being a fact.
+model GarmentReturn {
+  id     String              @id @default(cuid())
+  lineId String
+  line   GarmentShipmentLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  /// Garments that came back usable. Negative corrects an earlier overcount.
+  quantity Int
+
+  /// Garments the workshop ruined or lost. They will never come back, so they
+  /// close the balance just like a return does — but they are not production.
+  scrapQuantity Int @default(0)
+
+  notes String?
+
+  userId String?
+  user   User?   @relation("GarmentReturnBy", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([lineId])
+  @@map("garment_returns")
 }

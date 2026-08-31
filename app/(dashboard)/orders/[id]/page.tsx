@@ -23,6 +23,12 @@ import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
 import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
 import { OrderSendToIssueDialog } from "@/components/orders/order-send-to-issue-dialog";
+import { OrderShipmentDialog } from "@/components/orders/order-shipment-dialog";
+import {
+  OrderShipments,
+  type ShipmentView,
+} from "@/components/orders/order-shipments";
+import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -91,6 +97,57 @@ export default async function OrderDetailPage({ params }: PageProps) {
     id: folder.id,
     name: folder.name,
     hint: [folder.code, folder.client?.name].filter(Boolean).join(" · "),
+  }));
+
+  /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
+     un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
+  const [balances, shipments, workshops, stages] = await Promise.all([
+    new GarmentShipmentService().balances(id),
+    prisma.garmentShipment.findMany({
+      where: { orderId: id },
+      orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
+      include: {
+        workshop: { select: { name: true } },
+        stage: { select: { name: true } },
+        lines: {
+          orderBy: { position: "asc" },
+          include: { size: { select: { code: true } } },
+        },
+      },
+    }),
+    prisma.workshop.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.processStage.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true },
+      orderBy: [{ position: "asc" }, { name: "asc" }],
+    }),
+  ]);
+
+  const shipmentViews: ShipmentView[] = shipments.map((shipment) => ({
+    id: shipment.id,
+    code: shipment.code,
+    status: shipment.status,
+    workshopName: shipment.workshop.name,
+    stageName: shipment.stage.name,
+    sentAt: shipment.sentAt,
+    reference: shipment.reference,
+    lines: shipment.lines.map((line) => ({
+      id: line.id,
+      sizeCode: line.size.code,
+      sentQuantity: line.sentQuantity,
+      returnedQuantity: line.returnedQuantity,
+      scrapQuantity: line.scrapQuantity,
+    })),
+  }));
+
+  const shippableSizes = order.lines.map((line) => ({
+    sizeId: line.sizeId,
+    sizeCode: line.size.code,
+    available: balances.get(line.sizeId)?.available ?? 0,
   }));
 
   const ordered = order.lines.reduce((s, l) => s + l.orderedQuantity, 0);
@@ -175,6 +232,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   pendingSizes={order.lines.length - issueSizes.length}
                 />
               )}
+              {/* Sin talleres ni etapas dadas de alta no hay nada que
+                  elegir, y el botón sólo llevaría a un diálogo vacío. */}
+              {workshops.length > 0 && stages.length > 0 && (
+                <OrderShipmentDialog
+                  orderId={order.id}
+                  orderCode={order.code}
+                  sizes={shippableSizes}
+                  workshops={workshops}
+                  stages={stages}
+                />
+              )}
               <OrderMoveDialog
                 orderId={order.id}
                 orderCode={order.code}
@@ -225,6 +293,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
         )}
       </div>
 
+      {/* Va antes del desglose por talla sólo cuando hay algo afuera: lo que
+          anda en un taller es lo que se pregunta por teléfono. */}
+      {shipmentViews.length > 0 && (
+        <section className="flat-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold">En talleres</h2>
+          <OrderShipments shipments={shipmentViews} />
+        </section>
+      )}
+
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">Tallas</h2>
 
@@ -235,6 +312,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
               surplus: lineSurplus,
               done,
             } = cutProgress(line.orderedQuantity, line.cutQuantity);
+
+            const balance = balances.get(line.sizeId);
 
             return (
               <li
@@ -264,6 +343,18 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     {linePending > 0 && ` · faltan ${linePending}`}
                     {lineSurplus > 0 && ` · sobran ${lineSurplus}`}
                   </p>
+
+                  {/* Dónde están las piezas ya cortadas. Sólo se pinta si algo
+                      salió: en una orden que nunca fue a taller, "0 en taller"
+                      es ruido en todos los renglones. */}
+                  {balance && balance.sent > 0 && (
+                    <p className="tabular text-xs text-muted-foreground">
+                      {balance.available} aquí
+                      {balance.atWorkshop > 0 &&
+                        ` · ${balance.atWorkshop} en taller`}
+                      {balance.scrap > 0 && ` · ${balance.scrap} merma`}
+                    </p>
+                  )}
 
                   {line.notes && (
                     <p className="truncate text-xs text-muted-foreground">

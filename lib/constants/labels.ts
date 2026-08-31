@@ -1,4 +1,5 @@
 import type {
+  GarmentShipmentStatus,
   AuditAction,
   CutTag,
   CutVersion,
@@ -420,4 +421,24 @@ export const SENSITIVITY_LABELS: Record<Sensitivity, string> = {
   MEDIUM: "Media",
   HIGH: "Alta",
   CRITICAL: "Crítica",
+};
+
+/**
+ * Dónde anda un envío a taller.
+ *
+ * El estado no se elige: sale de sumar los retornos de sus renglones, igual
+ * que el de una orden de corte sale de sus avances.
+ */
+export const GARMENT_SHIPMENT_STATUS_LABELS: Record<GarmentShipmentStatus, string> = {
+  SENT: "En el taller",
+  PARTIAL: "Regresó a medias",
+  CLOSED: "Cerrado",
+  CANCELLED: "Cancelado",
+};
+
+export const GARMENT_SHIPMENT_STATUS_STYLES: Record<GarmentShipmentStatus, string> = {
+  SENT: "bg-state-reserved text-state-reserved-foreground",
+  PARTIAL: "bg-state-remnant-muted text-state-remnant",
+  CLOSED: "bg-state-available text-state-available-foreground",
+  CANCELLED: "bg-state-defective text-state-defective-foreground",
 };

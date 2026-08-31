@@ -41,6 +41,7 @@ export const NAV_ICONS = {
   products: Package2,
   sizes: Ruler,
   cutTags: Tag,
+  workshops: Factory,
   tasks: KanbanSquare,
   rules: BookOpen,
   orders: ClipboardList,

@@ -103,6 +103,12 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:browse",
       },
       {
+        href: "/workshops",
+        label: "Talleres",
+        icon: "workshops",
+        permission: "inventory:browse",
+      },
+      {
         href: "/warehouses",
         label: "Almacenes",
         icon: "warehouses",
