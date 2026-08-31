@@ -27,8 +27,9 @@ export interface OrderFolderWithTotals extends OrderFolder {
  * Lectura de carpetas de pedido.
  *
  * Sin soft delete: la carpeta es una agrupación, no un catálogo al que apunte
- * el kárdex. Se archiva para quitarla de en medio, y si de verdad se borra,
- * sus órdenes quedan sueltas en vez de irse con ella.
+ * el kárdex. Se archiva para quitarla de en medio, y sólo se borra cuando ya
+ * está vacía —vaciarla es un acto aparte, orden por orden—, para que tirar la
+ * agrupación nunca se lleve papeles por delante.
  */
 export class OrderFolderRepository extends BaseRepository<
   OrderFolder,

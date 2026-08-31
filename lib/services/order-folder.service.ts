@@ -196,10 +196,18 @@ export class OrderFolderService extends BaseService {
   }
 
   /**
-   * Borra la carpeta. Sus órdenes NO se van con ella: quedan sueltas.
+   * Borra la carpeta, y SÓLO si ya está vacía.
    *
-   * Es la razón del `onDelete: SetNull` en el esquema. Una carpeta es una
-   * forma de acomodar papeles; tirar la carpeta jamás puede tirar los papeles.
+   * Tirar la carpeta jamás puede tirar los papeles: por eso no se borra en
+   * cascada. Pero dejar sueltas las órdenes de una carpeta borrada tampoco
+   * sirve —se van al fondo de la lista general, sin el pedido que les daba
+   * sentido, y ahí nadie las vuelve a encontrar—. Así que se exige vaciarla a
+   * propósito: primero se borra o se mueve cada orden, y hasta entonces se va
+   * la carpeta. Quien sólo quiere quitarla de en medio tiene Archivar.
+   *
+   * El `onDelete: SetNull` del esquema se queda como red: con esta regla ya no
+   * llega a dispararse, pero si algún día se borra una carpeta por otro
+   * camino, sus órdenes siguen sin irse con ella.
    */
   async remove(id: string): Promise<OrderFolder> {
     return this.transaction(async (tx) => {
@@ -208,6 +216,14 @@ export class OrderFolderService extends BaseService {
         include: { _count: { select: { orders: true } } },
       });
       if (!current) throw new NotFoundError("la carpeta", id);
+
+      const orders = current._count.orders;
+
+      if (orders > 0) {
+        throw new BusinessRuleError(
+          `El pedido ${current.code} todavía tiene ${orders} ${orders === 1 ? "orden" : "órdenes"}. Bórralas o muévelas a otro pedido antes de eliminarlo.`,
+        );
+      }
 
       const folder = await tx.orderFolder.delete({ where: { id } });
 

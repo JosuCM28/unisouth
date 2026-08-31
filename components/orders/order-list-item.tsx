@@ -5,6 +5,7 @@ import {
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
 import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { OrderDeleteButton } from "./order-delete-button";
 
 /** Lo mínimo que la tarjeta necesita saber de una orden. */
 export interface OrderListEntry {
@@ -42,10 +43,16 @@ export function OrderListItem({ order, folderName }: Props) {
   const { pending, surplus } = cutProgress(ordered, cut);
 
   return (
-    <Link
-      href={`/orders/${order.id}`}
-      className="flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent"
-    >
+    <div className="flat-surface relative flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent">
+      {/* El enlace va como capa sobre toda la tarjeta en vez de envolverla:
+          un <button> dentro de un <a> no es HTML válido, y el botón de borrar
+          tiene que quedar fuera del área que navega. */}
+      <Link
+        href={`/orders/${order.id}`}
+        className="absolute inset-0 z-10"
+        aria-label={`Abrir ${order.code}`}
+      />
+
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="tabular text-sm font-medium">{order.code}</span>
@@ -103,25 +110,35 @@ export function OrderListItem({ order, folderName }: Props) {
       {/* Lo que falta es el número que se busca al abrir la lista. Si se cortó
           de más, ese excedente pasa a ser el dato: un cero escondería que
           sobran piezas. */}
-      <div className="shrink-0 text-right">
-        <p
-          className={cn(
-            "tabular text-lg font-bold leading-none",
-            surplus > 0 && "text-state-remnant",
-          )}
-        >
-          {surplus > 0 ? `+${surplus}` : pending}
-        </p>
-        <p className="tabular text-xs text-muted-foreground">
-          {surplus > 0 ? "sobran" : `de ${ordered}`}
-        </p>
-        {/* Cuánto se lleva cortado: sin esto, "faltan 300" no distingue una
-            orden recién abierta de una casi lista. */}
-        <p className="tabular mt-0.5 text-xs text-muted-foreground">
-          {cut} cortadas
-        </p>
+      <div className="flex shrink-0 items-start gap-1">
+        <div className="text-right">
+          <p
+            className={cn(
+              "tabular text-lg font-bold leading-none",
+              surplus > 0 && "text-state-remnant",
+            )}
+          >
+            {surplus > 0 ? `+${surplus}` : pending}
+          </p>
+          <p className="tabular text-xs text-muted-foreground">
+            {surplus > 0 ? "sobran" : `de ${ordered}`}
+          </p>
+          {/* Cuánto se lleva cortado: sin esto, "faltan 300" no distingue una
+              orden recién abierta de una casi lista. */}
+          <p className="tabular mt-0.5 text-xs text-muted-foreground">
+            {cut} cortadas
+          </p>
+        </div>
+
+        {/* Por encima de la capa del enlace, o el toque abriría la orden. */}
+        <OrderDeleteButton
+          orderId={order.id}
+          orderCode={order.code}
+          cutQuantity={cut}
+          className="relative z-20"
+        />
       </div>
-    </Link>
+    </div>
   );
 }
 

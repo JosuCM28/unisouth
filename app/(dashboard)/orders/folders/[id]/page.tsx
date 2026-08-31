@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { FolderArchiveButton } from "@/components/orders/folder-archive-button";
+import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
 import { OrderListItem } from "@/components/orders/order-list-item";
 
 interface PageProps {
@@ -110,6 +111,13 @@ export default async function OrderFolderPage({ params }: PageProps) {
             </Link>
           </Button>
           <FolderArchiveButton folderId={folder.id} isArchived={isArchived} />
+          {/* Aquí es donde se vacía el pedido —orden por orden, abajo— así que
+              aquí tiene que estar el botón que se desbloquea al terminar. */}
+          <FolderDeleteButton
+            folderId={folder.id}
+            folderCode={folder.code}
+            orderCount={folder.orders.length}
+          />
         </div>
       </div>
 

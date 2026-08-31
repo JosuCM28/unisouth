@@ -64,6 +64,24 @@ export async function cancelCuttingOrderAction(input: unknown) {
 }
 
 /**
+ * Borra la orden por completo.
+ *
+ * Cancelar y borrar no son lo mismo y por eso conviven: se cancela lo que se
+ * hizo y ya no va —y su historial se consulta—, se borra lo que nunca debió
+ * existir. La huella queda en la auditoría.
+ */
+export async function removeCuttingOrderAction(input: unknown) {
+  return executeAction(input, {
+    schema: idSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Orden eliminada",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).remove(input.id),
+  });
+}
+
+/**
  * Manda la orden a Salidas como borrador.
  *
  * Revalida también `/issues` y `/documents`: el vale nuevo tiene que

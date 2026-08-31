@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Archive, FolderOpen } from "lucide-react";
 import type { OrderFolderWithTotals } from "@/lib/repositories/order-folder.repository";
 import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { FolderDeleteButton } from "./folder-delete-button";
 
 interface Props {
   folder: OrderFolderWithTotals;
@@ -22,15 +23,23 @@ export function FolderCard({ folder }: Props) {
   const late = isLate(folder.dueDate, pending);
 
   return (
-    <Link
-      href={`/orders/folders/${folder.id}`}
+    <div
       className={cn(
-        "flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent",
+        "flat-surface relative flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent",
         // La carpeta archivada se apaga en vez de esconderse: sigue ahí para
         // consultarse, pero no compite con lo que sí hay que cortar.
         isArchived && "opacity-60",
       )}
     >
+      {/* El enlace va como capa sobre toda la tarjeta en vez de envolverla:
+          un <button> dentro de un <a> no es HTML válido, y el botón de borrar
+          tiene que quedar fuera del área que navega. */}
+      <Link
+        href={`/orders/folders/${folder.id}`}
+        className="absolute inset-0 z-10"
+        aria-label={`Abrir ${folder.code}`}
+      />
+
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           {isArchived ? (
@@ -79,29 +88,41 @@ export function FolderCard({ folder }: Props) {
 
       {/* Sin órdenes todavía no hay nada que sumar: un "0 de 0" haría creer
           que el pedido está terminado cuando ni siquiera ha empezado. */}
-      <div className="shrink-0 text-right">
-        {folder.orderCount === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin órdenes</p>
-        ) : (
-          <>
-            <p
-              className={cn(
-                "tabular text-lg font-bold leading-none",
-                surplus > 0 && "text-state-remnant",
-              )}
-            >
-              {surplus > 0 ? `+${surplus}` : pending}
-            </p>
-            <p className="tabular text-xs text-muted-foreground">
-              {surplus > 0 ? "sobran" : `de ${folder.orderedQuantity}`}
-            </p>
-            <p className="tabular mt-0.5 text-xs text-muted-foreground">
-              {folder.cutQuantity} cortadas
-            </p>
-          </>
-        )}
+      <div className="flex shrink-0 items-start gap-1">
+        <div className="text-right">
+          {folder.orderCount === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin órdenes</p>
+          ) : (
+            <>
+              <p
+                className={cn(
+                  "tabular text-lg font-bold leading-none",
+                  surplus > 0 && "text-state-remnant",
+                )}
+              >
+                {surplus > 0 ? `+${surplus}` : pending}
+              </p>
+              <p className="tabular text-xs text-muted-foreground">
+                {surplus > 0 ? "sobran" : `de ${folder.orderedQuantity}`}
+              </p>
+              <p className="tabular mt-0.5 text-xs text-muted-foreground">
+                {folder.cutQuantity} cortadas
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Por encima de la capa del enlace, o el toque abriría el pedido.
+            El botón se ofrece siempre: con órdenes dentro, el diálogo explica
+            que hay que vaciarlo primero en vez de esconder la acción. */}
+        <FolderDeleteButton
+          folderId={folder.id}
+          folderCode={folder.code}
+          orderCount={folder.orderCount}
+          className="relative z-20"
+        />
       </div>
-    </Link>
+    </div>
   );
 }
 

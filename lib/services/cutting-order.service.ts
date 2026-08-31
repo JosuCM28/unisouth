@@ -277,6 +277,63 @@ export class CuttingOrderService extends BaseService {
   }
 
   /**
+   * Borra la orden, con su desglose y su historial de cortes.
+   *
+   * No sustituye a cancelar, que es otra cosa: una orden cancelada conserva el
+   * papel —qué se alcanzó a cortar antes de que se cayera— y se sigue
+   * consultando. Borrar no deja nada, y por eso es para el otro caso: la orden
+   * capturada por error, que no es historia sino basura, y que dejada como
+   * cancelada para siempre le estorba al piso.
+   *
+   * Los renglones y sus avances se van por cascada del esquema. Lo único que
+   * sobrevive es el AuditLog —quién la borró, cuándo y qué se llevó por
+   * delante—, que es append-only justo para esto.
+   */
+  async remove(id: string): Promise<CuttingOrder> {
+    return this.transaction(async (tx) => {
+      const current = await tx.cuttingOrder.findUnique({
+        where: { id },
+        include: {
+          lines: {
+            select: {
+              orderedQuantity: true,
+              cutQuantity: true,
+              _count: { select: { progress: true } },
+            },
+          },
+        },
+      });
+      if (!current) throw new NotFoundError("la orden", id);
+
+      const ordered = current.lines.reduce((s, l) => s + l.orderedQuantity, 0);
+      const cut = current.lines.reduce((s, l) => s + l.cutQuantity, 0);
+      const entries = current.lines.reduce((s, l) => s + l._count.progress, 0);
+
+      const order = await tx.cuttingOrder.delete({ where: { id } });
+
+      /* Se guarda el RESUMEN de lo que se llevo y no solo el folio: cuando
+         alguien pregunte por qué una orden ya no está, el registro tiene que
+         poder decir si se borró un papel vacío o uno con 300 piezas cortadas. */
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: id,
+        action: "DELETE",
+        reference: current.code,
+        oldValue: {
+          estado: current.status,
+          tallas: current.lines.length,
+          pedidas: ordered,
+          cortadas: cut,
+          avances: entries,
+        },
+        sensitivity: "HIGH",
+      });
+
+      return order;
+    });
+  }
+
+  /**
    * Manda una orden ya cortada a Salidas como BORRADOR.
    *
    * Existe porque el flujo real era capturar dos veces lo mismo: la orden ya
