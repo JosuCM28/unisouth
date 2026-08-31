@@ -6,7 +6,7 @@ import {
   CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
 } from "@/lib/constants/labels";
-import { cutProgress, formatDate, formatDateTime } from "@/lib/utils";
+import { cutProgress, cutTotals, formatDate, formatDateTime } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
 
 interface PageProps {
@@ -49,9 +49,7 @@ export default async function PrintOrderPage({ params }: PageProps) {
 
   if (!order) notFound();
 
-  const ordered = order.lines.reduce((sum, l) => sum + l.orderedQuantity, 0);
-  const cut = order.lines.reduce((sum, l) => sum + l.cutQuantity, 0);
-  const { pending, surplus } = cutProgress(ordered, cut);
+  const { ordered, cut, pending, surplus } = cutTotals(order.lines);
 
   const history = order.lines
     .flatMap((line) =>

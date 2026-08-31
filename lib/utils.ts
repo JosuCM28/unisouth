@@ -271,3 +271,44 @@ export function cutProgress(ordered: number, cut: number): CutProgress {
     done: difference >= 0,
   };
 }
+
+export interface CutTotals {
+  ordered: number;
+  cut: number;
+  pending: number;
+  surplus: number;
+}
+
+/**
+ * El renglón de Total al pie de una hoja de corte.
+ *
+ * "Faltan" y "sobran" se suman COLUMNA POR COLUMNA, no se sacan del neto de
+ * los totales. El neto miente en el pie: a una orden a la que le faltan 552
+ * piezas de una talla y le sobran 4 repartidas en otras dos no "le faltan
+ * 548" —hay 552 sin cortar y 4 de más, que son dos problemas distintos y se
+ * arreglan por separado—. Restarlos entre sí desaparece el excedente de la
+ * hoja, y el excedente es tela que ya se gastó.
+ *
+ * Es la misma razón por la que existe `cutProgress`: lo que se ve en un
+ * renglón y lo que se ve en el pie tienen que estar contando lo mismo.
+ */
+export function cutTotals(
+  lines: Array<{ orderedQuantity: number; cutQuantity: number }>,
+): CutTotals {
+  return lines.reduce<CutTotals>(
+    (totals, line) => {
+      const { pending, surplus } = cutProgress(
+        line.orderedQuantity,
+        line.cutQuantity,
+      );
+
+      return {
+        ordered: totals.ordered + line.orderedQuantity,
+        cut: totals.cut + line.cutQuantity,
+        pending: totals.pending + pending,
+        surplus: totals.surplus + surplus,
+      };
+    },
+    { ordered: 0, cut: 0, pending: 0, surplus: 0 },
+  );
+}

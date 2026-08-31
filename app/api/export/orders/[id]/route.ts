@@ -11,7 +11,7 @@ import {
   CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
 } from "@/lib/constants/labels";
-import { cutProgress, formatDate } from "@/lib/utils";
+import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
 
 /**
  * Una orden en Excel, con la misma forma de la hoja impresa.
@@ -229,9 +229,7 @@ function sizeRows(lines: Line[]): SheetRow[] {
     ];
   });
 
-  const ordered = lines.reduce((sum, line) => sum + line.orderedQuantity, 0);
-  const cut = lines.reduce((sum, line) => sum + line.cutQuantity, 0);
-  const total = cutProgress(ordered, cut);
+  const total = cutTotals(lines);
 
   return [
     [],
@@ -247,8 +245,8 @@ function sizeRows(lines: Line[]): SheetRow[] {
     [
       { at: A, value: "Total", style: "total" },
       { at: B, value: "", style: "total" },
-      { at: C, value: ordered, kind: "number", style: "totalNumber" },
-      { at: D, value: cut, kind: "number", style: "totalNumber" },
+      { at: C, value: total.ordered, kind: "number", style: "totalNumber" },
+      { at: D, value: total.cut, kind: "number", style: "totalNumber" },
       {
         at: E,
         value: total.pending > 0 ? total.pending : "",
