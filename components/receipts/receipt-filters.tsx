@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/shared/search-select";
 
-interface Option { id: string; label: string }
+interface Option { id: string; label: string; hint?: string }
 
 interface ReceiptFiltersProps {
   clients: Option[];
   suppliers: Option[];
   carriers: Option[];
+  materials: Option[];
 }
 
 /**
@@ -38,6 +39,7 @@ export function ReceiptFilters({
   clients,
   suppliers,
   carriers,
+  materials,
 }: ReceiptFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,9 +58,12 @@ export function ReceiptFilters({
 
   const arrivedWithin = searchParams.get("arrivedWithin");
   const hasFilters = [...searchParams.keys()].some((key) => key !== "q");
-  const advancedCount = ["clientId", "supplierId", "carrierId"].filter((key) =>
-    searchParams.get(key),
-  ).length;
+  const advancedCount = [
+    "materialId",
+    "clientId",
+    "supplierId",
+    "carrierId",
+  ].filter((key) => searchParams.get(key)).length;
 
   return (
     <>
@@ -93,6 +98,14 @@ export function ReceiptFilters({
 
       {showAdvanced && (
         <div className="flex flex-col gap-2 border border-border p-3 md:flex-row md:flex-wrap md:items-center">
+          {/* La tela va PRIMERO: "¿cuándo llegó la gabardina azul?" se
+              pregunta mucho más que "¿qué mandó tal proveedor?". */}
+          <FilterSelect
+            placeholder="Material"
+            value={searchParams.get("materialId")}
+            options={materials}
+            onChange={(v) => setParam("materialId", v)}
+          />
           <FilterSelect
             placeholder="Proveedor"
             value={searchParams.get("supplierId")}
@@ -154,6 +167,9 @@ function FilterSelect({
       options={options.map((option) => ({
         value: option.id,
         label: option.label,
+        // El código del material, de subtítulo: dos telas pueden llamarse
+        // casi igual y es el código lo que trae impresa la etiqueta.
+        hint: option.hint,
       }))}
       value={value ?? ""}
       onChange={(next) => onChange(next || null)}

@@ -25,6 +25,7 @@ interface PageProps {
   searchParams: Promise<{
     q?: string;
     clientId?: string;
+    materialId?: string;
     supplierId?: string;
     carrierId?: string;
     arrivedWithin?: string;
@@ -71,7 +72,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput
-          placeholder="Guía, folio, factura, proveedor…"
+          placeholder="Guía, folio, factura, tela, proveedor…"
           className="flex-1 md:max-w-sm"
         />
       </div>
@@ -80,6 +81,11 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
         clients={options.clients.map((c) => ({ id: c.id, label: c.name }))}
         suppliers={options.suppliers.map((s) => ({ id: s.id, label: s.name }))}
         carriers={options.carriers.map((c) => ({ id: c.id, label: c.name }))}
+        materials={options.materials.map((m) => ({
+          id: m.id,
+          label: m.name,
+          hint: m.code,
+        }))}
       />
 
       <Suspense key={JSON.stringify(params)} fallback={<ListSkeleton />}>
@@ -104,6 +110,7 @@ async function ListSection({
   const result = await new ReceiptRepository().search({
     search: params.q,
     clientId: params.clientId,
+    materialId: params.materialId,
     supplierId: params.supplierId,
     carrierId: params.carrierId,
     arrivedWithinDays: parsePositiveInt(params.arrivedWithin),

@@ -9,6 +9,8 @@ import {
 export interface ReceiptFilters extends PaginationInput {
   search?: string;
   clientId?: string;
+  /** La tela que trajo la guía. Vive en los ROLLOS, no en el encabezado. */
+  materialId?: string;
   supplierId?: string;
   carrierId?: string;
   /** Llegadas dentro de los últimos N días. */
@@ -68,6 +70,10 @@ export class ReceiptRepository extends BaseRepository<
    * La búsqueda pega contra guía, folio y factura porque ésa es justo la
    * pregunta del piso: "¿qué llegó en la guía tal?". Quien pregunta trae el
    * número en un papel y no sabe —ni le importa— en qué campo lo guardamos.
+   *
+   * Y también contra la TELA, que es la otra forma de preguntar lo mismo:
+   * "¿cuándo llegó la gabardina azul?". El nombre del material vive en los
+   * rollos, así que se busca a través de ellos.
    */
   async search(
     filters: ReceiptFilters = {},
@@ -89,14 +95,41 @@ export class ReceiptRepository extends BaseRepository<
         // También por el folio del rollo: a veces lo que trae en la mano es
         // la etiqueta de un rollo y quiere ver con qué más llegó.
         { lots: { some: { code: { contains: search, mode: "insensitive" } } } },
+        // Y por la tela: nombre o código del material de cualquiera de sus
+        // rollos. "¿cuándo llegó la gabardina?" es la pregunta de todos los días.
+        {
+          lots: {
+            some: {
+              material: { name: { contains: search, mode: "insensitive" } },
+            },
+          },
+        },
+        {
+          lots: {
+            some: {
+              material: { code: { contains: search, mode: "insensitive" } },
+            },
+          },
+        },
       ];
     }
 
-    /* Se filtra por el dueño de los ROLLOS y no por el del encabezado: una
-       guía compartida entre dos clientes no tiene dueño en el encabezado, y
-       filtrando por ahí se caería de las dos listas justo cuando más importa
-       encontrarla. Así aparece bajo los dos. */
-    if (filters.clientId) where.lots = { some: { clientId: filters.clientId } };
+    /* Dueño y tela viven los dos en los ROLLOS, así que van en un SOLO `some`
+       y no en dos.
+       
+       Es la diferencia entre "un rollo que es de Ternium Y es mezclilla" y
+       "la guía trae algo de Ternium y por otro lado algo de mezclilla": con
+       guías compartidas entre dos clientes, lo segundo devolvería recepciones
+       donde la mezclilla es del OTRO cliente, que es justo lo que no se puede
+       confundir.
+       
+       Del dueño se filtra por el rollo y no por el encabezado porque una guía
+       compartida no tiene dueño arriba, y filtrando por ahí se caería de las
+       dos listas justo cuando más importa encontrarla. */
+    const lotWhere: Prisma.LotWhereInput = {};
+    if (filters.clientId) lotWhere.clientId = filters.clientId;
+    if (filters.materialId) lotWhere.materialId = filters.materialId;
+    if (Object.keys(lotWhere).length > 0) where.lots = { some: lotWhere };
     if (filters.supplierId) where.supplierId = filters.supplierId;
     if (filters.carrierId) where.carrierId = filters.carrierId;
 
@@ -299,7 +332,7 @@ export class ReceiptRepository extends BaseRepository<
   }
 
   async findFilterOptions() {
-    const [clients, suppliers, carriers] = await Promise.all([
+    const [clients, suppliers, carriers, materials] = await Promise.all([
       this.db.client.findMany({
         where: { lots: { some: {} } },
         select: { id: true, name: true },
@@ -315,8 +348,17 @@ export class ReceiptRepository extends BaseRepository<
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       }),
+      /* Sólo telas que de verdad llegaron en alguna recepción: ofrecer el
+         catálogo entero llenaría el selector de materiales que no devuelven
+         nada. El código va aparte para poder enseñarlo de subtítulo, que es
+         lo que trae impreso la etiqueta del rollo. */
+      this.db.material.findMany({
+        where: { lots: { some: { receiptId: { not: null } } } },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
-    return { clients, suppliers, carriers };
+    return { clients, suppliers, carriers, materials };
   }
 }
