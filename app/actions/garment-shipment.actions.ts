@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { cuidSchema, removeSchema } from "@/lib/validations/common";
 import {
   cancelGarmentShipmentSchema,
+  removeGarmentShipmentSchema,
   garmentReturnSchema,
   garmentShipmentSchema,
   processStageSchema,
@@ -38,6 +39,23 @@ export async function addGarmentReturnAction(input: unknown) {
     successMessage: "Retorno registrado",
     handler: ({ input, auditContext }) =>
       new GarmentShipmentService(auditContext).addReturn(input),
+  });
+}
+
+/**
+ * Borra un envío capturado por error.
+ *
+ * Revalida también /documents e /issues: su vale se cancela con él y tiene que
+ * dejar de verse vivo en el registro sin que nadie recargue a mano.
+ */
+export async function removeGarmentShipmentAction(input: unknown) {
+  return executeAction(input, {
+    schema: removeGarmentShipmentSchema,
+    permission: "inventory:write",
+    revalidate: [...REVALIDATE, "/documents", "/issues"],
+    successMessage: "Envío eliminado",
+    handler: ({ input, auditContext }) =>
+      new GarmentShipmentService(auditContext).remove(input.id),
   });
 }
 

@@ -13,6 +13,7 @@ import {
   GARMENT_SHIPMENT_STATUS_STYLES,
 } from "@/lib/constants/labels";
 import { cn, formatDate } from "@/lib/utils";
+import { ShipmentDeleteButton } from "./shipment-delete-button";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export interface ShipmentView {
   reference: string | null;
   parts: string | null;
   /** El vale de salida que generó, para ir a imprimirlo o aplicarlo. */
-  document: { id: string; code: string } | null;
+  document: { id: string; code: string; isDraft: boolean } | null;
   lines: ShipmentLineView[];
 }
 
@@ -62,7 +63,16 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
 
   return (
     <ul className="flex flex-col gap-3">
-      {shipments.map((shipment) => (
+      {shipments.map((shipment) => {
+        const totalSent = shipment.lines.reduce(
+          (sum, line) => sum + line.sentQuantity,
+          0,
+        );
+        const shipmentHasReturns = shipment.lines.some(
+          (line) => line.returnedQuantity > 0 || line.scrapQuantity > 0,
+        );
+
+        return (
         <li key={shipment.id} className="flat-surface flex flex-col gap-2 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
@@ -91,17 +101,34 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
               )}
             </div>
 
-            {/* El vale que se imprime y se firma. Va aquí porque es el papel
-                que acompaña al bulto, no un detalle del registro. */}
-            {shipment.document && (
-              <Link
-                href={`/documents/${shipment.document.id}`}
-                className="touch-target flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"
-              >
-                <FileText className="size-4" aria-hidden />
-                <span className="tabular">{shipment.document.code}</span>
-              </Link>
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              {/* El vale que se imprime y se firma. Va aquí porque es el papel
+                  que acompaña al bulto, no un detalle del registro. */}
+              {shipment.document && (
+                <Link
+                  href={`/documents/${shipment.document.id}`}
+                  className="touch-target flex items-center gap-1.5 text-sm text-muted-foreground"
+                >
+                  <FileText className="size-4" aria-hidden />
+                  <span className="tabular">{shipment.document.code}</span>
+                </Link>
+              )}
+
+              <ShipmentDeleteButton
+                shipmentId={shipment.id}
+                shipmentCode={shipment.code}
+                sentQuantity={totalSent}
+                hasReturns={shipmentHasReturns}
+                voucher={
+                  shipment.document
+                    ? {
+                        code: shipment.document.code,
+                        isDraft: shipment.document.isDraft,
+                      }
+                    : null
+                }
+              />
+            </div>
           </div>
 
           <ul className="flex flex-col gap-1">
@@ -151,7 +178,8 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
             })}
           </ul>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

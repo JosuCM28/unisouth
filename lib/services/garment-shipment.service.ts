@@ -389,6 +389,89 @@ export class GarmentShipmentService extends BaseService {
     });
   }
 
+  /**
+   * Borra un envío capturado por error.
+   *
+   * Distinto de cancelar: cancelar deja constancia de que algo salió y se
+   * echó atrás; borrar es para el envío que nunca debió existir —el taller
+   * equivocado, la etapa equivocada, un dedazo al capturar—. Eso no es
+   * historia del taller, es basura, y dejarlo cancelado para siempre ensucia
+   * la ficha de la orden.
+   *
+   * Su vale se CANCELA, no se borra: los documentos son la bitácora del
+   * almacén y esa regla no se rompe por una corrección de captura. Si ya está
+   * aplicado no se toca siquiera —movió cosas y deshacerlo es una decisión
+   * aparte, de quien mira el kárdex— y se avisa para que nadie crea que se fue
+   * con el envío.
+   *
+   * Lo que sobrevive es el AuditLog, con el resumen de lo que se llevó.
+   */
+  async remove(id: string): Promise<{
+    code: string;
+    voucherCode: string | null;
+    voucherCancelled: boolean;
+  }> {
+    return this.transaction(async (tx) => {
+      const current = await tx.garmentShipment.findUnique({
+        where: { id },
+        include: {
+          stage: { select: { name: true } },
+          workshop: { select: { name: true } },
+          document: { select: { id: true, code: true, status: true } },
+          lines: {
+            select: {
+              sentQuantity: true,
+              returnedQuantity: true,
+              scrapQuantity: true,
+            },
+          },
+        },
+      });
+      if (!current) throw new NotFoundError("el envío", id);
+
+      const sent = current.lines.reduce((sum, l) => sum + l.sentQuantity, 0);
+      const returned = current.lines.reduce(
+        (sum, l) => sum + l.returnedQuantity + l.scrapQuantity,
+        0,
+      );
+
+      // Los renglones y sus retornos se van por cascada del esquema.
+      await tx.garmentShipment.delete({ where: { id } });
+
+      const voucher = current.document;
+      const cancelVoucher = voucher?.status === "DRAFT";
+
+      if (voucher && cancelVoucher) {
+        await new DocumentService(this.context, tx).cancel(
+          voucher.id,
+          `Se eliminó el envío ${current.code}`,
+        );
+      }
+
+      await this.auditWith(tx).record({
+        entity: "GarmentShipment",
+        entityId: id,
+        action: "DELETE",
+        reference: current.code,
+        oldValue: {
+          etapa: current.stage.name,
+          taller: current.workshop.name,
+          tallas: current.lines.length,
+          piezas: sent,
+          retornos: returned,
+          vale: voucher?.code ?? null,
+        },
+        sensitivity: "MEDIUM",
+      });
+
+      return {
+        code: current.code,
+        voucherCode: voucher?.code ?? null,
+        voucherCancelled: Boolean(voucher && cancelVoucher),
+      };
+    });
+  }
+
   /** El tablero de la orden: cuánto se ha mandado de cada talla a cada etapa. */
   async balances(orderId: string): Promise<Map<string, SizeBalance>> {
     const [lines, shipmentLines] = await Promise.all([

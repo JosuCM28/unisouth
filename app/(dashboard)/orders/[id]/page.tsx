@@ -109,7 +109,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       include: {
         workshop: { select: { name: true } },
         stage: { select: { name: true } },
-        document: { select: { id: true, code: true } },
+        document: { select: { id: true, code: true, status: true } },
         lines: {
           orderBy: { position: "asc" },
           include: { size: { select: { code: true } } },
@@ -138,7 +138,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
     reference: shipment.reference,
     parts: shipment.parts,
     document: shipment.document
-      ? { id: shipment.document.id, code: shipment.document.code }
+      ? {
+          id: shipment.document.id,
+          code: shipment.document.code,
+          isDraft: shipment.document.status === "DRAFT",
+        }
       : null,
     lines: shipment.lines.map((line) => ({
       id: line.id,

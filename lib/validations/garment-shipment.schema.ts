@@ -67,6 +67,11 @@ export const garmentReturnSchema = z
 
 export type GarmentReturnInput = z.infer<typeof garmentReturnSchema>;
 
+/* Sin motivo obligatorio: se borra lo que se capturó por error, y exigir
+   una justificación por cada dedazo consigue que nadie corrija nada. Lo que
+   se llevó queda en la auditoría de todos modos. */
+export const removeGarmentShipmentSchema = z.object({ id: cuidSchema });
+
 export const cancelGarmentShipmentSchema = z.object({
   id: cuidSchema,
   reason: requiredText("El motivo", 500),
