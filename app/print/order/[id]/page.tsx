@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/core/session";
 import {
   CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
+  cutBatchLabel,
 } from "@/lib/constants/labels";
 import { cutProgress, cutTotals, formatDate, formatDateTime } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
@@ -40,7 +41,10 @@ export default async function PrintOrderPage({ params }: PageProps) {
           cutTag: { select: { name: true } },
           progress: {
             orderBy: { createdAt: "asc" },
-            include: { user: { select: { name: true } } },
+            include: {
+              user: { select: { name: true } },
+              batch: { select: { number: true, label: true } },
+            },
           },
         },
       },
@@ -191,6 +195,9 @@ export default async function PrintOrderPage({ params }: PageProps) {
             <thead>
               <tr className="border-b border-black text-left">
                 <th className="py-1 pr-2">Fecha</th>
+                {/* De qué tendido salieron: sin esta columna el papel es una
+                    lista de fechas y hay que deducir dónde acabó una tanda. */}
+                <th className="py-1 pr-2">Corte</th>
                 <th className="py-1 pr-2">Talla</th>
                 <th className="py-1 pr-2 text-right">Piezas</th>
                 <th className="py-1 pr-2">Quién</th>
@@ -202,6 +209,9 @@ export default async function PrintOrderPage({ params }: PageProps) {
                 <tr key={entry.id} className="border-b border-black/20">
                   <td className="tabular py-1 pr-2">
                     {formatDateTime(entry.createdAt)}
+                  </td>
+                  <td className="py-1 pr-2">
+                    {cutBatchLabel(entry.batch.number, entry.batch.label)}
                   </td>
                   <td className="py-1 pr-2">{entry.sizeCode}</td>
                   <td className="tabular py-1 pr-2 text-right">

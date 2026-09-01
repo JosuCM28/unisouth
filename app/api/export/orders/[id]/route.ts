@@ -10,6 +10,7 @@ import {
 import {
   CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
+  cutBatchLabel,
 } from "@/lib/constants/labels";
 import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ interface Line {
     quantity: number;
     notes: string | null;
     createdAt: Date;
+    batch: { number: number; label: string | null };
     user: { name: string } | null;
   }[];
 }
@@ -99,7 +101,10 @@ export async function GET(
           cutTag: { select: { name: true } },
           progress: {
             orderBy: { createdAt: "asc" },
-            include: { user: { select: { name: true } } },
+            include: {
+              user: { select: { name: true } },
+              batch: { select: { number: true, label: true } },
+            },
           },
         },
       },
@@ -284,18 +289,23 @@ function historyRows(lines: Line[]): SheetRow[] {
     [{ at: A, value: "Historial de cortes", style: "section" }],
     [
       { at: A, value: "Fecha", style: "tableHeader" },
-      { at: B, value: "Talla", style: "tableHeader" },
-      { at: C, value: "Piezas", style: "tableHeaderRight" },
-      { at: D, value: "Quién", style: "tableHeader" },
-      { at: E, value: "Notas", style: "tableHeader" },
+      /* De qué tendido salieron. Va en columna propia y no pegada a la fecha
+         para que en Excel se pueda filtrar y sumar por corte, que es justo la
+         pregunta que el acumulado no contesta. */
+      { at: B, value: "Corte", style: "tableHeader" },
+      { at: C, value: "Talla", style: "tableHeader" },
+      { at: D, value: "Piezas", style: "tableHeaderRight" },
+      { at: E, value: "Quién", style: "tableHeader" },
+      { at: F, value: "Notas", style: "tableHeader" },
     ],
     ...entries.map(
       ({ entry, sizeCode }): SheetRow => [
         { at: A, value: entry.createdAt, kind: "datetime" },
-        { at: B, value: sizeCode },
-        { at: C, value: entry.quantity, kind: "number" },
-        { at: D, value: entry.user?.name ?? "" },
-        { at: E, value: entry.notes ?? "" },
+        { at: B, value: cutBatchLabel(entry.batch.number, entry.batch.label) },
+        { at: C, value: sizeCode },
+        { at: D, value: entry.quantity, kind: "number" },
+        { at: E, value: entry.user?.name ?? "" },
+        { at: F, value: entry.notes ?? "" },
       ],
     ),
   ];

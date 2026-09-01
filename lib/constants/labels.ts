@@ -444,3 +444,33 @@ export const GARMENT_SHIPMENT_STATUS_STYLES: Record<GarmentShipmentStatus, strin
   CLOSED: "bg-state-available text-state-available-foreground",
   CANCELLED: "bg-state-defective text-state-defective-foreground",
 };
+
+/**
+ * Los ordinales que de verdad se dicen en el piso, del 1 al 10.
+ *
+ * Es un diccionario y no una regla porque en español el ordinal masculino
+ * abreviado no es regular: "1er" y "3er" se apocopan, el resto lleva "º".
+ */
+const CUT_ORDINALS: Record<number, string> = {
+  1: "1er",
+  2: "2º",
+  3: "3er",
+  4: "4º",
+  5: "5º",
+  6: "6º",
+  7: "7º",
+  8: "8º",
+  9: "9º",
+  10: "10º",
+};
+
+/**
+ * Cómo se nombra un corte de una orden: "1er corte", "2º corte".
+ *
+ * Si el corte trae nombre propio se usa ése —"corte de muestra" dice más que
+ * "4º corte"—, y el número queda como respaldo.
+ */
+export function cutBatchLabel(number: number, label?: string | null): string {
+  if (label) return label;
+  return `${CUT_ORDINALS[number] ?? `${number}º`} corte`;
+}

@@ -74,6 +74,7 @@ model User {
   purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
   cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
   cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
+  cuttingBatches            CuttingBatch[]      @relation("CuttingBatchOpenedBy")
   garmentReturns            GarmentReturn[]     @relation("GarmentReturnBy")
   garmentShipments          GarmentShipment[]   @relation("GarmentShipmentCreatedBy")
   orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
@@ -1589,12 +1590,53 @@ model CuttingOrder {
   updatedAt   DateTime @updatedAt
 
   lines     CuttingOrderLine[]
+  batches   CuttingBatch[]
   shipments GarmentShipment[]
 
   @@index([status, orderedAt])
   @@index([clientId])
   @@index([folderId])
   @@map("cutting_orders")
+}
+
+/// A cutting run: "the first cut", "the second cut" of an order.
+///
+/// The floor does not cut an order in one go. It lays a spread, cuts a few of
+/// every size, and days later lays another. Until now every entry piled into a
+/// single running total, so "how many came out of the second cut" could only be
+/// answered by reading timestamps and guessing where one run ended.
+///
+/// It belongs to the ORDER and not to the size: "second cut" has to mean the
+/// same thing for size 32 as for size 45, otherwise each size would carry its
+/// own numbering and picking one from a list would be meaningless.
+///
+/// A batch is never closed. A straggler bundle turns up after the next run has
+/// already started, and forcing it into the open batch would file it under a
+/// run it did not come from.
+model CuttingBatch {
+  id      String       @id @default(cuid())
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Sequential WITHIN the order: 1, 2, 3. Not a global folio — the floor says
+  /// "the second cut of this order", never "cut number 4,712".
+  number Int
+  /// What this run was, when the number is not enough: "corte de muestra".
+  label  String?
+  notes  String?
+
+  openedAt DateTime @default(now())
+
+  createdById String?
+  createdBy   User?   @relation("CuttingBatchOpenedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  entries CuttingProgress[]
+
+  @@unique([orderId, number])
+  @@index([orderId])
+  @@map("cutting_batches")
 }
 
 enum CuttingOrderStatus {
@@ -1641,6 +1683,13 @@ model CuttingProgress {
   lineId String
   line   CuttingOrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
 
+  /// Which cutting run these garments came out of. REQUIRED: an entry that
+  /// belongs to no run is exactly the untraceable number this model exists to
+  /// get rid of. Entries captured before batches existed were backfilled into
+  /// their order's batch #1.
+  batchId String
+  batch   CuttingBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
   /// Garments cut in this batch. Negative corrects an earlier overcount.
   quantity Int
   notes    String?
@@ -1651,6 +1700,7 @@ model CuttingProgress {
   createdAt DateTime @default(now())
 
   @@index([lineId])
+  @@index([batchId])
   @@map("cutting_progress")
 }
 

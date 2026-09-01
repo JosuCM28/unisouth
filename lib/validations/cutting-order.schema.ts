@@ -67,6 +67,9 @@ export type CuttingOrderLineInput = z.infer<typeof cuttingOrderLineSchema>;
  */
 export const cuttingProgressSchema = z.object({
   lineId: cuidSchema,
+  /* De qué corte salieron. Obligatorio: un avance suelto es justo el número
+     sin rastro que los cortes vienen a quitar. */
+  batchId: cuidSchema,
   quantity: z.coerce
     .number({ message: "Escribe cuántas piezas se cortaron" })
     .int("Las piezas se cuentan enteras")
@@ -75,3 +78,54 @@ export const cuttingProgressSchema = z.object({
 });
 
 export type CuttingProgressInput = z.infer<typeof cuttingProgressSchema>;
+
+/**
+ * Abre un corte de una orden.
+ *
+ * El número NO se captura: lo pone el servidor correlativo dentro de la orden.
+ * Dejarlo teclear invita a que dos personas abran el "3er corte" a la vez.
+ */
+export const cuttingBatchSchema = z.object({
+  orderId: cuidSchema,
+  label: optionalText,
+  notes: optionalText,
+});
+
+export type CuttingBatchInput = z.infer<typeof cuttingBatchSchema>;
+
+/**
+ * La captura de una tanda completa: un corte y varias tallas de golpe.
+ *
+ * Es el flujo real del piso —se tiende, se corta de cada talla y se anota todo
+ * junto—, y hacerlo en una sola transacción evita que media captura quede
+ * guardada si se cae el WiFi a la mitad.
+ *
+ * Los renglones en cero se descartan ANTES de validar: en la pantalla se
+ * enseñan todas las tallas de la orden y lo normal es que en una tanda no
+ * salgan todas. Exigir un número en cada una obligaría a teclear ceros.
+ */
+export const batchProgressSchema = z.object({
+  orderId: cuidSchema,
+  /* El corte al que va la tanda. Si viene vacío se abre uno nuevo EN LA MISMA
+     transacción que la captura: hacerlo en dos llamadas dejaría un corte vacío
+     colgando cada vez que la captura fallara. */
+  batchId: optionalCuid,
+  newBatchLabel: optionalText,
+  notes: optionalText,
+  lines: z
+    .array(
+      z.object({
+        lineId: cuidSchema,
+        quantity: z.coerce
+          .number({ message: "Escribe cuántas piezas se cortaron" })
+          .int("Las piezas se cuentan enteras"),
+      }),
+    )
+    .transform((lines) => lines.filter((line) => line.quantity !== 0))
+    .refine(
+      (lines) => lines.length > 0,
+      "Captura cuántas piezas salieron de al menos una talla",
+    ),
+});
+
+export type BatchProgressInput = z.infer<typeof batchProgressSchema>;

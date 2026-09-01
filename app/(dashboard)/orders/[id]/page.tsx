@@ -25,6 +25,14 @@ import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
 import { OrderSendToIssueDialog } from "@/components/orders/order-send-to-issue-dialog";
 import { OrderShipmentDialog } from "@/components/orders/order-shipment-dialog";
 import {
+  OrderBatchDialog,
+  type BatchOption,
+} from "@/components/orders/order-batch-dialog";
+import {
+  OrderBatches,
+  type BatchView,
+} from "@/components/orders/order-batches";
+import {
   OrderShipments,
   type ShipmentView,
 } from "@/components/orders/order-shipments";
@@ -75,6 +83,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
             include: { user: { select: { name: true } } },
           },
         },
+      },
+      /* Los cortes, del más nuevo al más viejo: el que se está capturando es
+         el último y tiene que quedar arriba, tanto en la ficha como en el
+         selector del diálogo. */
+      batches: {
+        orderBy: { number: "desc" },
+        include: { createdBy: { select: { name: true } } },
       },
     },
   });
@@ -196,12 +211,50 @@ export default async function OrderDetailPage({ params }: PageProps) {
       order.cutNotes.length > 0,
   );
 
-  // Todos los avances de la orden, del más reciente al más viejo.
+  /* Todos los avances de la orden, del más reciente al más viejo. Se aplanan
+     desde las tallas porque la bitácora cuelga del renglón, no del corte. */
   const history = order.lines
     .flatMap((line) =>
       line.progress.map((entry) => ({ ...entry, sizeCode: line.size.code })),
     )
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  // Cada corte con las capturas que le pertenecen.
+  const batchViews: BatchView[] = order.batches.map((batch) => ({
+    id: batch.id,
+    number: batch.number,
+    label: batch.label,
+    notes: batch.notes,
+    openedAt: batch.openedAt,
+    openedByName: batch.createdBy?.name ?? null,
+    entries: history
+      .filter((entry) => entry.batchId === batch.id)
+      .map((entry) => ({
+        id: entry.id,
+        sizeCode: entry.sizeCode,
+        quantity: entry.quantity,
+        createdAt: entry.createdAt,
+        userName: entry.user?.name ?? null,
+        notes: entry.notes,
+      })),
+  }));
+
+  /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las
+     piezas y cuánto lleva cada uno, para reconocerlo en el selector. */
+  const batchOptions: BatchOption[] = batchViews.map((batch) => ({
+    id: batch.id,
+    number: batch.number,
+    label: batch.label,
+    openedAt: batch.openedAt,
+    pieces: batch.entries.reduce((sum, entry) => sum + entry.quantity, 0),
+  }));
+
+  const batchSizes = order.lines.map((line) => ({
+    lineId: line.id,
+    sizeCode: line.size.code,
+    ordered: line.orderedQuantity,
+    cut: line.cutQuantity,
+  }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -221,6 +274,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
         action={
           !isCancelled ? (
             <div className="flex flex-wrap gap-2">
+              {/* Va PRIMERO y es el único botón sólido: capturar el corte es
+                  lo que se viene a hacer a esta pantalla; imprimir y editar
+                  son lo de después. */}
+              <OrderBatchDialog
+                orderId={order.id}
+                batches={batchOptions}
+                sizes={batchSizes}
+              />
               <Button asChild variant="outline" className="touch-target">
                 <a href={`/print/order/${order.id}`} target="_blank" rel="noopener">
                   <Printer className="size-4" aria-hidden />
@@ -400,12 +461,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   </p>
                 </div>
 
-                {!isCancelled && (
+                {/* Sin ningún corte abierto no hay a qué cargar las piezas:
+                    el botón llevaría a un diálogo que no puede guardar. La
+                    primera captura se hace con "Capturar corte". */}
+                {!isCancelled && batchOptions.length > 0 && (
                   <OrderProgressDialog
                     lineId={line.id}
                     sizeCode={line.size.code}
                     ordered={line.orderedQuantity}
                     cut={line.cutQuantity}
+                    batches={batchOptions}
                     trigger={
                       <Button
                         variant="outline"
@@ -501,51 +566,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
         )}
       </section>
 
-      {/* El historial: responde cuándo se cortó cada tanda, que es lo que un
-          número acumulado no puede decir. */}
+      {/* El historial, agrupado por tanda: un acumulado dice cuánto llevas,
+          pero no cuántas dio el segundo corte, que es lo que se pregunta. */}
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">
-          Historial de cortes ({history.length})
+          Cortes ({batchViews.length})
         </h2>
-
-        {history.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aún no se registra ningún avance.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {history.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-start justify-between gap-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="tabular text-sm">
-                    Talla {entry.sizeCode}
-                    <span
-                      className={cn(
-                        "ml-2 font-medium",
-                        entry.quantity < 0 && "text-state-defective",
-                      )}
-                    >
-                      {entry.quantity > 0 ? "+" : ""}
-                      {entry.quantity}
-                    </span>
-                  </p>
-                  <p className="tabular text-xs text-muted-foreground">
-                    {formatDateTime(entry.createdAt)}
-                    {entry.user?.name && ` · ${entry.user.name}`}
-                  </p>
-                  {entry.notes && (
-                    <p className="text-xs text-muted-foreground">
-                      {entry.notes}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <OrderBatches batches={batchViews} />
       </section>
     </div>
   );

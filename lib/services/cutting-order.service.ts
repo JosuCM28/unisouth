@@ -1,11 +1,16 @@
-import type { CuttingOrder } from "@prisma/client";
+import type { CuttingBatch, CuttingOrder } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import type {
+  BatchProgressInput,
+  CuttingBatchInput,
   CuttingOrderInput,
   CuttingProgressInput,
 } from "@/lib/validations/cutting-order.schema";
 import { BaseService } from "./base.service";
 import { DocumentService } from "./document.service";
+
+/** La transacción que reparte `BaseService`. */
+type Tx = Parameters<Parameters<BaseService["transaction"]>[0]>[0];
 
 /**
  * Órdenes de corte: qué pidió el cliente y cómo va el corte.
@@ -184,7 +189,43 @@ export class CuttingOrderService extends BaseService {
   }
 
   /**
-   * Registra que se cortaron N piezas de una talla.
+   * Abre el siguiente corte de una orden.
+   *
+   * El número es correlativo DENTRO de la orden y se calcula aquí, en la
+   * transacción: el piso dice "el segundo corte de esta orden", nunca "el
+   * corte 4,712", así que no va por `SequenceService`. El `@@unique(orderId,
+   * number)` del esquema es la red: si dos personas abren corte a la vez, una
+   * de las dos choca contra el índice en vez de crear dos "2º corte".
+   */
+  async openBatch(input: CuttingBatchInput): Promise<CuttingBatch> {
+    return this.transaction(async (tx) => {
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id: input.orderId },
+        select: { id: true, code: true, status: true },
+      });
+      if (!order) throw new NotFoundError("la orden", input.orderId);
+
+      if (order.status === "CANCELLED") {
+        throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
+      }
+
+      const batch = await this.createBatch(tx, input.orderId, input.label, input.notes);
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: order.id,
+        action: "UPDATE",
+        reference: order.code,
+        newValue: { corteAbierto: batch.number, nombre: input.label },
+        sensitivity: "LOW",
+      });
+
+      return batch;
+    });
+  }
+
+  /**
+   * Registra que se cortaron N piezas de una talla, dentro de un corte.
    *
    * El total de la talla se recalcula sumando su bitácora y NO incrementando
    * el número guardado: si dos personas capturan avance a la vez, sumar sobre
@@ -205,34 +246,19 @@ export class CuttingOrderService extends BaseService {
         );
       }
 
+      const batch = await this.requireBatch(tx, input.batchId, line.orderId);
+
       await tx.cuttingProgress.create({
         data: {
           lineId: input.lineId,
+          batchId: batch.id,
           quantity: input.quantity,
           notes: input.notes,
           userId: this.context.userId,
         },
       });
 
-      const total = await tx.cuttingProgress.aggregate({
-        where: { lineId: input.lineId },
-        _sum: { quantity: true },
-      });
-      const cut = total._sum.quantity ?? 0;
-
-      /* Un avance no puede dejar el total en negativo: sería un corte que se
-         deshizo más veces de las que se hizo, y sólo puede ser un error de
-         captura. */
-      if (cut < 0) {
-        throw new BusinessRuleError(
-          `El avance dejaría la talla ${line.size.code} en negativo.`,
-        );
-      }
-
-      await tx.cuttingOrderLine.update({
-        where: { id: input.lineId },
-        data: { cutQuantity: cut },
-      });
+      const cut = await this.recalculateLine(tx, input.lineId, line.size.code);
 
       await this.syncStatus(tx, line.orderId);
 
@@ -241,13 +267,186 @@ export class CuttingOrderService extends BaseService {
         entityId: line.orderId,
         action: "UPDATE",
         reference: `${line.order.code} · talla ${line.size.code}`,
-        newValue: { avance: input.quantity, acumulado: cut },
+        newValue: {
+          corte: batch.number,
+          avance: input.quantity,
+          acumulado: cut,
+        },
         sensitivity: "LOW",
         reason: input.notes,
       });
 
       return { cutQuantity: cut };
     });
+  }
+
+  /**
+   * Captura una tanda completa: un corte y varias tallas de un jalón.
+   *
+   * Es el flujo real del piso —se tiende, salen 5 de la 32 y 5 de la 45, y se
+   * anota todo junto—, y por eso va en UNA transacción: media captura guardada
+   * porque se cayó el WiFi a la mitad deja la orden diciendo una mentira.
+   *
+   * El estado de la orden se sincroniza UNA vez al final y no por talla: es el
+   * mismo cálculo sobre los mismos renglones, y repetirlo por cada una sólo
+   * gastaría viajes a la base.
+   */
+  async addBatchProgress(input: BatchProgressInput) {
+    return this.transaction(async (tx) => {
+      const lines = await tx.cuttingOrderLine.findMany({
+        where: { id: { in: input.lines.map((line) => line.lineId) } },
+        include: { order: true, size: { select: { code: true } } },
+      });
+
+      if (lines.length !== input.lines.length) {
+        throw new NotFoundError("el renglón", "de la captura");
+      }
+
+      /* Todas las tallas tienen que ser de la MISMA orden, y de la que dice el
+         formulario: el corte pertenece a una, y aceptar renglones de otra
+         colgaría piezas de una tanda que nunca las cortó. */
+      const orderIds = new Set(lines.map((line) => line.orderId));
+      if (orderIds.size !== 1 || !orderIds.has(input.orderId)) {
+        throw new BusinessRuleError(
+          "Las tallas de una captura tienen que ser de la misma orden.",
+        );
+      }
+
+      const orderId = input.orderId;
+
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id: orderId },
+        select: { code: true, status: true },
+      });
+      if (!order) throw new NotFoundError("la orden", orderId);
+
+      if (order.status === "CANCELLED") {
+        throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
+      }
+
+      /* Sin corte elegido se abre uno aquí mismo: así el corte nuevo y las
+         piezas que lo estrenan se confirman o se revierten juntos, y no queda
+         un corte vacío si la captura falla. */
+      const batch = input.batchId
+        ? await this.requireBatch(tx, input.batchId, orderId)
+        : await this.createBatch(tx, orderId, input.newBatchLabel);
+
+      const byId = new Map(lines.map((line) => [line.id, line]));
+      let total = 0;
+
+      for (const entry of input.lines) {
+        /* El `!` es seguro por el conteo de arriba: si algún id no existiera
+           —o viniera repetido— `findMany` habría devuelto menos renglones de
+           los que pide la captura y ya se habría lanzado NotFoundError. */
+        const line = byId.get(entry.lineId)!;
+
+        await tx.cuttingProgress.create({
+          data: {
+            lineId: entry.lineId,
+            batchId: batch.id,
+            quantity: entry.quantity,
+            notes: input.notes,
+            userId: this.context.userId,
+          },
+        });
+
+        await this.recalculateLine(tx, entry.lineId, line.size.code);
+        total += entry.quantity;
+      }
+
+      await this.syncStatus(tx, orderId);
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: orderId,
+        action: "UPDATE",
+        reference: `${order.code} · ${batch.number}º corte`,
+        newValue: {
+          corte: batch.number,
+          tallas: input.lines.length,
+          piezas: total,
+        },
+        sensitivity: "LOW",
+        reason: input.notes,
+      });
+
+      return { batchId: batch.id, pieces: total, sizes: input.lines.length };
+    });
+  }
+
+  /**
+   * Crea el corte con el siguiente número de la orden.
+   *
+   * Privado y con `tx` explícito porque lo usan dos caminos —abrir un corte a
+   * mano y capturar una tanda en uno nuevo— y ambos tienen que numerarlo
+   * dentro de SU transacción. Llamar a `openBatch()` desde adentro abriría una
+   * segunda transacción, y Postgres no anida.
+   */
+  private async createBatch(
+    tx: Tx,
+    orderId: string,
+    label?: string,
+    notes?: string,
+  ) {
+    const last = await tx.cuttingBatch.findFirst({
+      where: { orderId },
+      orderBy: { number: "desc" },
+      select: { number: true },
+    });
+
+    return tx.cuttingBatch.create({
+      data: {
+        orderId,
+        number: (last?.number ?? 0) + 1,
+        label,
+        notes,
+        createdById: this.context.userId,
+      },
+    });
+  }
+
+  /** El corte, comprobando que de verdad sea de esta orden. */
+  private async requireBatch(tx: Tx, batchId: string, orderId: string) {
+    const batch = await tx.cuttingBatch.findUnique({ where: { id: batchId } });
+    if (!batch) throw new NotFoundError("el corte", batchId);
+
+    if (batch.orderId !== orderId) {
+      throw new BusinessRuleError(
+        "Ese corte es de otra orden. Elige uno de esta.",
+      );
+    }
+
+    return batch;
+  }
+
+  /**
+   * Recalcula el acumulado de una talla desde su bitácora y lo guarda.
+   *
+   * Suma el log en vez de incrementar el número guardado: dos capturas
+   * simultáneas sobre un valor leído antes perderían una de las dos.
+   */
+  private async recalculateLine(tx: Tx, lineId: string, sizeCode: string) {
+    const total = await tx.cuttingProgress.aggregate({
+      where: { lineId },
+      _sum: { quantity: true },
+    });
+    const cut = total._sum.quantity ?? 0;
+
+    /* Un avance no puede dejar el total en negativo: sería un corte que se
+       deshizo más veces de las que se hizo, y sólo puede ser un error de
+       captura. */
+    if (cut < 0) {
+      throw new BusinessRuleError(
+        `El avance dejaría la talla ${sizeCode} en negativo.`,
+      );
+    }
+
+    await tx.cuttingOrderLine.update({
+      where: { id: lineId },
+      data: { cutQuantity: cut },
+    });
+
+    return cut;
   }
 
   /** Cancela la orden. No se borra: su historial de corte debe conservarse. */
@@ -446,10 +645,7 @@ export class CuttingOrderService extends BaseService {
    * Que alguien tenga que acordarse de marcar una orden como terminada es
    * garantía de que el tablero mienta: se calcula de lo que ya está capturado.
    */
-  private async syncStatus(
-    tx: Parameters<Parameters<BaseService["transaction"]>[0]>[0],
-    orderId: string,
-  ) {
+  private async syncStatus(tx: Tx, orderId: string) {
     const lines = await tx.cuttingOrderLine.findMany({
       where: { orderId },
       select: { orderedQuantity: true, cutQuantity: true },

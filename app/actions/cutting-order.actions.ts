@@ -4,6 +4,8 @@ import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, requiredText } from "@/lib/validations/common";
 import {
+  batchProgressSchema,
+  cuttingBatchSchema,
   cuttingOrderSchema,
   cuttingProgressSchema,
 } from "@/lib/validations/cutting-order.schema";
@@ -49,6 +51,35 @@ export async function addCuttingProgressAction(input: unknown) {
     successMessage: "Avance registrado",
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).addProgress(input),
+  });
+}
+
+/** Abre el siguiente corte de la orden. El número lo pone el servidor. */
+export async function openCuttingBatchAction(input: unknown) {
+  return executeAction(input, {
+    schema: cuttingBatchSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Corte abierto",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).openBatch(input),
+  });
+}
+
+/**
+ * Captura una tanda entera: un corte y varias tallas de un jalón.
+ *
+ * Es la acción principal del piso desde que existen los cortes; la de una sola
+ * talla queda para correcciones.
+ */
+export async function addBatchProgressAction(input: unknown) {
+  return executeAction(input, {
+    schema: batchProgressSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Corte capturado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).addBatchProgress(input),
   });
 }
 
