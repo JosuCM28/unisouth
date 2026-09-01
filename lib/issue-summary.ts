@@ -10,7 +10,7 @@ export interface IssueSummary {
   materialNames: string[];
   /** Rollos del vale. */
   lots: number;
-  /** Prendas del desglose de corte, si lo trae. */
+  /** Total de prendas del desglose de corte (cantidad × bultos), si lo trae. */
   cutPieces: number;
 }
 
@@ -43,7 +43,7 @@ export async function getIssueSummaries(
     }),
     prisma.documentCutLine.findMany({
       where: { documentId: { in: documentIds } },
-      select: { documentId: true, quantity: true },
+      select: { documentId: true, quantity: true, bundles: true },
     }),
   ]);
 
@@ -67,7 +67,10 @@ export async function getIssueSummaries(
 
   for (const cut of cuts) {
     const current = summaries.get(cut.documentId) ?? emptySummary();
-    current.cutPieces += Number(cut.quantity);
+    // `quantity` es la cantidad POR BULTO, no el total del renglón: 64 en 2
+    // bultos son 128 prendas. Sumar sólo `quantity` dejaba la tarjeta con la
+    // mitad de lo que realmente salió al taller.
+    current.cutPieces += Number(cut.quantity) * Number(cut.bundles);
     summaries.set(cut.documentId, current);
   }
 

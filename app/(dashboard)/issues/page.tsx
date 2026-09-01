@@ -3,11 +3,14 @@ import Link from "next/link";
 import { PackageMinus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getIssueSummaries } from "@/lib/issue-summary";
+import { parseIssueFilters, issueWhere } from "@/lib/repositories/issue-filters";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pager } from "@/components/shared/pager";
+import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import { IssueCard } from "@/components/issues/issue-card";
+import { IssueFilters } from "@/components/issues/issue-filters";
 import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Salidas" };
@@ -24,7 +27,12 @@ const EMPTY_SUMMARY = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; all?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    page?: string;
+    all?: string;
+  }>;
 }
 
 export default async function IssuesPage({ searchParams }: PageProps) {
@@ -42,10 +50,11 @@ export default async function IssuesPage({ searchParams }: PageProps) {
   const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
   const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
 
-  // Sólo salidas: los vales de entrada tienen su propio registro y mezclarlos
-  // obligaría a leer el tipo de cada renglón para saber si el material entró
-  // o salió.
-  const where = { type: "ISSUE" as const };
+  // El buscador pega contra folio, encabezado de corte, quién entregó/recibió,
+  // cliente, tela y los rollos y tallas que llevó; el chip acota por estado.
+  const filters = parseIssueFilters(params);
+  const where = issueWhere(filters);
+  const isFiltered = Boolean(filters.search || filters.status);
 
   const [total, issues] = await Promise.all([
     prisma.inventoryDocument.count({ where }),
@@ -88,12 +97,24 @@ export default async function IssuesPage({ searchParams }: PageProps) {
         }
       />
 
+      <div className="flex flex-col gap-2">
+        <SearchInput
+          placeholder="Folio, orden, tela, prenda, quién recibió…"
+          className="w-full md:max-w-sm"
+        />
+        <IssueFilters />
+      </div>
+
       {issues.length === 0 ? (
         <div className="flat-surface">
           <EmptyState
             icon={PackageMinus}
-            title="Aún no hay salidas"
-            description="Registra la primera cuando producción se lleve material."
+            title={isFiltered ? "Ninguna salida coincide" : "Aún no hay salidas"}
+            description={
+              isFiltered
+                ? "Prueba con menos palabras o quita el filtro de estado."
+                : "Registra la primera cuando producción se lleve material."
+            }
           />
         </div>
       ) : (
