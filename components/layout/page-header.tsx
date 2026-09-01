@@ -18,7 +18,12 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
         )}
       </div>
 
-      {action && <div className="shrink-0">{action}</div>}
+      {/* `max-w-full` además de `shrink-0`: sin el tope, un encabezado con
+          varias acciones se mide a su ancho natural —`shrink-0` se lo permite—
+          y el `flex-wrap` de dentro nunca llega a envolver. La ficha de una
+          orden, que lleva ocho botones, sacaba la página 496px de ancho en un
+          celular de 375 y todo se barría de lado. */}
+      {action && <div className="max-w-full shrink-0">{action}</div>}
     </div>
   );
 }

@@ -54,8 +54,13 @@ export function OrderBatches({ batches }: { batches: BatchView[] }) {
 
         return (
           <li key={batch.id} className="flat-surface flex flex-col gap-2 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
+            {/* El total SIEMPRE a la derecha del nombre. La nota va fuera de
+                esta fila —no dentro de la columna izquierda— porque su ancho
+                natural empujaba el número al renglón de abajo en cuanto el
+                texto era largo, y en celular cada corte quedaba maquetado
+                distinto según lo que alguien hubiera escrito. */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">
                   {cutBatchLabel(batch.number, batch.label)}
                 </p>
@@ -63,15 +68,16 @@ export function OrderBatches({ batches }: { batches: BatchView[] }) {
                   {formatDate(batch.openedAt)}
                   {batch.openedByName && ` · ${batch.openedByName}`}
                 </p>
-                {batch.notes && (
-                  <p className="text-xs text-muted-foreground">{batch.notes}</p>
-                )}
               </div>
 
               <p className="tabular shrink-0 text-2xl font-semibold leading-none">
                 {total}
               </p>
             </div>
+
+            {batch.notes && (
+              <p className="text-xs text-muted-foreground">{batch.notes}</p>
+            )}
 
             {batch.entries.length === 0 ? (
               /* Un corte abierto sin piezas es un estado válido: se abrió para

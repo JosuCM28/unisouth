@@ -202,6 +202,12 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
                       {surplus > 0
                         ? ` · sobran ${surplus}`
                         : ` · faltan ${pending}`}
+                      {/* El acumulado que quedaría va AQUÍ y no en una
+                          columna aparte: como sólo aparece en la talla que se
+                          está tecleando, una columna propia movía ese input y
+                          lo desalineaba de los demás justo mientras se
+                          captura de pie con una mano. */}
+                      {typed !== 0 && ` · quedaría en ${size.cut + typed}`}
                     </p>
                   </div>
 
@@ -218,14 +224,6 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
                     }
                     className="tabular touch-target w-24 shrink-0 text-right"
                   />
-
-                  {/* El acumulado que quedaría, sólo en la talla que se está
-                      tecleando: es la comprobación que se hace en voz alta. */}
-                  {typed !== 0 && (
-                    <span className="tabular w-16 shrink-0 text-right text-xs text-muted-foreground">
-                      → {size.cut + typed}
-                    </span>
-                  )}
                 </li>
               );
             })}
