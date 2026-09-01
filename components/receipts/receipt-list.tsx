@@ -94,10 +94,13 @@ export function ReceiptList({
     {
       id: "client",
       header: "Cliente",
-      accessorFn: (receipt) => receipt.client?.name ?? "Fábrica",
+      /* De los ROLLOS, no del encabezado: una guía compartida no tiene dueño
+         arriba, y leerlo de ahí pondría "Fábrica" sobre tela que sí es de un
+         cliente. Con más de dos se cuentan, para no reventar la columna. */
+      accessorFn: (receipt) => ownersLabel(receipt.ownerNames),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {row.original.client?.name ?? "Fábrica"}
+          {ownersLabel(row.original.ownerNames)}
         </span>
       ),
     },
@@ -161,4 +164,11 @@ export function ReceiptList({
       />
     </div>
   );
+}
+
+/** Uno o dos dueños se nombran; de tres en adelante se cuentan. */
+function ownersLabel(owners: string[]): string {
+  if (owners.length === 0) return "Fábrica";
+  if (owners.length <= 2) return owners.join(" · ");
+  return `${owners.length} dueños`;
 }

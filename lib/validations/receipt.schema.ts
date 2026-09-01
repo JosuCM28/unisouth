@@ -2,7 +2,13 @@ import { z } from "zod";
 import { MeasurementSource, Unit } from "@prisma/client";
 import { cuidSchema, optionalCuid, optionalNumber, optionalText, positiveQuantity, localDate } from "./common";
 
-/** Paso 1 del wizard: de dónde viene la carga. Sólo la fecha es obligatoria. */
+/**
+ * Paso 1 del wizard: de dónde viene la carga. Sólo la fecha es obligatoria.
+ *
+ * `clientId` sigue aquí para PODER CORREGIRLO después, no para capturarlo: el
+ * dueño se elige rollo por rollo porque una misma guía puede traer tela de dos
+ * clientes. Al dar de alta, este campo se DERIVA de los rollos.
+ */
 export const receiptHeaderSchema = z.object({
   date: localDate,
   guideNumber: optionalText,
@@ -22,6 +28,11 @@ export const receiptLotSchema = z.object({
   quantity: positiveQuantity,
   unit: z.nativeEnum(Unit),
   locationId: optionalCuid,
+  /// De qué CLIENTE es esta tela. Va por rollo y no por recepción porque una
+  /// misma guía puede traer tela de dos clientes, y la regla que no se rompe
+  /// es que jamás se surte material de uno a la producción de otro. Vacío =
+  /// de la fábrica.
+  clientId: optionalCuid,
   /// Quién bajó ESTE rollo del camión. Va por rollo y no por recepción
   /// porque dos ayudantes pueden repartirse un mismo camión.
   helperId: optionalCuid,

@@ -61,7 +61,6 @@ interface HeaderState {
   carrierId: string;
   origin: string;
   supplierId: string;
-  clientId: string;
   invoiceRef: string;
 }
 
@@ -70,6 +69,9 @@ interface LotRow {
   quantity: string;
   unit: Unit | "";
   locationId: string;
+  /** De qué cliente es esta tela. Va por rollo: una guía puede traer tela de
+   *  dos clientes y jamás se surte la de uno a la producción de otro. */
+  clientId: string;
   /** Quién bajó este rollo. Va por rollo: dos ayudantes pueden repartirse
    *  un mismo camión y cada uno cobra lo suyo. */
   helperId: string;
@@ -111,7 +113,6 @@ export function ReceiptWizard({
     carrierId: "",
     origin: "",
     supplierId: "",
-    clientId: "",
     invoiceRef: "",
   });
 
@@ -125,12 +126,6 @@ export function ReceiptWizard({
    * select sin recargar: recargar perdería los rollos ya capturados.
    */
   const [materialOptions, setMaterialOptions] = useState(materials);
-
-  /* El dueño no es un dato del material sino de la recepción: se eligió en el
-     paso 1 y aplica a todos los rollos de esta carga. Se muestra en cada
-     renglón porque surtir tela del cliente equivocado es el error caro. */
-  const clientName =
-    clients.find((client) => client.id === header.clientId)?.name ?? null;
 
   /** Igual que los materiales: uno nuevo debe aparecer sin recargar. */
   const [helperOptions, setHelperOptions] = useState(helpers);
@@ -147,7 +142,6 @@ export function ReceiptWizard({
     Boolean(header.carrierId) ||
     Boolean(header.origin) ||
     Boolean(header.supplierId) ||
-    Boolean(header.clientId) ||
     Boolean(header.invoiceRef);
 
   /* Mientras se guarda ya no se avisa: el `router.push` del final es una
@@ -279,6 +273,7 @@ export function ReceiptWizard({
         quantity: row.quantity,
         unit: row.unit,
         locationId: row.locationId || undefined,
+        clientId: row.clientId || undefined,
         helperId: row.helperId || undefined,
         shade: row.shade || undefined,
         supplierLotNumber: row.supplierLotNumber || undefined,
@@ -296,7 +291,6 @@ export function ReceiptWizard({
       carrierId: header.carrierId || undefined,
       origin: header.origin || undefined,
       supplierId: header.supplierId || undefined,
-      clientId: header.clientId || undefined,
       invoiceRef: header.invoiceRef || undefined,
       lots,
     }));
@@ -372,36 +366,19 @@ export function ReceiptWizard({
             onChange={(event) => setHeader({ ...header, origin: event.target.value })}
           />
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <FormSelectField id="supplierId" label="Proveedor">
-              <SearchSelect
-                id="supplierId"
-                options={supplierOptions}
-                value={header.supplierId}
-                onChange={(value) => setHeader({ ...header, supplierId: value })}
-                placeholder="Sin especificar"
-                searchPlaceholder="Buscar proveedor…"
-                clearLabel="Sin especificar"
-              />
-            </FormSelectField>
-
-            {/* El dueño se hereda a TODOS los rollos de la carga. */}
-            <FormSelectField
-              id="clientId"
-              label="Cliente dueño"
-              hint="Se aplica a todos los rollos de esta guía."
-            >
-              <SearchSelect
-                id="clientId"
-                options={clientOptions}
-                value={header.clientId}
-                onChange={(value) => setHeader({ ...header, clientId: value })}
-                placeholder="De la fábrica"
-                searchPlaceholder="Buscar cliente…"
-                clearLabel="De la fábrica"
-              />
-            </FormSelectField>
-          </div>
+          {/* El dueño NO está aquí: se elige en cada rollo, porque una misma
+              guía puede traer tela de dos clientes. */}
+          <FormSelectField id="supplierId" label="Proveedor">
+            <SearchSelect
+              id="supplierId"
+              options={supplierOptions}
+              value={header.supplierId}
+              onChange={(value) => setHeader({ ...header, supplierId: value })}
+              placeholder="Sin especificar"
+              searchPlaceholder="Buscar proveedor…"
+              clearLabel="Sin especificar"
+            />
+          </FormSelectField>
 
           <FormField
             id="invoiceRef"
@@ -505,7 +482,23 @@ export function ReceiptWizard({
                     material={materialOptions.find(
                       (item) => item.id === row.materialId,
                     )}
-                    clientName={clientName}
+                  />
+                </FormSelectField>
+
+                {/* De quién es ESTA tela. Va por rollo y no en el encabezado
+                    porque una guía puede traer tela de dos clientes, y va
+                    arriba —junto al material, no perdido al final— porque
+                    surtir la tela del cliente equivocado es el error caro.
+                    "Duplicar" lo arrastra como al resto del renglón. */}
+                <FormSelectField id={`client-row-${index}`} label="Cliente dueño">
+                  <SearchSelect
+                    id={`client-row-${index}`}
+                    options={clientOptions}
+                    value={row.clientId}
+                    onChange={(value) => updateRow(index, { clientId: value })}
+                    placeholder="De la fábrica"
+                    searchPlaceholder="Buscar cliente…"
+                    clearLabel="De la fábrica"
                   />
                 </FormSelectField>
 
@@ -775,26 +768,23 @@ function UnitMismatchNotice({
  * Ficha rápida del material seleccionado.
  *
  * No repite el nombre —ya se lee en el select de arriba— sino lo que el
- * auxiliar necesita cotejar contra la etiqueta física: de quién es la tela,
- * de qué está hecha y de qué color. Si el material no trae esos datos
- * capturados, se dice explícitamente en vez de mostrar un hueco: "sin
- * composición registrada" es información, un espacio en blanco no.
+ * auxiliar necesita cotejar contra la etiqueta física: de qué está hecha la
+ * tela y de qué color. Si el material no trae esos datos capturados, se dice
+ * explícitamente en vez de mostrar un hueco: "sin composición registrada" es
+ * información, un espacio en blanco no.
+ *
+ * El dueño NO está aquí: es un dato del rollo —se elige abajo y cambia de un
+ * renglón a otro—, no del material del catálogo.
  */
 function MaterialPreview({
   material,
-  clientName,
 }: {
   material: MaterialOption | undefined;
-  clientName: string | null;
 }) {
   if (!material) return null;
 
   return (
     <dl className="mt-2 flex flex-col gap-1 border border-border bg-muted/40 p-2.5 text-xs">
-      <PreviewRow
-        label="Cliente dueño"
-        value={clientName ?? "De la fábrica"}
-      />
       <PreviewRow label="Color" value={material.colorName} />
       <PreviewRow label="Composición" value={material.composition} />
       <PreviewRow label="Código" value={material.code} tabular />
@@ -917,6 +907,7 @@ function emptyRow(): LotRow {
     quantity: "",
     unit: "",
     locationId: "",
+    clientId: "",
     helperId: "",
     shade: "",
     supplierLotNumber: "",

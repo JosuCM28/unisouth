@@ -42,6 +42,22 @@ function pickHeader(receipt: Receipt): Record<string, unknown> {
 }
 
 /**
+ * El dueño de la guía, si TODOS sus rollos son del mismo.
+ *
+ * `undefined` cuando vienen de dos clientes: una carga compartida no tiene un
+ * dueño, y guardar el del primer rollo haría que la tarjeta y el filtro de
+ * recepciones afirmaran algo falso. El dato de verdad vive en cada rollo.
+ */
+function singleOwner(lots: { clientId?: string }[]): string | undefined {
+  const owners = new Set(lots.map((lot) => lot.clientId ?? ""));
+  if (owners.size !== 1) return undefined;
+
+  // El único dueño, o `undefined` si ese único valor es "de la fábrica".
+  const [owner] = [...owners];
+  return owner || undefined;
+}
+
+/**
  * Recepción de mercancía: la carga que llega en el camión.
  *
  * Da de alta N rollos de golpe y los cuelga todos de la misma recepción, para
@@ -127,11 +143,23 @@ export class ReceiptService extends BaseService {
       select: {
         id: true,
         code: true,
+        clientId: true,
         initialQuantity: true,
         currentQuantity: true,
         reservedQuantity: true,
       },
     });
+
+    /* Una guía COMPARTIDA no se toca. Si sus rollos ya están repartidos entre
+       dos clientes, bajarles el dueño del encabezado aplastaría de un golpe la
+       separación que alguien capturó rollo por rollo —y separar el material por
+       dueño es la regla que sostiene todo lo demás—. Se devuelven todos como
+       "conservados" para poder decírselo al usuario: aquí el dueño se corrige
+       en la ficha de cada rollo. */
+    const owners = new Set(lots.map((lot) => lot.clientId ?? ""));
+    if (owners.size > 1) {
+      return { reassignedLotCodes: [], keptLotCodes: lots.map((l) => l.code) };
+    }
 
     const intact = lots.filter(
       (lot) =>
@@ -168,7 +196,8 @@ export class ReceiptService extends BaseService {
           carrierId: input.carrierId,
           origin: input.origin,
           supplierId: input.supplierId,
-          clientId: input.clientId,
+          // El dueño de la GUÍA se deduce de sus rollos, no se captura.
+          clientId: singleOwner(input.lots),
           invoiceRef: input.invoiceRef,
           orderRef: input.orderRef,
           packageCount: input.packageCount,
@@ -187,9 +216,11 @@ export class ReceiptService extends BaseService {
             code: lotCode,
             materialId: lotInput.materialId,
             receiptId: receipt.id,
-            // El dueño se hereda del encabezado: toda la carga de una guía
-            // suele ser del mismo cliente.
-            clientId: input.clientId,
+            /* El dueño es de ESTE rollo. Antes se heredaba del encabezado, y
+               una guía que traía tela de dos clientes quedaba toda a nombre de
+               uno: material del cliente equivocado listo para surtirse a la
+               producción de otro, que es el error que no se puede cometer. */
+            clientId: lotInput.clientId,
             locationId: lotInput.locationId,
             // Quien lo bajó: sostiene el cálculo de su bonificación.
             helperId: lotInput.helperId,

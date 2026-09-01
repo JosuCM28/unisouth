@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Boxes, MapPin, Palette } from "lucide-react";
+import { Boxes, MapPin, Palette, User } from "lucide-react";
 import type { LotStatus, Unit } from "@prisma/client";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity } from "@/lib/utils";
@@ -20,6 +20,8 @@ export interface ReceiptLotRow {
   material: { name: string; code: string };
   location: { code: string } | null;
   helper: { name: string } | null;
+  /** El dueño de ESTE rollo. Vacío = de la fábrica. */
+  client: { name: string } | null;
 }
 
 /**
@@ -95,6 +97,10 @@ export function ReceiptLots({ lots }: { lots: ReceiptLotRow[] }) {
 
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <StatusChip status={lot.status} />
+              {/* El dueño va PRIMERO entre los chips: una guía puede traer
+                  tela de dos clientes, y de quién es cada rollo es lo que
+                  decide a qué producción se puede surtir. */}
+              <Chip icon={User} label={lot.client?.name ?? "De la fábrica"} />
               {lot.location && <Chip icon={MapPin} label={lot.location.code} />}
               {lot.shade && <Chip icon={Palette} label={lot.shade} />}
               {lot.supplierLotNumber && (

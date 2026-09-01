@@ -57,6 +57,8 @@ interface LotRow {
   material: { code: string; name: string; composition: string | null };
   location: { code: string } | null;
   helper: { id: string; name: string } | null;
+  /** El dueño de ESTE rollo: una guía puede traer tela de dos clientes. */
+  client: { name: string } | null;
 }
 
 /** Acumulador de una agrupación: cuántos rollos y cuánto de cada unidad. */
@@ -88,7 +90,9 @@ export async function GET(
   const lots = receipt.lots as unknown as LotRow[];
 
   const rows: ReceiptCsvRow[] = [
-    ...headerRows(receipt, lots.length),
+    ...headerRows(receipt, lots.length, [
+      ...new Set(lots.map((lot) => lot.client?.name ?? "De la fábrica")),
+    ]),
     ...helperRows(lots),
     ...materialRows(lots),
     ...colorRows(lots),
@@ -114,6 +118,7 @@ function headerRows(
     recordedBy: { name: string } | null;
   },
   lotCount: number,
+  owners: string[],
 ): ReceiptCsvRow[] {
   const meta: [string, string][] = [
     ["Folio", receipt.code],
@@ -121,7 +126,9 @@ function headerRows(
     ["Guía", receipt.guideNumber ?? "—"],
     ["Paquetería", receipt.carrier?.name ?? "—"],
     ["Proveedor", receipt.supplier?.name ?? "—"],
-    ["Cliente dueño", receipt.client?.name ?? "De la fábrica"],
+    // De los rollos: en una guía compartida el encabezado está vacío a
+    // propósito y leerlo de ahí diría "de la fábrica" sobre tela con dueño.
+    ["Cliente dueño", owners.join(" · ") || "De la fábrica"],
     ["Origen", receipt.origin ?? "—"],
     ["Registró", receipt.recordedBy?.name ?? "—"],
     ["Rollos recibidos", String(lotCount)],
@@ -189,6 +196,9 @@ function detailRows(lots: LotRow[]): ReceiptCsvRow[] {
     concept: lot.code,
     detail: [
       lot.material.name,
+      // El dueño va por rollo: en una guía compartida es el único lugar del
+      // archivo que dice cuál tela es de quién.
+      lot.client ? `de ${lot.client.name}` : "de la fábrica",
       lot.helper ? `bajó ${lot.helper.name}` : "sin ayudante",
       lot.location ? `ubic. ${lot.location.code}` : "sin ubicación",
       lot.supplierLotNumber ? `lote ${lot.supplierLotNumber}` : "",

@@ -67,7 +67,13 @@ export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
       {/* Sólo se pintan los chips que traen dato: una fila de "—" ocupa el
           mismo espacio que la información y no dice nada. */}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        {receipt.client && <Chip icon={User} label={receipt.client.name} />}
+        {/* Los dueños salen de los rollos, no del encabezado: una guía puede
+            traer tela de dos clientes y en ese caso el encabezado está vacío
+            a propósito. Con más de dos se cuentan, que si no el chip se come
+            la tarjeta entera en el celular. */}
+        {receipt.ownerNames.length > 0 && (
+          <Chip icon={User} label={ownersLabel(receipt.ownerNames)} />
+        )}
         {receipt.origin && <Chip icon={Boxes} label={receipt.origin} />}
         {receipt.invoiceRef && (
           <Chip icon={Factory} label={`Factura ${receipt.invoiceRef}`} />
@@ -100,4 +106,10 @@ function Chip({
       <span className="truncate">{label}</span>
     </span>
   );
+}
+
+/** Uno o dos dueños se nombran; de tres en adelante se cuentan. */
+function ownersLabel(owners: string[]): string {
+  if (owners.length <= 2) return owners.join(" · ");
+  return `${owners.length} dueños`;
 }

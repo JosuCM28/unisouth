@@ -32,6 +32,14 @@ export interface ReceiptCardData extends Receipt {
   totalQuantity: number;
   unit: Unit | null;
   materialNames: string[];
+  /**
+   * Los dueños de sus rollos, sin repetir.
+   *
+   * Van en plural porque una guía puede traer tela de dos clientes; en ese
+   * caso el `clientId` del encabezado queda vacío y pintar la tarjeta desde
+   * ahí diría "de la fábrica" sobre material que sí tiene dueño.
+   */
+  ownerNames: string[];
 }
 
 export class ReceiptRepository extends BaseRepository<
@@ -84,7 +92,11 @@ export class ReceiptRepository extends BaseRepository<
       ];
     }
 
-    if (filters.clientId) where.clientId = filters.clientId;
+    /* Se filtra por el dueño de los ROLLOS y no por el del encabezado: una
+       guía compartida entre dos clientes no tiene dueño en el encabezado, y
+       filtrando por ahí se caería de las dos listas justo cuando más importa
+       encontrarla. Así aparece bajo los dos. */
+    if (filters.clientId) where.lots = { some: { clientId: filters.clientId } };
     if (filters.supplierId) where.supplierId = filters.supplierId;
     if (filters.carrierId) where.carrierId = filters.carrierId;
 
@@ -138,12 +150,13 @@ export class ReceiptRepository extends BaseRepository<
     totalQuantity: number;
     unit: Unit | null;
     materialNames: string[];
+    ownerNames: string[];
   })[]> {
     if (receipts.length === 0) return [];
 
     const ids = receipts.map((receipt) => receipt.id);
 
-    const [sums, materials] = await Promise.all([
+    const [sums, materials, owners] = await Promise.all([
       this.db.lot.groupBy({
         by: ["receiptId", "unit"],
         where: { receiptId: { in: ids } },
@@ -155,6 +168,17 @@ export class ReceiptRepository extends BaseRepository<
         select: {
           receiptId: true,
           material: { select: { name: true } },
+        },
+      }),
+      /* Los dueños salen de los ROLLOS, que es donde vive el dato. `distinct`
+         por recepción y cliente para traer un renglón por dueño y no los
+         veinte rollos de una guía sólo para quedarnos con un nombre. */
+      this.db.lot.findMany({
+        where: { receiptId: { in: ids } },
+        distinct: ["receiptId", "clientId"],
+        select: {
+          receiptId: true,
+          client: { select: { name: true } },
         },
       }),
     ]);
@@ -186,11 +210,26 @@ export class ReceiptRepository extends BaseRepository<
       ]);
     }
 
+    const ownerNames = new Map<string, string[]>();
+    for (const row of owners as {
+      receiptId: string | null;
+      client: { name: string } | null;
+    }[]) {
+      if (!row.receiptId) continue;
+      // Sin cliente = tela de la fábrica. Se nombra en vez de omitirse: una
+      // guía mitad de un cliente y mitad de la fábrica tiene que decir las dos.
+      ownerNames.set(row.receiptId, [
+        ...(ownerNames.get(row.receiptId) ?? []),
+        row.client?.name ?? "De la fábrica",
+      ]);
+    }
+
     return receipts.map((receipt) => ({
       ...receipt,
       totalQuantity: totals.get(receipt.id)?.quantity ?? 0,
       unit: totals.get(receipt.id)?.unit ?? null,
       materialNames: names.get(receipt.id) ?? [],
+      ownerNames: ownerNames.get(receipt.id) ?? [],
     }));
   }
 

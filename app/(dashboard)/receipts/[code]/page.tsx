@@ -44,6 +44,11 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
 
   const plain = toPlainObject(receipt);
 
+  /* Si la guía trae rollos de varios dueños, corregir el dueño del encabezado
+     no los toca: cambia lo que la hoja de edición promete. */
+  const hasMixedOwners =
+    new Set(plain.lots.map((lot) => lot.clientId ?? "")).size > 1;
+
   // Sin permiso de escritura no se ofrece corregir: el botón abriría un
   // formulario que el servidor va a rechazar de todos modos.
   const canEdit = user
@@ -85,6 +90,7 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
                 clients={options.clients}
                 suppliers={options.suppliers}
                 carriers={options.carriers}
+                hasMixedOwners={hasMixedOwners}
                 trigger={
                   <Button variant="outline" className="touch-target">
                     <Pencil className="size-4" aria-hidden />
@@ -118,7 +124,7 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
           <Row label="Guía" value={receipt.guideNumber} tabular />
           <Row label="Paquetería" value={receipt.carrier?.name} />
           <Row label="Proveedor" value={receipt.supplier?.name} />
-          <Row label="Cliente dueño" value={receipt.client?.name ?? "De la fábrica"} />
+          <Row label="Cliente dueño" value={ownerLabel(plain.lots)} />
           <Row label="Origen" value={receipt.origin} />
           <Row label="Factura" value={receipt.invoiceRef} tabular />
           <Row label="Orden de compra" value={receipt.orderRef} tabular />
@@ -168,4 +174,21 @@ function Row({
       </dd>
     </div>
   );
+}
+
+/**
+ * De quién es la tela de esta guía, leído de los ROLLOS y no del encabezado.
+ *
+ * Una guía puede traer tela de dos clientes, y en ese caso el encabezado se
+ * queda vacío a propósito: no hay un dueño. Leerlo de ahí haría que la ficha
+ * dijera "De la fábrica" sobre material que sí tiene dueño, que es justo la
+ * confusión que puede terminar en surtirle a la producción equivocada.
+ */
+function ownerLabel(lots: { client: { name: string } | null }[]): string {
+  const owners = [...new Set(lots.map((lot) => lot.client?.name ?? "De la fábrica"))];
+
+  if (owners.length === 0) return "De la fábrica";
+  if (owners.length <= 2) return owners.join(" · ");
+
+  return `${owners.length} dueños`;
 }

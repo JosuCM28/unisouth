@@ -60,6 +60,14 @@ interface ReceiptEditSheetProps {
   clients: { id: string; name: string }[];
   suppliers: { id: string; name: string }[];
   carriers: { id: string; name: string }[];
+  /**
+   * La guía trae rollos de más de un dueño.
+   *
+   * Cambia lo que se promete al corregir el dueño: en una guía compartida NO
+   * se hereda nada, porque bajar un dueño a todos aplastaría la separación
+   * que alguien capturó rollo por rollo.
+   */
+  hasMixedOwners: boolean;
   trigger: ReactNode;
 }
 
@@ -90,6 +98,7 @@ export function ReceiptEditSheet({
   clients,
   suppliers,
   carriers,
+  hasMixedOwners,
   trigger,
 }: ReceiptEditSheetProps) {
   const router = useRouter();
@@ -217,9 +226,9 @@ export function ReceiptEditSheet({
             <p className="flex items-start gap-2 border border-border bg-muted p-2 text-xs text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               <span>
-                Los rollos de esta guía que sigan completos y sin apartar
-                pasarán al nuevo dueño. Los que ya se cortaron o están
-                reservados conservan el actual.
+                {hasMixedOwners
+                  ? "Esta guía trae rollos de varios dueños, así que ninguno se va a tocar: aquí sólo se corrige el dato de la guía. El dueño de cada rollo se cambia en su propia ficha."
+                  : "Los rollos de esta guía que sigan completos y sin apartar pasarán al nuevo dueño. Los que ya se cortaron o están reservados conservan el actual."}
               </span>
             </p>
           )}
@@ -361,6 +370,15 @@ function notifyOwnerChange(data: unknown) {
 
   const kept = result?.keptLotCodes?.length ?? 0;
   const reassigned = result?.reassignedLotCodes?.length ?? 0;
+
+  // Ninguno reasignado y todos conservados = guía compartida: no se propagó a
+  // propósito. Decir "0 pasaron al nuevo dueño" leería como una falla.
+  if (kept > 0 && reassigned === 0) {
+    toast.warning(
+      `Recepción actualizada. Los ${kept} rollo(s) conservan su dueño: el de cada uno se cambia en su ficha.`,
+    );
+    return;
+  }
 
   if (kept > 0) {
     toast.warning(
