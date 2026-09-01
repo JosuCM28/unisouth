@@ -49,10 +49,16 @@ export function OrderFilters({ clients, showArchived }: Props) {
   const to = searchParams.get("to") ?? "";
   const folder = searchParams.get("folder") ?? "";
 
-  const hasFilters = Boolean(client || status || from || to || showArchived);
+  const hasFilters = Boolean(
+    searchParams.get("q") || client || status || from || to || showArchived,
+  );
 
   // El export recibe los filtros vigentes, nunca la página ni el acumulador.
   const exportParams = new URLSearchParams();
+  // El texto buscado también viaja: si no, el Excel traería más órdenes de
+  // las que se están viendo y dejaría de ser un respaldo de la pantalla.
+  const q = searchParams.get("q") ?? "";
+  if (q) exportParams.set("q", q);
   if (client) exportParams.set("client", client);
   if (status) exportParams.set("status", status);
   if (from) exportParams.set("from", from);

@@ -10,6 +10,12 @@ import { fromDateInputValue } from "@/lib/utils";
  * hace inservible un reporte.
  */
 export interface CuttingOrderFilters {
+  /**
+   * Texto libre. Se parte en palabras y TODAS deben aparecer, cada una en
+   * algún campo: quien busca una orden trae en la cabeza dos o tres datos
+   * sueltos —"albero blusa"— y no el folio exacto.
+   */
+  search?: string;
   clientId?: string;
   status?: string;
   from?: string;
@@ -27,6 +33,9 @@ export interface CuttingOrderFilters {
 /** Valor del filtro que pide las órdenes que no están en ninguna carpeta. */
 export const LOOSE_ORDERS = "none";
 
+/** Cuántas palabras del buscador se consideran; el resto se descarta. */
+const MAX_TERMS = 6;
+
 /** Estados válidos. Cualquier otra cosa en la URL se ignora en vez de tronar. */
 const STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 
@@ -34,6 +43,7 @@ export function parseCuttingOrderFilters(
   params: Record<string, string | undefined>,
 ): CuttingOrderFilters {
   return {
+    search: params.q?.trim() || undefined,
     clientId: params.client || undefined,
     folderId: params.folder || undefined,
     status: params.status && STATUSES.has(params.status) ? params.status : undefined,
@@ -48,6 +58,34 @@ export function cuttingOrderWhere(
   const where: Prisma.CuttingOrderWhereInput = {};
 
   if (filters.clientId) where.clientId = filters.clientId;
+
+  if (filters.search) {
+    /* AND de ORs: cada palabra tiene que aparecer en ALGÚN campo. Así
+       "albero blusa" encuentra la orden de Albero cuya prenda es una blusa, en
+       vez de todo lo que mencione cualquiera de las dos. */
+    where.AND = tokenize(filters.search).map((term) => {
+      const contains = { contains: term, mode: "insensitive" as const };
+
+      return {
+        OR: [
+          { code: contains },
+          { reference: contains },
+          { description: contains },
+          { notes: contains },
+          { cutFabricText: contains },
+          { cutPattern: contains },
+          { cutVersionNotes: contains },
+          { client: { name: contains } },
+          { material: { name: contains } },
+          { material: { code: contains } },
+          { folder: { name: contains } },
+          { folder: { code: contains } },
+          // También por talla: a veces lo que se busca es "quién pidió 38".
+          { lines: { some: { size: { code: contains } } } },
+        ],
+      };
+    });
+  }
 
   if (filters.folderId === LOOSE_ORDERS) {
     where.folderId = null;
@@ -77,4 +115,13 @@ export function cuttingOrderWhere(
   }
 
   return where;
+}
+
+/** Palabras de la búsqueda, sin vacíos y topadas a un máximo razonable. */
+function tokenize(search: string): string[] {
+  return search
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(Boolean)
+    .slice(0, MAX_TERMS);
 }

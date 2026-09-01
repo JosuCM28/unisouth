@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardList, FolderPlus, Plus } from "lucide-react";
+import { ArrowRight, ClipboardList, FolderPlus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pager } from "@/components/shared/pager";
+import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import { FolderCard } from "@/components/orders/folder-card";
 import { OrderFilters } from "@/components/orders/order-filters";
@@ -21,8 +22,19 @@ export const metadata: Metadata = { title: "Órdenes" };
 
 const PAGE_SIZE = 50;
 
+/**
+ * Cuántos pedidos se asoman en esta pantalla.
+ *
+ * Son un aperitivo, no la lista: el resto vive en /orders/folders, paginado.
+ * Antes se bajaban TODOS y, por cada uno, sus órdenes y sus renglones para
+ * sumar el avance —una consulta que crece sin techo conforme se acumulan
+ * pedidos, encima de una pantalla que ya nadie recorre entera.
+ */
+const FOLDER_PREVIEW = 6;
+
 interface PageProps {
   searchParams: Promise<{
+    q?: string;
     page?: string;
     all?: string;
     client?: string;
@@ -58,7 +70,11 @@ export default async function OrdersPage({ searchParams }: PageProps) {
      En cuanto se filtra por algo, se busca en todas —quien filtra por cliente
      o por fecha quiere encontrar la orden, esté donde esté. */
   const isSearching = Boolean(
-    filters.clientId || filters.status || filters.from || filters.to,
+    filters.search ||
+      filters.clientId ||
+      filters.status ||
+      filters.from ||
+      filters.to,
   );
   const listFilters = {
     ...filters,
@@ -66,7 +82,12 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   };
   const where = cuttingOrderWhere(listFilters);
 
-  const [total, orders, clients, folders] = await Promise.all([
+  const folderFilters = {
+    clientId: filters.clientId,
+    includeArchived: showArchived,
+  };
+
+  const [total, orders, clients, folders, folderTotal] = await Promise.all([
     prisma.cuttingOrder.count({ where }),
     prisma.cuttingOrder.findMany({
       where,
@@ -91,9 +112,10 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       orderBy: { name: "asc" },
     }),
     new OrderFolderRepository().findAllWithTotals({
-      clientId: filters.clientId,
-      includeArchived: showArchived,
+      ...folderFilters,
+      limit: FOLDER_PREVIEW,
     }),
+    new OrderFolderRepository().countWithTotals(folderFilters),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
@@ -123,13 +145,34 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         }
       />
 
+      {/* El buscador va ARRIBA de los filtros: con muchas órdenes es más
+          rápido teclear el folio o la prenda que ir acotando por cliente y
+          fecha hasta dar con ella. */}
+      <SearchInput
+        placeholder="Folio, orden del cliente, prenda, tela, pedido…"
+        className="w-full md:max-w-sm"
+      />
+
       <OrderFilters clients={clients} showArchived={showArchived} />
 
       {folders.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Pedidos
-          </h2>
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Pedidos
+            </h2>
+            {/* Siempre visible, aunque quepan todos: allá se puede buscar
+                por nombre y sacar los archivados, y aquí no. Si estuviera
+                sólo cuando sobran, esa pantalla no existiría para quien
+                todavía tiene pocos pedidos. */}
+            <Link
+              href="/orders/folders"
+              className="touch-target flex items-center gap-1 text-sm text-muted-foreground"
+            >
+              {folderTotal > folders.length ? `Ver los ${folderTotal}` : "Ver todos"}
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          </div>
           <ul className="flex flex-col gap-2">
             {folders.map((folder) => (
               <li key={folder.id}>

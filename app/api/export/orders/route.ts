@@ -82,6 +82,9 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const filters = parseCuttingOrderFilters({
+    // El texto buscado también: sin él el archivo traería más órdenes de las
+    // que se están viendo y dejaría de ser un respaldo de la pantalla.
+    q: url.searchParams.get("q") ?? undefined,
     client: url.searchParams.get("client") ?? undefined,
     status: url.searchParams.get("status") ?? undefined,
     from: url.searchParams.get("from") ?? undefined,

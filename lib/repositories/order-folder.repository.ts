@@ -10,7 +10,19 @@ export interface OrderFolderFilters extends PaginationInput {
   clientId?: string;
   /** Incluir las archivadas. Por omisión sólo se listan las vivas. */
   includeArchived?: boolean;
+  /** Cuántas traer. Se topa en `MAX_FOLDERS` aunque se pida más. */
+  limit?: number;
+  skip?: number;
 }
+
+/**
+ * Techo duro de carpetas por consulta.
+ *
+ * No es el tamaño de página —eso lo decide la pantalla— sino el seguro: por
+ * cada carpeta se suman sus órdenes y sus renglones, y una petición sin tope
+ * crece sin límite conforme la fábrica acumula pedidos.
+ */
+const MAX_FOLDERS = 100;
 
 /** Una carpeta con lo que suman sus órdenes. */
 export interface OrderFolderWithTotals extends OrderFolder {
@@ -63,6 +75,13 @@ export class OrderFolderRepository extends BaseRepository<
       where,
       // Lo último capturado hasta arriba, igual que en el resto de las listas.
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      /* SIEMPRE acotado. Antes bajaba todas las carpetas y, por cada una,
+         todas sus órdenes y todos sus renglones para sumar el avance: con
+         cuarenta pedidos son miles de filas viajando para pintar una lista que
+         nadie recorre entera. Sin `limit` se cae en el tope de seguridad, no
+         en "todo". */
+      take: Math.min(filters.limit ?? MAX_FOLDERS, MAX_FOLDERS),
+      skip: filters.skip,
       include: {
         client: { select: { id: true, name: true } },
         _count: { select: { orders: true } },
@@ -84,6 +103,11 @@ export class OrderFolderRepository extends BaseRepository<
         completedCount: total?.completed ?? 0,
       };
     });
+  }
+
+  /** Cuántas carpetas cumplen el filtro. Para el paginador. */
+  async countWithTotals(filters: OrderFolderFilters = {}): Promise<number> {
+    return this.db.orderFolder.count({ where: this.buildWhere(filters) });
   }
 
   /** Una carpeta con sus órdenes, para la pantalla del pedido. */

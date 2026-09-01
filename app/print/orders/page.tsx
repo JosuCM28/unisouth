@@ -14,6 +14,7 @@ export const metadata: Metadata = { title: "Órdenes impresas" };
 
 interface PageProps {
   searchParams: Promise<{
+    q?: string;
     client?: string;
     status?: string;
     from?: string;
