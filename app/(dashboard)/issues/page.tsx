@@ -130,6 +130,7 @@ export default async function IssuesPage({ searchParams }: PageProps) {
                   concept: issue.concept,
                   reference: issue.reference,
                   clientName: issue.client?.name ?? null,
+                  receivedBy: issue.receivedBy,
                   cutFabricName: issue.cutFabric?.name ?? null,
                   cutDescription: issue.cutDescription,
                   summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,

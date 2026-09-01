@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, Scissors, User } from "lucide-react";
+import { CalendarDays, HandHelping, Scissors, User } from "lucide-react";
 import type { DocumentStatus, Unit } from "@prisma/client";
 import {
   DOCUMENT_STATUS_LABELS,
@@ -17,6 +17,14 @@ export interface IssueRow {
   concept: string | null;
   reference: string | null;
   clientName: string | null;
+  /**
+   * Quién se llevó el material ("ELVIA", "ING. OMAR").
+   *
+   * Es texto libre y no un catálogo a propósito: quien recibe puede ser del
+   * taller, de otra planta o un chofer, y frenar la salida porque falta dar
+   * de alta a la persona es lo que devuelve al auxiliar a la libreta.
+   */
+  receivedBy: string | null;
   /** Tela del desglose de corte: identifica el vale cuando no lleva rollos. */
   cutFabricName: string | null;
   cutDescription: string | null;
@@ -78,9 +86,22 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
             </p>
           )}
 
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <CalendarDays className="size-3 shrink-0" aria-hidden />
-            <span className="tabular">{formatDate(issue.date)}</span>
+          {/* Fecha y quién recibió, en el mismo renglón chico: son las dos
+              cosas que se cotejan cuando alguien reclama un material —"¿cuándo
+              salió y quién se lo llevó?"— y separarlas obligaría a leer dos
+              lugares de la tarjeta. */}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="size-3 shrink-0" aria-hidden />
+              <span className="tabular">{formatDate(issue.date)}</span>
+            </span>
+
+            {issue.receivedBy && (
+              <span className="flex min-w-0 items-center gap-1.5">
+                <HandHelping className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">Recibió {issue.receivedBy}</span>
+              </span>
+            )}
           </p>
         </div>
 
