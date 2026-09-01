@@ -19,6 +19,15 @@ const cancelSchema = z.object({
   id: cuidSchema,
   reason: requiredText("El motivo", 500),
 });
+/* Borrar exige motivo por la misma razón que cancelar: es una acción HIGH y
+   `AuditService` no acepta una sin explicación. Antes la acción sólo recibía
+   el id, así que el servicio llegaba al audit con `reason` vacío y el borrado
+   fallaba SIEMPRE con "Este cambio requiere un motivo" —un motivo que la
+   pantalla ni siquiera pedía. */
+const removeSchema = z.object({
+  id: cuidSchema,
+  reason: requiredText("El motivo", 500),
+});
 
 export async function createCuttingOrderAction(input: unknown) {
   return executeAction(input, {
@@ -103,12 +112,12 @@ export async function cancelCuttingOrderAction(input: unknown) {
  */
 export async function removeCuttingOrderAction(input: unknown) {
   return executeAction(input, {
-    schema: idSchema,
+    schema: removeSchema,
     permission: "inventory:write",
     revalidate: REVALIDATE,
     successMessage: "Orden eliminada",
     handler: ({ input, auditContext }) =>
-      new CuttingOrderService(auditContext).remove(input.id),
+      new CuttingOrderService(auditContext).remove(input.id, input.reason),
   });
 }
 

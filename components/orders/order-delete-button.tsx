@@ -9,6 +9,8 @@ import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   orderId: string;
@@ -34,14 +36,24 @@ export function OrderDeleteButton({
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
   const hasProgress = cutQuantity > 0;
 
   async function handleDelete() {
+    /* El motivo es obligatorio en el servidor —borrar es una acción HIGH y el
+       AuditLog no acepta una sin explicación—, así que se pide aquí en vez de
+       dejar que el guardado reviente con un error que no se puede resolver
+       desde la pantalla. */
+    if (!reason.trim()) {
+      toast.error("Escribe por qué se borra esta orden.");
+      return;
+    }
+
     setIsDeleting(true);
     const result = await runAction(() =>
-      removeCuttingOrderAction({ id: orderId }),
+      removeCuttingOrderAction({ id: orderId, reason: reason.trim() }),
     );
     setIsDeleting(false);
 
@@ -52,13 +64,19 @@ export function OrderDeleteButton({
 
     toast.success("Orden eliminada");
     setOpen(false);
+    setReason("");
     router.refresh();
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) setReason("");
   }
 
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       title={`Borrar ${orderCode}`}
       description={
         hasProgress
@@ -86,10 +104,25 @@ export function OrderDeleteButton({
           </p>
         )}
 
+        {/* Lo único que va a sobrevivir a la orden. Cuando alguien pregunte
+            por qué ya no está, la respuesta es este texto: de la orden no
+            queda nada más. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="delete-reason">Motivo</Label>
+          <Textarea
+            id="delete-reason"
+            rows={2}
+            autoFocus
+            placeholder="Se capturó por error, duplicada de la PO-2026-0012…"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </div>
+
         <Button
           type="button"
           onClick={handleDelete}
-          disabled={isDeleting}
+          disabled={isDeleting || !reason.trim()}
           className="h-12 w-full bg-destructive text-white hover:bg-destructive/90"
         >
           {isDeleting ? "Borrando…" : "Sí, borrar la orden"}

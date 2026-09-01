@@ -485,10 +485,14 @@ export class CuttingOrderService extends BaseService {
    * cancelada para siempre le estorba al piso.
    *
    * Los renglones y sus avances se van por cascada del esquema. Lo único que
-   * sobrevive es el AuditLog —quién la borró, cuándo y qué se llevó por
-   * delante—, que es append-only justo para esto.
+   * sobrevive es el AuditLog —quién la borró, cuándo, por qué y qué se llevó
+   * por delante—, que es append-only justo para esto.
+   *
+   * El motivo es OBLIGATORIO: es una acción HIGH y el AuditLog no acepta una
+   * sin explicación. Es además lo único que va a quedar para contestar por qué
+   * ya no está esa orden, porque de la orden misma no queda nada.
    */
-  async remove(id: string): Promise<CuttingOrder> {
+  async remove(id: string, reason: string): Promise<CuttingOrder> {
     return this.transaction(async (tx) => {
       const current = await tx.cuttingOrder.findUnique({
         where: { id },
@@ -526,6 +530,7 @@ export class CuttingOrderService extends BaseService {
           avances: entries,
         },
         sensitivity: "HIGH",
+        reason,
       });
 
       return order;
