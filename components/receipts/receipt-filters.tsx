@@ -14,6 +14,14 @@ interface ReceiptFiltersProps {
   suppliers: Option[];
   carriers: Option[];
   materials: Option[];
+  /**
+   * Los chips de "Hoy / Esta semana / Este mes".
+   *
+   * Se apagan en el REPORTE, que ya tiene su propio rango con fechas: el
+   * rango explícito manda sobre estos chips, así que ahí quedarían pintados
+   * como activos sin cambiar nada de lo que se está viendo.
+   */
+  showRanges?: boolean;
 }
 
 /**
@@ -40,6 +48,7 @@ export function ReceiptFilters({
   suppliers,
   carriers,
   materials,
+  showRanges = true,
 }: ReceiptFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -69,16 +78,17 @@ export function ReceiptFilters({
     <>
       {/* ── Rangos de fecha: siempre visibles, en los dos tamaños ── */}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0">
-        {ARRIVAL_RANGES.map(({ value, label }) => (
-          <Chip
-            key={value}
-            label={label}
-            active={arrivedWithin === value}
-            onClick={() =>
-              setParam("arrivedWithin", arrivedWithin === value ? null : value)
-            }
-          />
-        ))}
+        {showRanges &&
+          ARRIVAL_RANGES.map(({ value, label }) => (
+            <Chip
+              key={value}
+              label={label}
+              active={arrivedWithin === value}
+              onClick={() =>
+                setParam("arrivedWithin", arrivedWithin === value ? null : value)
+              }
+            />
+          ))}
 
         <Chip
           label="Filtros"

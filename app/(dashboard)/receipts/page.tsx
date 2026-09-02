@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { BarChart3, Plus } from "lucide-react";
 import { getCurrentUser } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { ReceiptRepository } from "@/lib/repositories/receipt.repository";
 import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
+import { ExportButton } from "@/components/shared/export-button";
 import { ReceiptFilters } from "@/components/receipts/receipt-filters";
 import { ReceiptList } from "@/components/receipts/receipt-list";
 import type { ReceiptCardData } from "@/lib/repositories/receipt.repository";
@@ -59,14 +60,29 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
         title="Recepciones"
         description="Qué llegó, cuándo y en qué guía"
         action={
-          canCreate ? (
-            <Button asChild className="touch-target">
-              <Link href="/receipts/new">
-                <Plus className="size-4" aria-hidden />
-                Nueva
+          <div className="flex flex-wrap gap-2">
+            {/* Baja la lista COMPLETA que casa con el filtro de la pantalla,
+                no la página en la que quedó el pulgar. */}
+            <ExportButton href="/api/export/receipts" label="Excel" />
+
+            {/* El reporte pide lo mismo que esta pantalla (`inventory:browse`),
+                así que quien llegó hasta aquí siempre puede abrirlo. */}
+            <Button asChild variant="outline" className="touch-target">
+              <Link href="/receipts/report">
+                <BarChart3 className="size-4" aria-hidden />
+                Reporte
               </Link>
             </Button>
-          ) : undefined
+
+            {canCreate && (
+              <Button asChild className="touch-target">
+                <Link href="/receipts/new">
+                  <Plus className="size-4" aria-hidden />
+                  Nueva
+                </Link>
+              </Button>
+            )}
+          </div>
         }
       />
 
