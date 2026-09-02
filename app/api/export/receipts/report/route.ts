@@ -35,6 +35,8 @@ import { formatDate } from "@/lib/utils";
 interface ReportRow {
   section: string;
   concept: string;
+  /** Sólo en el detalle. Es la columna por la que se pivotea una guía mixta. */
+  material: string;
   detail: string;
   date: Date | "";
   receipts: number | "";
@@ -46,6 +48,7 @@ interface ReportRow {
 const COLUMNS: XlsxColumn<ReportRow>[] = [
   { header: "Sección", value: (row) => row.section, width: 24 },
   { header: "Concepto", value: (row) => row.concept, width: 30 },
+  { header: "Material", value: (row) => row.material, width: 30 },
   { header: "Detalle", value: (row) => row.detail, width: 34 },
   { header: "Fecha", value: (row) => row.date, kind: "date" },
   { header: "Guías", value: (row) => row.receipts, kind: "number" },
@@ -115,6 +118,13 @@ function headerRows(
     ["Agrupado por", groupLabel],
     ["Filtros", applied.length > 0 ? applied.join(" · ") : "Sin filtros"],
     ["Se cuenta", "Lo que entró (metraje de alta), no el saldo de hoy"],
+    // Se dice porque no es evidente: quien pivotee por "Material" sin acotar
+    // la sección obtendría ceros en los cortes agregados y creería que faltan
+    // datos, cuando ahí la tela va en la columna "Concepto".
+    [
+      "Columna Material",
+      "Sólo en «Detalle por recepción». En los cortes agregados la tela va en «Concepto».",
+    ],
   ];
 
   if (report.truncated) {
@@ -184,7 +194,18 @@ function groupRows(rows: ReportGroupRow[], section: string): ReportRow[] {
   });
 }
 
-/** Guía por guía: el respaldo de todas las cifras de arriba. */
+/**
+ * Guía por guía Y TELA POR TELA: el respaldo de todas las cifras de arriba.
+ *
+ * Un renglón por (recepción, tela, unidad) y no uno por recepción. Con una
+ * guía que trajo gabardina y mezclilla, el renglón único decía el total
+ * sumado y no cuánto fue de cada una —que es lo que se compara contra la
+ * factura—. Así además la hoja se puede pivotear por la columna "Material"
+ * sin salirse de esta sección.
+ *
+ * Las cantidades siguen cuadrando: sumar los renglones de una guía da su
+ * total, y sumar los de una unidad da el del resumen.
+ */
 function detailRows(report: ReceiptReportData): ReportRow[] {
   return report.detail.flatMap((receipt) => {
     const detail = [
@@ -195,12 +216,13 @@ function detailRows(report: ReceiptReportData): ReportRow[] {
       // vacío a propósito y leerlo de ahí diría "de la fábrica" sobre tela
       // que sí tiene dueño.
       receipt.ownerNames.join(" y ") || "De la fábrica",
-      receipt.materialNames.join(" · "),
     ]
       .filter(Boolean)
       .join(" · ");
 
-    if (receipt.byUnit.length === 0) {
+    // Una guía sin rollos es un encabezado huérfano —casi siempre una captura
+    // que se interrumpió—. Sale igual, con cero: omitirla la escondería.
+    if (receipt.materials.length === 0) {
       return [blank({
         section: "Detalle por recepción",
         concept: receipt.code,
@@ -211,19 +233,20 @@ function detailRows(report: ReceiptReportData): ReportRow[] {
       })];
     }
 
-    return receipt.byUnit.map((total, index) =>
+    return receipt.materials.map((material, index) =>
       blank({
         section: "Detalle por recepción",
         concept: receipt.code,
+        material: `${material.name}${material.code ? ` (${material.code})` : ""}`,
         detail,
         date: receipt.date,
-        // Sólo en el primer renglón: una guía con metros y piezas ocupa dos
-        // líneas, y contarla en las dos haría que la columna sume el doble de
-        // guías de las que llegaron.
+        // Sólo en el primer renglón: una guía con dos telas ocupa dos líneas,
+        // y contarla en las dos haría que la columna sume el doble de guías
+        // de las que llegaron.
         receipts: index === 0 ? 1 : "",
-        lots: total.lots,
-        quantity: total.quantity,
-        unit: UNIT_SHORT_LABELS[total.unit],
+        lots: material.lots,
+        quantity: material.quantity,
+        unit: UNIT_SHORT_LABELS[material.unit],
       }),
     );
   });
@@ -234,6 +257,7 @@ function blank(row: Partial<ReportRow>): ReportRow {
   return {
     section: "",
     concept: "",
+    material: "",
     detail: "",
     date: "",
     receipts: "",

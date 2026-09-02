@@ -9,6 +9,7 @@ import { cn, formatDate, formatDateTime, toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
 import { ReceiptLots } from "@/components/receipts/receipt-lots";
+import { ReceiptMaterialTotals } from "@/components/receipts/receipt-material-totals";
 import { ReceiptEditSheet } from "@/components/receipts/receipt-edit-sheet";
 import { Button } from "@/components/ui/button";
 
@@ -142,6 +143,10 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* Cuánto entró de cada tela, antes del rollo por rollo: es la
+          pregunta que se contesta con la factura enfrente. */}
+      <ReceiptMaterialTotals lots={plain.lots} />
 
       <ReceiptLots lots={plain.lots} />
     </div>

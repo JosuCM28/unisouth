@@ -40,6 +40,26 @@ export interface UnitTotal {
   lots: number;
 }
 
+/**
+ * Cuánto entró de UNA tela dentro de UNA guía.
+ *
+ * Existe porque una recepción puede traer dos telas y el total de la guía no
+ * las distingue: "5,502 m" sobre una guía de gabardina y mezclilla no dice
+ * cuánto se recibió de cada una, que es justo lo que hay que cuadrar contra
+ * la factura.
+ *
+ * La unidad va en la llave junto con el material: la misma tela capturada en
+ * metros y en kilos son dos renglones, no uno con la suma.
+ */
+export interface MaterialTotal {
+  materialId: string;
+  name: string;
+  code: string;
+  unit: Unit;
+  quantity: number;
+  lots: number;
+}
+
 /** Un renglón de desglose del reporte: una tela, un cliente, un proveedor. */
 export interface ReportGroupRow {
   key: string;
@@ -85,6 +105,13 @@ export interface ReceiptCardData extends Receipt {
   unit: Unit | null;
   /** El desglose completo, que es lo que necesita el reporte para sumar. */
   byUnit: UnitTotal[];
+  /**
+   * Cuánto entró de cada tela, de mayor a menor.
+   *
+   * Es el dato que el total de la guía no puede dar cuando trae dos telas.
+   */
+  materials: MaterialTotal[];
+  /** Los nombres de `materials`, sin repetir. Para títulos y chips. */
   materialNames: string[];
   /**
    * Los dueños de sus rollos, sin repetir.
@@ -276,6 +303,7 @@ export class ReceiptRepository extends BaseRepository<
     totalQuantity: number;
     unit: Unit | null;
     byUnit: UnitTotal[];
+    materials: MaterialTotal[];
     materialNames: string[];
     ownerNames: string[];
   })[]> {
@@ -294,13 +322,16 @@ export class ReceiptRepository extends BaseRepository<
         // renglón diría "12 rollos" junto a los metros de sólo 3.
         _count: { _all: true },
       }),
-      this.db.lot.findMany({
+      /* Agrupado y no `distinct`: antes sólo se traían los NOMBRES de las
+         telas de cada guía, y con eso la tarjeta decía "gabardina · mezclilla"
+         junto a un único total que no distinguía cuánto era de cada una.
+         Sumar aquí cuesta lo mismo —lo hace Postgres— y da la cifra que hay
+         que cuadrar contra la factura. */
+      this.db.lot.groupBy({
+        by: ["receiptId", "materialId", "unit"],
         where,
-        distinct: ["receiptId", "materialId"],
-        select: {
-          receiptId: true,
-          material: { select: { name: true } },
-        },
+        _sum: { initialQuantity: true },
+        _count: { _all: true },
       }),
       /* Los dueños salen de los ROLLOS, que es donde vive el dato. `distinct`
          por recepción y cliente para traer un renglón por dueño y no los
@@ -332,15 +363,32 @@ export class ReceiptRepository extends BaseRepository<
       totals.set(row.receiptId, current);
     }
 
-    const names = new Map<string, string[]>();
-    for (const row of materials as {
+    const materialRows = materials as (GroupedLots<"materialId"> & {
       receiptId: string | null;
-      material: { name: string };
-    }[]) {
-      if (!row.receiptId) continue;
-      names.set(row.receiptId, [
-        ...(names.get(row.receiptId) ?? []),
-        row.material.name,
+    })[];
+
+    // Los nombres se piden UNA vez para toda la página, no por recepción.
+    const byMaterialId = await this.materialsById(
+      materialRows.map((row) => row.materialId),
+    );
+
+    const byReceipt = new Map<string, MaterialTotal[]>();
+    for (const row of materialRows) {
+      if (!row.receiptId || !row.materialId) continue;
+      const material = byMaterialId.get(row.materialId);
+
+      byReceipt.set(row.receiptId, [
+        ...(byReceipt.get(row.receiptId) ?? []),
+        {
+          materialId: row.materialId,
+          // Una tela dada de baja después de recibirla no borra lo que llegó
+          // con ella: el renglón se queda, nombrado como lo que es.
+          name: material?.name ?? "(material borrado)",
+          code: material?.code ?? "",
+          unit: row.unit,
+          quantity: Number(row._sum.initialQuantity ?? 0),
+          lots: row._count._all,
+        },
       ]);
     }
 
@@ -365,6 +413,11 @@ export class ReceiptRepository extends BaseRepository<
         (a, b) => b.quantity - a.quantity,
       );
 
+      // La tela de la que más llegó, primero: es la que da nombre a la guía.
+      const materials = (byReceipt.get(receipt.id) ?? []).sort(
+        (a, b) => b.quantity - a.quantity,
+      );
+
       return {
         ...receipt,
         lotCount: byUnit.reduce((sum, item) => sum + item.lots, 0),
@@ -374,10 +427,28 @@ export class ReceiptRepository extends BaseRepository<
         totalQuantity: byUnit[0]?.quantity ?? 0,
         unit: byUnit[0]?.unit ?? null,
         byUnit,
-        materialNames: names.get(receipt.id) ?? [],
+        materials,
+        /* Sin repetir: una tela recibida en metros Y en kilos son dos
+           renglones en `materials`, pero un solo nombre en la tarjeta. */
+        materialNames: [...new Set(materials.map((item) => item.name))],
         ownerNames: ownerNames.get(receipt.id) ?? [],
       };
     });
+  }
+
+  /** Nombre y código de un puñado de telas, en una sola consulta. */
+  private async materialsById(
+    ids: (string | null)[],
+  ): Promise<Map<string, { name: string; code: string }>> {
+    const unique = [...new Set(ids)].filter((id): id is string => Boolean(id));
+    if (unique.length === 0) return new Map();
+
+    const materials = await this.db.material.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, name: true, code: true },
+    });
+
+    return new Map(materials.map((item) => [item.id, item]));
   }
 
   /**
@@ -472,16 +543,7 @@ export class ReceiptRepository extends BaseRepository<
   private async labelMaterialGroups(
     groups: GroupedLots<"materialId">[],
   ): Promise<ReportGroupRow[]> {
-    const ids = [...new Set(groups.map((row) => row.materialId))].filter(
-      (id): id is string => Boolean(id),
-    );
-    if (ids.length === 0) return [];
-
-    const materials = await this.db.material.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, name: true, code: true },
-    });
-    const byId = new Map(materials.map((material) => [material.id, material]));
+    const byId = await this.materialsById(groups.map((row) => row.materialId));
 
     return foldGroups(groups, "materialId", (id) => ({
       // El material puede haberse dado de baja después de recibirlo: el

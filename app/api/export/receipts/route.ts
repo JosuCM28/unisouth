@@ -37,7 +37,17 @@ const COLUMNS: XlsxColumn<ReceiptCardData>[] = [
     value: (r) => r.ownerNames.join(" · ") || "De la fábrica",
     width: 26,
   },
-  { header: "Materiales", value: (r) => r.materialNames.join(" · "), width: 34 },
+  {
+    header: "Materiales",
+    /* Cada tela CON SU CANTIDAD, no sólo los nombres.
+
+       Antes decía "Gabardina · Mezclilla" junto a un único total, y sobre una
+       guía de dos telas eso no contesta cuánto llegó de cada una —que es lo
+       que se cuadra contra la factura—. La columna "Cantidad" sigue siendo el
+       total de la guía; ésta lo reparte. */
+    value: (r) => describeMaterials(r),
+    width: 44,
+  },
   { header: "Rollos", value: (r) => r.lotCount, kind: "number" },
   {
     header: "Cantidad",
@@ -95,6 +105,16 @@ export async function GET(request: Request) {
     toXlsxWithNotice(items, COLUMNS, "Recepciones"),
     "recepciones",
   );
+}
+
+/** "Gabardina Oviedo 1,200 m · Mezclilla Santa fe 800 m". */
+function describeMaterials(receipt: ReceiptCardData): string {
+  return receipt.materials
+    .map(
+      (material) =>
+        `${material.name} ${material.quantity.toLocaleString("es-MX")} ${UNIT_SHORT_LABELS[material.unit]}`,
+    )
+    .join(" · ");
 }
 
 /** "1,240 kg · 300 yd": todo lo que no cabe en la cantidad principal. */

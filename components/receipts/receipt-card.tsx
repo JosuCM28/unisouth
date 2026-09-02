@@ -33,10 +33,14 @@ export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
           </p>
 
           {/* La tela, en grande: es lo que distingue una recepción de otra
-              cuando llegan tres el mismo día. */}
-          {receipt.materialNames.length > 0 && (
+              cuando llegan tres el mismo día.
+
+              Con dos o más telas el nombre se calla y el desglose de abajo
+              toma el relevo: ahí cada una viene con su cantidad, que es lo
+              que hay que cuadrar contra la factura. */}
+          {receipt.materialNames.length === 1 && (
             <p className="mt-1 truncate text-sm font-medium">
-              {receipt.materialNames.join(" · ")}
+              {receipt.materialNames[0]}
             </p>
           )}
 
@@ -63,6 +67,35 @@ export function ReceiptCard({ receipt }: { receipt: ReceiptCardData }) {
           </p>
         </div>
       </div>
+
+      {/* Cuánto entró de CADA tela.
+
+          Sólo cuando la guía trae más de una: con una sola, la cifra grande
+          de arriba ya es ésa y repetirla llenaría la tarjeta de ruido. Con
+          dos, ese total grande es la suma y no dice cuánto fue de cada cual
+          —que es justo lo que se compara contra la factura—. */}
+      {receipt.materials.length > 1 && (
+        <ul className="mt-2 border-t border-border">
+          {receipt.materials.map((material) => (
+            <li
+              key={`${material.materialId}-${material.unit}`}
+              className="flex items-baseline justify-between gap-3 border-b border-border py-1.5 last:border-0 text-sm"
+            >
+              <span className="min-w-0 truncate font-medium">
+                {material.name}
+              </span>
+              <span className="tabular shrink-0">
+                {formatQuantity(material.quantity, {
+                  unit: UNIT_SHORT_LABELS[material.unit],
+                })}
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  {material.lots} {material.lots === 1 ? "rollo" : "rollos"}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Sólo se pintan los chips que traen dato: una fila de "—" ocupa el
           mismo espacio que la información y no dice nada. */}
