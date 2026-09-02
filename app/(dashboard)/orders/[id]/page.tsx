@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, FolderOpen, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Copy, FolderOpen, Pencil, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
@@ -354,6 +354,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   Editar
                 </Link>
               </Button>
+              {/* Junto a Editar porque es su hermana: una corrige esta orden
+                  y la otra arranca una igual. El mismo cliente vuelve a pedir
+                  la misma prenda con la misma base de tallas, y recapturar
+                  quince renglones a mano es de donde salen los errores. */}
+              <Button asChild variant="outline" className="touch-target">
+                <Link href={`/orders/new?from=${order.id}`}>
+                  <Copy className="size-4" aria-hidden />
+                  Duplicar
+                </Link>
+              </Button>
               {/* Va antes de Mover y Cancelar: es la acción que sigue cuando
                   el taller termina, y estaba costando recapturar el desglose
                   entero en Salidas. */}
@@ -391,7 +401,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
               />
               <OrderCancelDialog orderId={order.id} orderCode={order.code} />
             </div>
-          ) : undefined
+          ) : (
+            /* Cancelada no se toca… salvo para volver a empezar. Duplicar es
+               justo lo que se hace cuando una orden se cae: la base de tallas
+               sigue siendo buena y lo único que sobra es su historial. */
+            <Button asChild variant="outline" className="touch-target">
+              <Link href={`/orders/new?from=${order.id}`}>
+                <Copy className="size-4" aria-hidden />
+                Duplicar
+              </Link>
+            </Button>
+          )
         }
       />
 

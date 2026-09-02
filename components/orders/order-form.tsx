@@ -89,6 +89,15 @@ interface Props {
    * que ya sabe a qué pedido va, para no obligar a elegirlo otra vez.
    */
   defaults?: { folderId?: string; clientId?: string; dueDate?: string };
+  /**
+   * `order` no es la orden que se edita, sino la que se está COPIANDO.
+   *
+   * Los campos se precargan igual —la base de tallas es justo lo que se
+   * quiere reaprovechar— pero al guardar se CREA una nueva. Sin esta
+   * distinción, duplicar terminaría sobrescribiendo la orden original, que es
+   * exactamente lo contrario de lo que se pidió.
+   */
+  duplicating?: boolean;
 }
 
 /**
@@ -107,9 +116,11 @@ export function OrderForm({
   folders,
   order,
   defaults,
+  duplicating = false,
 }: Props) {
   const router = useRouter();
-  const isEditing = Boolean(order);
+  // Duplicar precarga desde una orden existente pero CREA otra.
+  const isEditing = Boolean(order) && !duplicating;
 
   const [clientId, setClientId] = useState(
     order?.clientId ?? defaults?.clientId ?? "",
@@ -258,9 +269,15 @@ export function OrderForm({
       })),
     };
 
-    const result = order
-      ? await runAction(() => updateCuttingOrderAction({ id: order.id, data: payload }))
-      : await runAction(() => createCuttingOrderAction(payload));
+    /* `isEditing` y no `order`: al duplicar también llega una orden cargada,
+       pero lo que hay que hacer con ella es CREAR otra. Preguntar por `order`
+       aquí sobrescribiría la orden que se estaba copiando. */
+    const result =
+      isEditing && order
+        ? await runAction(() =>
+            updateCuttingOrderAction({ id: order.id, data: payload }),
+          )
+        : await runAction(() => createCuttingOrderAction(payload));
 
     setIsSubmitting(false);
 
