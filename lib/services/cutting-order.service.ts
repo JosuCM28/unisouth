@@ -1,5 +1,6 @@
 import type { CuttingBatch, CuttingOrder } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { cutBatchLabel } from "@/lib/constants/labels";
 import type {
   BatchProgressInput,
   CuttingBatchInput,
@@ -555,8 +556,18 @@ export class CuttingOrderService extends BaseService {
    * El vale NO se aplica aquí —eso mueve inventario y es un acto deliberado
    * del auxiliar— ni la orden cambia de estado: mandar el papel al taller no
    * es cortar más.
+   *
+   * @param batchId Manda UN corte en vez de la orden entera.
+   *
+   * El taller no entrega la orden completa de una vez: entrega el primer
+   * tendido, sigue cortando y entrega el segundo. Sin esto había que mandar
+   * todo lo cortado hasta la fecha, y el segundo vale volvía a incluir lo que
+   * ya se había llevado el primero.
    */
-  async sendToIssue(orderId: string): Promise<{ id: string; code: string }> {
+  async sendToIssue(
+    orderId: string,
+    batchId?: string,
+  ): Promise<{ id: string; code: string }> {
     return this.transaction(async (tx) => {
       const order = await tx.cuttingOrder.findUnique({
         where: { id: orderId },
@@ -564,6 +575,7 @@ export class CuttingOrderService extends BaseService {
           lines: {
             orderBy: { position: "asc" },
             select: {
+              id: true,
               sizeId: true,
               cutQuantity: true,
               tagId: true,
@@ -581,21 +593,29 @@ export class CuttingOrderService extends BaseService {
         );
       }
 
-      const cutLines = order.lines
-        .filter((line) => line.cutQuantity > 0)
-        .map((line) => ({
-          sizeId: line.sizeId,
-          quantity: line.cutQuantity,
-          // Un bulto por talla: cuántos son de verdad se sabe al empacar, y
-          // el auxiliar lo corrige en el vale. Poner cero sería mentir.
-          bundles: 1,
-          tagId: line.tagId ?? undefined,
-          notes: line.notes ?? undefined,
-        }));
+      const batch = batchId
+        ? await this.loadSendableBatch(tx, orderId, batchId)
+        : null;
+
+      const cutLines = batch
+        ? await this.batchCutLines(tx, order.lines, batch.id)
+        : order.lines
+            .filter((line) => line.cutQuantity > 0)
+            .map((line) => ({
+              sizeId: line.sizeId,
+              quantity: line.cutQuantity,
+              // Un bulto por talla: cuántos son de verdad se sabe al empacar, y
+              // el auxiliar lo corrige en el vale. Poner cero sería mentir.
+              bundles: 1,
+              tagId: line.tagId ?? undefined,
+              notes: line.notes ?? undefined,
+            }));
 
       if (cutLines.length === 0) {
         throw new BusinessRuleError(
-          "Esta orden todavía no tiene piezas cortadas que entregar.",
+          batch
+            ? `${cutBatchLabel(batch.number, batch.label)} no tiene piezas capturadas que entregar.`
+            : "Esta orden todavía no tiene piezas cortadas que entregar.",
         );
       }
 
@@ -608,6 +628,11 @@ export class CuttingOrderService extends BaseService {
         date: new Date(),
         clientId: order.clientId ?? undefined,
         productionRunId: order.productionRunId ?? undefined,
+        /* La liga de verdad con la orden, aparte de la referencia de papel:
+           es lo que después deja a la ficha decir "esta orden ya salió y el
+           vale sigue en pie", y lo que impide mandar dos veces el mismo corte. */
+        cuttingOrderId: order.id,
+        cuttingBatchId: batch?.id,
         // De dónde salió, en el papel que firma el taller.
         concept: order.description ?? undefined,
         reference: order.reference ?? order.code,
@@ -636,12 +661,99 @@ export class CuttingOrderService extends BaseService {
         entityId: order.id,
         action: "UPDATE",
         reference: order.code,
-        newValue: { sentToIssue: document.code, cutLines: cutLines.length },
+        newValue: {
+          sentToIssue: document.code,
+          cutLines: cutLines.length,
+          batch: batch ? batch.number : null,
+        },
         sensitivity: "LOW",
       });
 
       return { id: document.id, code: document.code };
     });
+  }
+
+  /**
+   * El corte que se va a mandar, si de verdad se puede mandar.
+   *
+   * Bloquea el reenvío cuando ese corte ya tiene un vale VIVO —borrador o
+   * aplicado—. Mandarlo dos veces entregaría las mismas prendas dos veces en
+   * el papel, y la cuenta de lo que anda afuera dejaría de cuadrar sin que
+   * nadie se enterara hasta el conteo. Un vale cancelado no estorba: cancelar
+   * es justo cómo se deshace un envío equivocado.
+   */
+  private async loadSendableBatch(
+    tx: Tx,
+    orderId: string,
+    batchId: string,
+  ) {
+    const batch = await tx.cuttingBatch.findUnique({
+      where: { id: batchId },
+      select: { id: true, orderId: true, number: true, label: true },
+    });
+
+    if (!batch) throw new NotFoundError("el corte", batchId);
+
+    // El corte llega de la URL: sin esto se podría colgar el corte de una
+    // orden al vale de otra.
+    if (batch.orderId !== orderId) {
+      throw new BusinessRuleError("Ese corte no pertenece a esta orden.");
+    }
+
+    const live = await tx.inventoryDocument.findFirst({
+      where: { cuttingBatchId: batchId, status: { not: "CANCELLED" } },
+      select: { code: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (live) {
+      const state = live.status === "DRAFT" ? "en borrador" : "aplicada";
+      throw new BusinessRuleError(
+        `${cutBatchLabel(batch.number, batch.label)} ya salió en ${live.code} (${state}). Cancela esa salida si quieres volver a mandarlo.`,
+      );
+    }
+
+    return batch;
+  }
+
+  /**
+   * Lo que dio UN corte, talla por talla.
+   *
+   * Se suman las capturas de ese corte y no se lee `cutQuantity`, que es el
+   * acumulado de toda la orden: usarlo haría que el segundo vale volviera a
+   * incluir lo que ya se llevó el primero.
+   *
+   * Las tallas con neto cero o negativo se caen: un corte puede llevar una
+   * corrección que descuenta piezas mal contadas, y mandar "-8 piezas" en un
+   * vale no significa nada para el taller que lo firma.
+   */
+  private async batchCutLines(
+    tx: Tx,
+    lines: { id: string; sizeId: string; tagId: string | null; notes: string | null }[],
+    batchId: string,
+  ) {
+    const grouped = await tx.cuttingProgress.groupBy({
+      by: ["lineId"],
+      where: { batchId },
+      _sum: { quantity: true },
+    });
+
+    const byLine = new Map(
+      grouped.map((row) => [row.lineId, row._sum.quantity ?? 0]),
+    );
+
+    // Se recorren las TALLAS y no el agrupado para respetar el orden del
+    // pedido: el vale se lee contra la orden, talla por talla y en su orden.
+    return lines
+      .map((line) => ({ line, quantity: byLine.get(line.id) ?? 0 }))
+      .filter(({ quantity }) => quantity > 0)
+      .map(({ line, quantity }) => ({
+        sizeId: line.sizeId,
+        quantity,
+        bundles: 1,
+        tagId: line.tagId ?? undefined,
+        notes: line.notes ?? undefined,
+      }));
   }
 
   /**

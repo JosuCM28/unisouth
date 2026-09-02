@@ -718,6 +718,24 @@ model InventoryDocument {
   productionOrderId String?
   productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
 
+  /// The cutting order this voucher came out of.
+  ///
+  /// A real relation and not the `reference` text below: two orders of the
+  /// same client can carry the same paper number, so matching by text would
+  /// sooner or later tie a voucher to the wrong order — and this is what the
+  /// order screen reads to say "this one already left, and it is not
+  /// cancelled". SetNull on delete: the voucher is the record of what went out
+  /// the door and must outlive the order it came from.
+  cuttingOrderId String?
+  cuttingOrder   CuttingOrder? @relation("DocumentCuttingOrder", fields: [cuttingOrderId], references: [id], onDelete: SetNull)
+
+  /// And which CUT of it. Null means the voucher covers the whole order.
+  ///
+  /// It is what stops the same cutting run from being delivered twice: before
+  /// creating a voucher for a run, the service looks for a live one here.
+  cuttingBatchId String?
+  cuttingBatch   CuttingBatch? @relation("DocumentCuttingBatch", fields: [cuttingBatchId], references: [id], onDelete: SetNull)
+
   concept      String?
   reference    String?
   handedOverBy String?
@@ -772,6 +790,8 @@ model InventoryDocument {
   @@index([type, status, date])
   @@index([date])
   @@index([productionRunId])
+  @@index([cuttingOrderId])
+  @@index([cuttingBatchId])
   @@map("inventory_documents")
 }
 
@@ -1592,6 +1612,9 @@ model CuttingOrder {
   lines     CuttingOrderLine[]
   batches   CuttingBatch[]
   shipments GarmentShipment[]
+  /// The issue vouchers born from this order. Read to show whether it already
+  /// left and whether that delivery is still standing.
+  issues    InventoryDocument[] @relation("DocumentCuttingOrder")
 
   @@index([status, orderedAt])
   @@index([clientId])
@@ -1633,6 +1656,9 @@ model CuttingBatch {
   createdAt DateTime @default(now())
 
   entries CuttingProgress[]
+  /// The issue vouchers for THIS cutting run. More than one only after
+  /// cancelling: a live voucher blocks sending the run again.
+  issues  InventoryDocument[] @relation("DocumentCuttingBatch")
 
   @@unique([orderId, number])
   @@index([orderId])

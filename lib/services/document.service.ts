@@ -78,6 +78,11 @@ export class DocumentService extends BaseService {
           status: "DRAFT",
           clientId: input.clientId,
           productionRunId: input.productionRunId,
+          /* De dónde nació. Se sella SÓLO al crear y `update` no lo toca: si
+             corregir un vale pudiera cambiarle la orden, la ficha de la orden
+             perdería de vista una entrega que sí salió por la puerta. */
+          cuttingOrderId: input.cuttingOrderId,
+          cuttingBatchId: input.cuttingBatchId,
           concept: input.concept,
           reference: input.reference,
           handedOverBy: input.handedOverBy,

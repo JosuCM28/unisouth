@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
   CUT_VERSION_LABELS,
+  cutBatchLabel,
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
@@ -36,6 +37,10 @@ import {
   OrderShipments,
   type ShipmentView,
 } from "@/components/orders/order-shipments";
+import {
+  OrderIssues,
+  type IssueView,
+} from "@/components/orders/order-issues";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { Button } from "@/components/ui/button";
 
@@ -116,7 +121,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages] = await Promise.all([
+  const [balances, shipments, workshops, stages, issues] = await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
       where: { orderId: id },
@@ -140,6 +145,27 @@ export default async function OrderDetailPage({ params }: PageProps) {
       where: { deletedAt: null, active: true },
       select: { id: true, name: true },
       orderBy: [{ position: "asc" }, { name: "asc" }],
+    }),
+    /* Las salidas nacidas de esta orden.
+
+       Se buscan por la LLAVE y no por el texto de la referencia: dos órdenes
+       del mismo cliente pueden traer el mismo número de papel, y cruzar por
+       ahí acabaría colgándole a esta orden la salida de otra. Los vales de
+       envío a taller no salen aquí a propósito: ya se pintan en "En talleres"
+       y aparecerían dos veces. */
+    prisma.inventoryDocument.findMany({
+      where: { cuttingOrderId: id },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        date: true,
+        cuttingBatchId: true,
+        receivedBy: true,
+        _count: { select: { cutLines: true } },
+        cutLines: { select: { quantity: true } },
+      },
     }),
   ]);
 
@@ -237,6 +263,31 @@ export default async function OrderDetailPage({ params }: PageProps) {
         userName: entry.user?.name ?? null,
         notes: entry.notes,
       })),
+    issues: issues
+      .filter((issue) => issue.cuttingBatchId === batch.id)
+      .map((issue) => ({
+        id: issue.id,
+        code: issue.code,
+        status: issue.status,
+      })),
+  }));
+
+  /* Las salidas que siguen en pie. Es el indicador que contesta "¿esta orden
+     ya salió?": una cancelada no cuenta porque cancelar es justo cómo se
+     deshace un envío equivocado. */
+  const liveIssues = issues.filter((issue) => issue.status !== "CANCELLED");
+
+  const issueViews: IssueView[] = issues.map((issue) => ({
+    id: issue.id,
+    code: issue.code,
+    status: issue.status,
+    date: issue.date,
+    receivedBy: issue.receivedBy,
+    // El corte del que salió, por su nombre de piso ("1er corte"). Sin corte
+    // el vale cubre la orden completa, que también hay que poder distinguir.
+    batchLabel: batchLabelOf(order.batches, issue.cuttingBatchId),
+    pieces: issue.cutLines.reduce((sum, line) => sum + line.quantity, 0),
+    sizes: issue._count.cutLines,
   }));
 
   /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las
@@ -312,6 +363,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   orderCode={order.code}
                   sizes={issueSizes}
                   pendingSizes={order.lines.length - issueSizes.length}
+                  /* Este botón manda TODO lo cortado hasta hoy. Si ya hay una
+                     salida en pie, lo que se cree ahora repite lo que ya se
+                     llevó, así que el diálogo lo advierte antes de firmar. */
+                  liveIssues={liveIssues.map((issue) => ({
+                    code: issue.code,
+                    isDraft: issue.status === "DRAFT",
+                  }))}
                 />
               )}
               {/* Sin talleres ni etapas dadas de alta no hay nada que
@@ -374,6 +432,25 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <Stat label="Faltan" value={pending} tone="pending" />
         )}
       </div>
+
+      {/* Arriba del todo cuando la orden ya salió: es lo primero que hay que
+          saber antes de mandar otro vale, no algo que se descubre al final de
+          la pantalla. */}
+      {issueViews.length > 0 && (
+        <section className="flat-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold">
+            Salidas de esta orden
+            {liveIssues.length > 0 && (
+              <span className="ml-2 rounded bg-state-available px-1.5 py-0.5 text-xs font-medium text-state-available-foreground">
+                {liveIssues.length === 1
+                  ? "1 sin cancelar"
+                  : `${liveIssues.length} sin cancelar`}
+              </span>
+            )}
+          </h2>
+          <OrderIssues issues={issueViews} />
+        </section>
+      )}
 
       {/* Va antes del desglose por talla sólo cuando hay algo afuera: lo que
           anda en un taller es lo que se pregunta por teléfono. */}
@@ -572,7 +649,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <h2 className="mb-3 text-sm font-semibold">
           Cortes ({batchViews.length})
         </h2>
-        <OrderBatches batches={batchViews} />
+        <OrderBatches
+          batches={batchViews}
+          orderId={order.id}
+          orderCode={order.code}
+          canSend={!isCancelled}
+        />
       </section>
     </div>
   );
@@ -630,4 +712,20 @@ function Row({
       </dd>
     </div>
   );
+}
+
+/**
+ * El nombre de piso del corte del que salió un vale ("1er corte").
+ *
+ * Sin corte devuelve nulo, y la pantalla lo lee como "orden completa": son
+ * dos cosas distintas y confundirlas haría ver un vale de toda la orden como
+ * si fuera de un tendido.
+ */
+function batchLabelOf(
+  batches: { id: string; number: number; label: string | null }[],
+  batchId: string | null,
+): string | null {
+  if (!batchId) return null;
+  const batch = batches.find((item) => item.id === batchId);
+  return batch ? cutBatchLabel(batch.number, batch.label) : null;
 }

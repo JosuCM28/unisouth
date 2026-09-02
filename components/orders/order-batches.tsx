@@ -1,6 +1,15 @@
-import { cutBatchLabel } from "@/lib/constants/labels";
+import Link from "next/link";
+import { Truck } from "lucide-react";
+import type { DocumentStatus } from "@prisma/client";
+import {
+  cutBatchLabel,
+  DOCUMENT_STATUS_LABELS,
+  DOCUMENT_STATUS_STYLES,
+} from "@/lib/constants/labels";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 
 /** Lo que una talla aportó a un corte. */
 export interface BatchEntryView {
@@ -12,6 +21,13 @@ export interface BatchEntryView {
   notes: string | null;
 }
 
+/** La salida de este corte, si ya se mandó. */
+export interface BatchIssueView {
+  id: string;
+  code: string;
+  status: DocumentStatus;
+}
+
 export interface BatchView {
   id: string;
   number: number;
@@ -20,6 +36,14 @@ export interface BatchView {
   openedAt: Date;
   openedByName: string | null;
   entries: BatchEntryView[];
+  /**
+   * Las salidas de ESTE corte, de la más nueva a la más vieja.
+   *
+   * En plural porque un vale cancelado no borra el intento: si alguien mandó
+   * el corte, se equivocó y lo canceló, la ficha tiene que seguir contando
+   * las dos cosas.
+   */
+  issues: BatchIssueView[];
 }
 
 /**
@@ -34,7 +58,18 @@ export interface BatchView {
  * un corte es un tendido, no una sesión de captura, y ver la 32 dos veces en
  * el mismo bloque obliga a sumarlas a mano.
  */
-export function OrderBatches({ batches }: { batches: BatchView[] }) {
+export function OrderBatches({
+  batches,
+  orderId,
+  orderCode,
+  canSend = false,
+}: {
+  batches: BatchView[];
+  orderId: string;
+  orderCode: string;
+  /** Si se ofrece mandar cortes a salidas. Falso en una orden cancelada. */
+  canSend?: boolean;
+}) {
   if (batches.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -50,6 +85,13 @@ export function OrderBatches({ batches }: { batches: BatchView[] }) {
         const total = batch.entries.reduce(
           (sum, entry) => sum + entry.quantity,
           0,
+        );
+
+        // Un vale cancelado no cuenta: cancelar es justo cómo se deshace un
+        // envío equivocado, y después el corte se puede volver a mandar.
+        const live = batch.issues.find((issue) => issue.status !== "CANCELLED");
+        const sizes = groupBySize(batch.entries).filter(
+          (row) => row.quantity > 0,
         );
 
         return (
@@ -77,6 +119,33 @@ export function OrderBatches({ batches }: { batches: BatchView[] }) {
 
             {batch.notes && (
               <p className="text-xs text-muted-foreground">{batch.notes}</p>
+            )}
+
+            {/* Las salidas de este corte. Se pintan TODAS, canceladas
+                incluidas: que un vale se haya cancelado es parte de lo que
+                pasó con este tendido, y esconderlo deja la pregunta "¿no que
+                ya lo habíamos mandado?" sin respuesta en la pantalla. */}
+            {batch.issues.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {batch.issues.map((issue) => (
+                  <Link
+                    key={issue.id}
+                    href={`/documents/${issue.id}`}
+                    className="flex items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-xs"
+                  >
+                    <Truck className="size-3 shrink-0" aria-hidden />
+                    <span className="tabular">{issue.code}</span>
+                    <span
+                      className={cn(
+                        "rounded px-1",
+                        DOCUMENT_STATUS_STYLES[issue.status],
+                      )}
+                    >
+                      {DOCUMENT_STATUS_LABELS[issue.status]}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             )}
 
             {batch.entries.length === 0 ? (
@@ -126,6 +195,37 @@ export function OrderBatches({ batches }: { batches: BatchView[] }) {
                   ))}
                 </ul>
               </details>
+            )}
+
+            {/* Mandar ESTE corte, no la orden entera.
+
+                El taller entrega por tendidos: corta el primero, lo entrega, y
+                sigue con el segundo. Sin este botón había que mandar todo lo
+                cortado hasta la fecha, y el segundo vale volvía a incluir lo
+                que ya se había llevado el primero.
+
+                Con una salida viva no se ofrece: mandarlo otra vez entregaría
+                dos veces las mismas prendas. El chip de arriba dice cuál es el
+                vale, y cancelarlo vuelve a habilitar el botón. */}
+            {canSend && !live && sizes.length > 0 && (
+              <OrderSendToIssueDialog
+                orderId={orderId}
+                orderCode={orderCode}
+                sizes={sizes}
+                batch={{
+                  id: batch.id,
+                  label: cutBatchLabel(batch.number, batch.label),
+                }}
+                trigger={
+                  <Button
+                    variant="outline"
+                    className="touch-target w-full sm:w-auto"
+                  >
+                    <Truck className="size-4" aria-hidden />
+                    Mandar a salida
+                  </Button>
+                }
+              />
             )}
           </li>
         );

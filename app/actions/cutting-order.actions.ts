@@ -13,7 +13,17 @@ import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 
 const REVALIDATE = ["/orders", "/dashboard"];
 
-const idSchema = z.object({ id: cuidSchema });
+/**
+ * Mandar a salidas: la orden completa o UN corte suyo.
+ *
+ * `batchId` opcional porque las dos son la misma acción vista desde distinta
+ * altura: sin él viaja todo lo cortado hasta hoy, con él sólo lo que dio ese
+ * tendido.
+ */
+const sendToIssueSchema = z.object({
+  id: cuidSchema,
+  batchId: cuidSchema.optional(),
+});
 const updateSchema = z.object({ id: cuidSchema, data: cuttingOrderSchema });
 const cancelSchema = z.object({
   id: cuidSchema,
@@ -129,10 +139,10 @@ export async function removeCuttingOrderAction(input: unknown) {
  */
 export async function sendOrderToIssueAction(input: unknown) {
   return executeAction(input, {
-    schema: idSchema,
+    schema: sendToIssueSchema,
     permission: "inventory:write",
     revalidate: [...REVALIDATE, "/issues", "/documents"],
     handler: ({ input, auditContext }) =>
-      new CuttingOrderService(auditContext).sendToIssue(input.id),
+      new CuttingOrderService(auditContext).sendToIssue(input.id, input.batchId),
   });
 }

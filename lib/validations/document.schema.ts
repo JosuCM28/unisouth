@@ -82,6 +82,16 @@ export const documentSchema = z.object({
   date: localDate.optional(),
   clientId: optionalCuid,
   productionRunId: optionalCuid,
+  /**
+   * De qué orden de corte —y de qué corte suyo— nace el vale.
+   *
+   * No los teclea nadie: los pone `CuttingOrderService.sendToIssue`. Viven en
+   * el esquema porque es la única puerta a crear un documento, y son lo que
+   * después deja a la ficha de la orden contestar "esto ya salió y el vale
+   * sigue en pie".
+   */
+  cuttingOrderId: optionalCuid,
+  cuttingBatchId: optionalCuid,
   concept: optionalText,
   reference: optionalText,
   /** Quién entrega y quién recibe: el vale se firma en físico. */
