@@ -2,6 +2,8 @@ import { visibleSections } from "@/lib/constants/navigation";
 import { roleHasPermission } from "@/lib/constants/roles";
 import type { CurrentUser } from "@/lib/core/session";
 import { SidebarLink } from "./sidebar-link";
+import { SidebarPanel } from "./sidebar-panel";
+import { SidebarToggle } from "./sidebar-toggle";
 import { UserMenu } from "./user-menu";
 
 interface AppSidebarProps {
@@ -22,10 +24,13 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const sections = visibleSections(user.role, roleHasPermission);
 
   return (
-    // En celular no existe: ahí manda la barra inferior.
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex md:h-dvh">
-      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-4">
+    /* El armazón es cliente —tiene que saber si está plegada—, pero la lista
+       se arma aquí, en el servidor: así los destinos sin permiso ni siquiera
+       se mandan al navegador. */
+    <SidebarPanel>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border pl-4 pr-2">
         <span className="text-sm font-semibold tracking-tight">UNISOUTH</span>
+        <SidebarToggle />
       </div>
 
       {/* min-h-0 es imprescindible: por defecto un hijo flex no se encoge por
@@ -55,6 +60,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <div className="shrink-0">
         <UserMenu user={user} />
       </div>
-    </aside>
+    </SidebarPanel>
   );
 }
