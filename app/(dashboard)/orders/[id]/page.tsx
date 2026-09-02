@@ -1,7 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Copy, FolderOpen, Pencil, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Copy,
+  FolderOpen,
+  Pencil,
+  Plus,
+  StickyNote,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
@@ -499,7 +506,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
             return (
               <li
                 key={line.id}
-                className="flat-surface flex items-center gap-3 p-3"
+                /* `items-start` y no `items-center`: con una anotación de
+                   dos renglones, centrar dejaba el número de la derecha
+                   flotando a media altura, lejos de su talla. */
+                className="flat-surface flex items-start gap-3 p-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -539,9 +549,26 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     </p>
                   )}
 
+                  {/* La anotación de la talla, ENTERA y en su propio bloque.
+
+                      Antes era otra línea gris diminuta con `truncate`, la
+                      tercera seguida bajo el mismo estilo: se leía como más
+                      relleno y "va sin bolsa" se cortaba a la mitad. Es una
+                      instrucción para quien corta —el único texto libre que
+                      lleva el renglón— y tiene que distinguirse de las cifras
+                      que la rodean, no competir con ellas.
+
+                      `whitespace-pre-wrap` porque la nota se teclea con sus
+                      renglones y respetarlos es lo que la hace legible. */}
                   {line.notes && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {line.notes}
+                    <p className="mt-1.5 flex items-start gap-1.5 border border-border bg-muted/40 px-2 py-1 text-sm">
+                      <StickyNote
+                        className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 whitespace-pre-wrap break-words">
+                        {line.notes}
+                      </span>
                     </p>
                   )}
                 </div>

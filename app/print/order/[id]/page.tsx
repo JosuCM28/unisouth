@@ -139,7 +139,12 @@ export default async function PrintOrderPage({ params }: PageProps) {
             <th className="py-1 pr-2 text-right">Pedidas</th>
             <th className="py-1 pr-2 text-right">Cortadas</th>
             <th className="py-1 pr-2 text-right">Faltan</th>
-            <th className="py-1 text-right">Sobran</th>
+            <th className="py-1 pr-2 text-right">Sobran</th>
+            {/* La anotación de la talla ("va sin bolsa") es una instrucción
+                para quien corta, y ésta es la hoja que tiene enfrente. Vive
+                en el renglón desde siempre y no se imprimía: una nota que
+                sólo existe en la pantalla no sirve de nada en la mesa. */}
+            <th className="py-1">Anotaciones</th>
           </tr>
         </thead>
         <tbody>
@@ -162,9 +167,13 @@ export default async function PrintOrderPage({ params }: PageProps) {
                 <td className="tabular py-1 pr-2 text-right">
                   {progress.pending > 0 ? progress.pending : ""}
                 </td>
-                <td className="tabular py-1 text-right font-medium">
+                <td className="tabular py-1 pr-2 text-right font-medium">
                   {progress.surplus > 0 ? `+${progress.surplus}` : ""}
                 </td>
+                {/* `whitespace-pre-wrap` para respetar los renglones tal como
+                    se escribieron: una nota de dos líneas aplastada en una
+                    deja de leerse como dos instrucciones. */}
+                <td className="whitespace-pre-wrap py-1">{line.notes ?? ""}</td>
               </tr>
             );
           })}
@@ -179,9 +188,13 @@ export default async function PrintOrderPage({ params }: PageProps) {
             <td className="tabular py-1 pr-2 text-right">
               {pending > 0 ? pending : ""}
             </td>
-            <td className="tabular py-1 text-right">
+            <td className="tabular py-1 pr-2 text-right">
               {surplus > 0 ? `+${surplus}` : ""}
             </td>
+            {/* La columna de anotaciones no suma nada, pero la celda tiene que
+                existir: sin ella el renglón de totales queda corto y el borde
+                superior no llega hasta el final de la tabla. */}
+            <td className="py-1" />
           </tr>
         </tfoot>
       </table>

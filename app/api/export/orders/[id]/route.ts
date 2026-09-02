@@ -33,7 +33,9 @@ import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
  *   Talla        Foleo     Pedidas  Cortadas  Faltan  Sobran
  *   Fecha        Talla     Piezas   Quién     Notas
  */
-const WIDTHS = [24, 22, 12, 16, 18, 12];
+/* La última es la de anotaciones: ancha porque lleva texto libre y no una
+   cifra, y con 12 caracteres una instrucción del taller sale ilegible. */
+const WIDTHS = [24, 22, 12, 16, 18, 12, 40];
 
 /** Columnas, por nombre, para no contar posiciones al leer el armado. */
 const A = 1;
@@ -42,6 +44,7 @@ const C = 3;
 const D = 4;
 const E = 5;
 const F = 6;
+const G = 7;
 
 interface OrderSheet {
   code: string;
@@ -231,6 +234,10 @@ function sizeRows(lines: Line[]): SheetRow[] {
       // dos renglones que de verdad deben algo.
       { at: E, value: pending > 0 ? pending : "", kind: "number" },
       { at: F, value: surplus > 0 ? surplus : "", kind: "number" },
+      /* La anotación de la talla. Vive en el renglón desde siempre y no salía
+         en el archivo: una instrucción de corte que sólo existe en la
+         pantalla no llega a quien tiene que leerla. */
+      { at: G, value: line.notes ?? "" },
     ];
   });
 
@@ -245,6 +252,7 @@ function sizeRows(lines: Line[]): SheetRow[] {
       { at: D, value: "Cortadas", style: "tableHeaderRight" },
       { at: E, value: "Faltan", style: "tableHeaderRight" },
       { at: F, value: "Sobran", style: "tableHeaderRight" },
+      { at: G, value: "Anotaciones", style: "tableHeader" },
     ],
     ...body,
     [
@@ -264,6 +272,9 @@ function sizeRows(lines: Line[]): SheetRow[] {
         kind: "number",
         style: "totalNumber",
       },
+      // Vacía pero con estilo: sin ella el borde del renglón de totales se
+      // corta antes de la última columna y la tabla se ve rota.
+      { at: G, value: "", style: "total" },
     ],
   ];
 }
