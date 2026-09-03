@@ -78,6 +78,9 @@ model User {
   orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
   garmentReturns            GarmentReturn[]     @relation("GarmentReturnBy")
   garmentShipments          GarmentShipment[]   @relation("GarmentShipmentCreatedBy")
+  garmentFolders            GarmentFolder[]     @relation("GarmentFolderCreatedBy")
+  garmentsCreated           Garment[]           @relation("GarmentCreatedBy")
+  garmentPhotos             GarmentPhoto[]      @relation("GarmentPhotoCreatedBy")
   orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
 
   @@index([active, role])
@@ -310,6 +313,7 @@ model Client {
   documents        InventoryDocument[]
   cuttingOrders    CuttingOrder[]
   orderFolders     OrderFolder[]
+  garmentFolders   GarmentFolder[]
   standingRules    StandingRule[]
 
   @@index([active])
@@ -2236,4 +2240,134 @@ model CuttingOrderComment {
   /// Newest first is how they are read, and the index serves that order.
   @@index([orderId, createdAt])
   @@map("cutting_order_comments")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GARMENTS — the visual catalogue the workshop works against
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Answers a question no other table did: "where exactly does the embroidery go
+// on this jacket?". It was answered by handing the workshop a sample garment or
+// by a photo on someone's phone, and when that person was off, the shop guessed.
+//
+// Deliberately NOT part of FinishedProduct. That model feeds bills of material
+// and fabric maths; this one is a picture board. Bolting placements onto it
+// would drag photos into every calculation query for no gain.
+
+/// A folder of garments, the way the floor groups them ("TAMSA").
+///
+/// Free name with an OPTIONAL client, exactly like OrderFolder: the folder gets
+/// written the moment someone has a photo to file, and forcing a client record
+/// first is what sends people back to the phone gallery.
+model GarmentFolder {
+  id   String @id @default(cuid())
+  name String
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  notes String?
+
+  /// Soft delete: a folder that stops being used still explains the photos
+  /// that hung from it.
+  deletedAt DateTime?
+
+  createdById String?
+  createdBy   User?    @relation("GarmentFolderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  garments Garment[]
+
+  @@index([deletedAt, name])
+  @@index([clientId])
+  @@map("garment_folders")
+}
+
+/// One garment model: "Chamarra Tenaris Shawcor".
+model Garment {
+  id       String        @id @default(cuid())
+  folderId String
+  folder   GarmentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  name String
+  /// The client's own name or code for it, when it differs from ours.
+  reference String?
+  notes     String?
+
+  /// The whole garment, so the folder can be read as a board of pictures.
+  photoId String?       @unique
+  photo   GarmentPhoto? @relation("GarmentPhoto", fields: [photoId], references: [id], onDelete: SetNull)
+
+  position Int @default(0)
+
+  deletedAt DateTime?
+
+  createdById String?
+  createdBy   User?    @relation("GarmentCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  placements GarmentPlacement[]
+
+  @@index([folderId, position])
+  @@index([deletedAt])
+  @@map("garments")
+}
+
+/// Where a mark goes on the garment: "Manga izquierda bordado".
+///
+/// Only the name is required. The photo comes later —somebody has to walk to
+/// the sample and take it— and a list of placements with no pictures is already
+/// worth more than nothing written down at all.
+model GarmentPlacement {
+  id        String  @id @default(cuid())
+  garmentId String
+  garment   Garment @relation(fields: [garmentId], references: [id], onDelete: Cascade)
+
+  name  String
+  notes String?
+
+  photoId String?       @unique
+  photo   GarmentPhoto? @relation("PlacementPhoto", fields: [photoId], references: [id], onDelete: SetNull)
+
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([garmentId, position])
+  @@map("garment_placements")
+}
+
+/// The bytes of one photo.
+///
+/// A table of its OWN, and that is the whole point: with the bytes sitting in
+/// `garments`, listing a folder of 40 garments would drag a dozen megabytes
+/// across just to paint 40 names. Here a listing reads `photoId` and the bytes
+/// are fetched one at a time by /api/garment-photos/[id].
+///
+/// Stored in Postgres and not on disk because the app runs in a container with
+/// no volume: anything written to its filesystem is gone on the next deploy,
+/// and a photo that vanishes silently is worse than one never taken. The photo
+/// is downscaled in the browser before it ever gets here.
+model GarmentPhoto {
+  id String @id @default(cuid())
+
+  data     Bytes
+  mimeType String
+  /// Rendered size, kept so the page can reserve the box before the bytes
+  /// arrive and the list does not jump while it loads.
+  width    Int
+  height   Int
+  byteSize Int
+
+  createdById String?
+  createdBy   User?    @relation("GarmentPhotoCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  garment   Garment?          @relation("GarmentPhoto")
+  placement GarmentPlacement? @relation("PlacementPhoto")
+
+  @@map("garment_photos")
 }

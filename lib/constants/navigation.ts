@@ -91,6 +91,15 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:browse",
       },
       {
+        /* Junto a Productos y no en Documentos: es un catálogo, no un papel
+           que se firme. Se consulta con `browse` como el resto de catálogos,
+           y editarlo exige `catalog:write`. */
+        href: "/garments",
+        label: "Prendas",
+        icon: "garments",
+        permission: "inventory:browse",
+      },
+      {
         href: "/sizes",
         label: "Tallas",
         icon: "sizes",
