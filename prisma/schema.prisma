@@ -75,6 +75,7 @@ model User {
   cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
   cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
   cuttingBatches            CuttingBatch[]      @relation("CuttingBatchOpenedBy")
+  orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
   garmentReturns            GarmentReturn[]     @relation("GarmentReturnBy")
   garmentShipments          GarmentShipment[]   @relation("GarmentShipmentCreatedBy")
   orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
@@ -1612,6 +1613,7 @@ model CuttingOrder {
   lines     CuttingOrderLine[]
   batches   CuttingBatch[]
   shipments GarmentShipment[]
+  comments  CuttingOrderComment[]
   /// The issue vouchers born from this order. Read to show whether it already
   /// left and whether that delivery is still standing.
   issues    InventoryDocument[] @relation("DocumentCuttingOrder")
@@ -2188,4 +2190,30 @@ model GarmentReturn {
 
   @@index([lineId])
   @@map("garment_returns")
+}
+
+/// An INTERNAL note on a cutting order.
+///
+/// Deliberately not `CuttingOrder.notes`: that field is part of the order
+/// DOCUMENT — it prints on the sheet the workshop signs and gets copied into
+/// the issue voucher. These are the office's own planning notes ("30% goes to
+/// Shawcor, the rest stays here") and must never leave the building.
+///
+/// A list and not one editable blob so the decisions keep their date: months
+/// later the question is not only what was decided but when, and overwriting a
+/// single field erases exactly that.
+model CuttingOrderComment {
+  id      String       @id @default(cuid())
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  body String
+
+  createdById String?
+  createdBy   User?   @relation("CuttingOrderCommentBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  /// Newest first is how they are read, and the index serves that order.
+  @@index([orderId, createdAt])
+  @@map("cutting_order_comments")
 }

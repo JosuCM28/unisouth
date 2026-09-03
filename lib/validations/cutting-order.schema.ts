@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { CutVersion } from "@prisma/client";
-import { cuidSchema, localDate, optionalCuid, optionalText } from "./common";
+import {
+  cuidSchema,
+  localDate,
+  optionalCuid,
+  optionalText,
+  requiredText,
+} from "./common";
 
 /** Un renglón: una talla y cuántas piezas pidieron de ella. */
 export const cuttingOrderLineSchema = z.object({
@@ -129,3 +135,18 @@ export const batchProgressSchema = z.object({
 });
 
 export type BatchProgressInput = z.infer<typeof batchProgressSchema>;
+
+/**
+ * Un comentario INTERNO de la orden.
+ *
+ * Sin campos opcionales: un comentario vacío no es un comentario. El tope de
+ * 2 000 caracteres es generoso a propósito —aquí se planea, no se llena una
+ * ficha— pero existe para que un pegado accidental no meta media hoja de
+ * cálculo en la base.
+ */
+export const orderCommentSchema = z.object({
+  orderId: cuidSchema,
+  body: requiredText("Escribe el comentario", 2000),
+});
+
+export type OrderCommentInput = z.infer<typeof orderCommentSchema>;

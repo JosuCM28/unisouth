@@ -10,7 +10,8 @@ import {
   StickyNote,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/core/session";
+import { getCurrentUser, requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import {
   CUT_VERSION_LABELS,
   cutBatchLabel,
@@ -48,6 +49,10 @@ import {
   OrderIssues,
   type IssueView,
 } from "@/components/orders/order-issues";
+import {
+  OrderComments,
+  type OrderCommentView,
+} from "@/components/orders/order-comments";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { Button } from "@/components/ui/button";
 
@@ -76,6 +81,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
   await requirePermission("inventory:browse");
 
   const { id } = await params;
+  // Para saber si se le ofrece escribir comentarios internos: leerlos sólo
+  // pide `browse`, que la línea de arriba ya exigió.
+  const user = await getCurrentUser();
+  const canComment = user
+    ? roleHasPermission(user.role, "inventory:write")
+    : false;
 
   const order = await prisma.cuttingOrder.findUnique({
     where: { id },
@@ -101,6 +112,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
          selector del diálogo. */
       batches: {
         orderBy: { number: "desc" },
+        include: { createdBy: { select: { name: true } } },
+      },
+      /* Los comentarios internos, del más nuevo al más viejo: lo último que
+         se acordó es lo que se necesita leer al abrir la orden. */
+      comments: {
+        orderBy: { createdAt: "desc" },
         include: { createdBy: { select: { name: true } } },
       },
     },
@@ -277,6 +294,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
         code: issue.code,
         status: issue.status,
       })),
+  }));
+
+  const commentViews: OrderCommentView[] = order.comments.map((comment) => ({
+    id: comment.id,
+    body: comment.body,
+    createdAt: comment.createdAt,
+    authorName: comment.createdBy?.name ?? null,
   }));
 
   /* Las salidas que siguen en pie. Es el indicador que contesta "¿esta orden
@@ -459,6 +483,21 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <Stat label="Faltan" value={pending} tone="pending" />
         )}
       </div>
+
+      {/* Los comentarios internos van ARRIBA de lo operativo: son la
+          planeación —a qué taller va qué parte— y se leen antes de tocar
+          nada, no después de recorrer la pantalla entera. */}
+      <section className="flat-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold">
+          Comentarios internos
+          {commentViews.length > 0 && ` (${commentViews.length})`}
+        </h2>
+        <OrderComments
+          orderId={order.id}
+          comments={commentViews}
+          canWrite={canComment}
+        />
+      </section>
 
       {/* Arriba del todo cuando la orden ya salió: es lo primero que hay que
           saber antes de mandar otro vale, no algo que se descubre al final de

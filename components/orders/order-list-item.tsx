@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import type { CuttingOrderStatus } from "@prisma/client";
 import {
   CUTTING_ORDER_STATUS_LABELS,
@@ -19,6 +20,13 @@ export interface OrderListEntry {
   client: { name: string } | null;
   material: { name: string } | null;
   lines: Array<{ orderedQuantity: number; cutQuantity: number }>;
+  /**
+   * Cuántos comentarios internos trae.
+   *
+   * Opcional porque no toda lista los pide, y ausente se lee como cero: una
+   * pantalla que no los consulta no debe pintar un contador en blanco.
+   */
+  _count?: { comments: number };
 }
 
 interface Props {
@@ -41,6 +49,7 @@ export function OrderListItem({ order, folderName }: Props) {
   );
   const cut = order.lines.reduce((sum, line) => sum + line.cutQuantity, 0);
   const { pending, surplus } = cutProgress(ordered, cut);
+  const commentCount = order._count?.comments ?? 0;
 
   return (
     <div className="flat-surface relative flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent">
@@ -86,6 +95,21 @@ export function OrderListItem({ order, folderName }: Props) {
           {order.reference && (
             <span className="tabular rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
               Ref. {order.reference}
+            </span>
+          )}
+
+          {/* Que la orden trae notas de planeación, sin sacarlas a la lista:
+              son internas y a veces largas. Lo que resuelve el chip es saber
+              cuáles ya se planearon sin abrirlas una por una. */}
+          {commentCount > 0 && (
+            <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+              <MessageSquare className="size-3" aria-hidden />
+              <span className="tabular">{commentCount}</span>
+              <span className="sr-only">
+                {commentCount === 1
+                  ? "comentario interno"
+                  : "comentarios internos"}
+              </span>
             </span>
           )}
 

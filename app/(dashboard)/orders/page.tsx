@@ -102,6 +102,8 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         material: { select: { name: true } },
         folder: { select: { name: true } },
         lines: { select: { orderedQuantity: true, cutQuantity: true } },
+        // Para el contador de comentarios internos de la tarjeta.
+        _count: { select: { comments: true } },
       },
     }),
     // Sólo los clientes que de verdad tienen órdenes: ofrecer el catálogo

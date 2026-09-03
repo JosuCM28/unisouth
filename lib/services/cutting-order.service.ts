@@ -1,4 +1,8 @@
-import type { CuttingBatch, CuttingOrder } from "@prisma/client";
+import type {
+  CuttingBatch,
+  CuttingOrder,
+  CuttingOrderComment,
+} from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import type {
@@ -6,6 +10,7 @@ import type {
   CuttingBatchInput,
   CuttingOrderInput,
   CuttingProgressInput,
+  OrderCommentInput,
 } from "@/lib/validations/cutting-order.schema";
 import { BaseService } from "./base.service";
 import { DocumentService } from "./document.service";
@@ -782,6 +787,77 @@ export class CuttingOrderService extends BaseService {
         // corrección: una fecha de cierre en una orden viva confunde.
         closedAt: status === "COMPLETED" ? new Date() : null,
       },
+    });
+  }
+
+  /**
+   * Agrega un comentario INTERNO a la orden.
+   *
+   * No toca `CuttingOrder.notes`: ese campo es parte del documento —se imprime
+   * en la hoja que firma el taller y se copia al vale de salida— y estos
+   * comentarios no pueden salir del edificio. Son la planeación de la oficina:
+   * a qué taller va qué porcentaje, con quién se quedó de acuerdo.
+   *
+   * Se permite comentar una orden CANCELADA: explicar por qué se cayó es justo
+   * cuando más falta hace tener dónde anotarlo.
+   */
+  async addComment(input: OrderCommentInput): Promise<CuttingOrderComment> {
+    return this.transaction(async (tx) => {
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id: input.orderId },
+        select: { id: true, code: true },
+      });
+      if (!order) throw new NotFoundError("la orden", input.orderId);
+
+      const comment = await tx.cuttingOrderComment.create({
+        data: {
+          orderId: order.id,
+          body: input.body,
+          createdById: this.context.userId,
+        },
+      });
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: order.id,
+        action: "UPDATE",
+        reference: order.code,
+        /* El TEXTO no se copia a la bitácora: son notas internas, y guardarlas
+           ahí las dejaría vivas después de borrarlas —justo lo contrario de
+           poder retirarlas—. Queda el rastro de que se agregó una. */
+        newValue: { commentAdded: comment.id },
+        sensitivity: "LOW",
+      });
+
+      return comment;
+    });
+  }
+
+  /**
+   * Retira un comentario interno.
+   *
+   * Se borra de verdad y no se marca: es una nota de trabajo, no un asiento
+   * del kárdex. Lo que sí queda es el renglón de auditoría de que alguien la
+   * retiró y cuándo.
+   */
+  async removeComment(id: string): Promise<void> {
+    return this.transaction(async (tx) => {
+      const comment = await tx.cuttingOrderComment.findUnique({
+        where: { id },
+        select: { id: true, orderId: true, order: { select: { code: true } } },
+      });
+      if (!comment) throw new NotFoundError("el comentario", id);
+
+      await tx.cuttingOrderComment.delete({ where: { id } });
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: comment.orderId,
+        action: "UPDATE",
+        reference: comment.order.code,
+        oldValue: { commentRemoved: id },
+        sensitivity: "LOW",
+      });
     });
   }
 }

@@ -8,6 +8,7 @@ import {
   cuttingBatchSchema,
   cuttingOrderSchema,
   cuttingProgressSchema,
+  orderCommentSchema,
 } from "@/lib/validations/cutting-order.schema";
 import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 
@@ -38,6 +39,9 @@ const removeSchema = z.object({
   id: cuidSchema,
   reason: requiredText("El motivo", 500),
 });
+/* Retirar un comentario interno NO pide motivo: es una nota de trabajo, no un
+   asiento del kárdex. La auditoría igual registra quién y cuándo. */
+const commentIdSchema = z.object({ id: cuidSchema });
 
 export async function createCuttingOrderAction(input: unknown) {
   return executeAction(input, {
@@ -144,5 +148,33 @@ export async function sendOrderToIssueAction(input: unknown) {
     revalidate: [...REVALIDATE, "/issues", "/documents"],
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).sendToIssue(input.id, input.batchId),
+  });
+}
+
+/**
+ * Agrega un comentario interno a la orden.
+ *
+ * Pide `inventory:write` igual que capturar un avance: quien puede trabajar
+ * la orden puede anotar sobre ella. Leerlos no necesita nada aparte —los
+ * pinta la propia ficha, que ya exige `inventory:browse`—.
+ */
+export async function addOrderCommentAction(input: unknown) {
+  return executeAction(input, {
+    schema: orderCommentSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).addComment(input),
+  });
+}
+
+export async function deleteOrderCommentAction(input: unknown) {
+  return executeAction(input, {
+    schema: commentIdSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Comentario retirado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).removeComment(input.id),
   });
 }

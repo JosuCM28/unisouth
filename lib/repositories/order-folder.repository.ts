@@ -126,6 +126,8 @@ export class OrderFolderRepository extends BaseRepository<
             client: { select: { name: true } },
             material: { select: { name: true } },
             lines: { select: { orderedQuantity: true, cutQuantity: true } },
+            // Para el contador de comentarios internos de la tarjeta.
+            _count: { select: { comments: true } },
           },
         },
       },
