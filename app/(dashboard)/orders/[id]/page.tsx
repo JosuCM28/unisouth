@@ -12,6 +12,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { sumBundlePieces } from "@/lib/bundles";
 import {
   CUT_VERSION_LABELS,
   cutBatchLabel,
@@ -213,6 +214,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       id: line.id,
       sizeCode: line.size.code,
       sentQuantity: line.sentQuantity,
+      bundles: line.bundles,
       returnedQuantity: line.returnedQuantity,
       scrapQuantity: line.scrapQuantity,
     })),
@@ -283,6 +285,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         id: entry.id,
         sizeCode: entry.sizeCode,
         quantity: entry.quantity,
+        bundles: entry.bundles,
         createdAt: entry.createdAt,
         userName: entry.user?.name ?? null,
         notes: entry.notes,
@@ -328,7 +331,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
     number: batch.number,
     label: batch.label,
     openedAt: batch.openedAt,
-    pieces: batch.entries.reduce((sum, entry) => sum + entry.quantity, 0),
+    // Cantidad × bultos, igual que en la tarjeta del corte.
+    pieces: sumBundlePieces(batch.entries),
   }));
 
   const batchSizes = order.lines.map((line) => ({

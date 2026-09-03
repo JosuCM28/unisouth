@@ -6,13 +6,28 @@ import {
   requiredText,
 } from "./common";
 
-/** Un renglón del envío: una talla y cuántas piezas se llevan. */
+/**
+ * Un renglón del envío: una talla, cuántas piezas lleva CADA bulto y cuántos
+ * bultos van con esa cuenta.
+ *
+ * La talla se puede repetir entre renglones a propósito: de la 43 salen un
+ * bulto de 30 y otro de 20, y eso son dos renglones porque el bulto no lleva
+ * la misma cantidad. Es la misma forma que la tabla de corte del vale, para
+ * que el desglose viaje tal cual al papel que firma el taller.
+ */
 export const garmentShipmentLineSchema = z.object({
   sizeId: cuidSchema,
   sentQuantity: z.coerce
     .number({ message: "Escribe cuántas piezas van" })
     .int("Las piezas se cuentan enteras")
     .positive("Deben ser más de cero"),
+  /* Al menos un bulto: un renglón de cero bultos no manda nada y sólo
+     conseguiría que el total del vale no cuadre con lo que sube al camión. */
+  bundles: z.coerce
+    .number({ message: "Escribe cuántos bultos van" })
+    .int("Los bultos se cuentan enteros")
+    .positive("Al menos un bulto")
+    .default(1),
   notes: optionalText,
 });
 

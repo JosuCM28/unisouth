@@ -12,6 +12,7 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   cutBatchLabel,
 } from "@/lib/constants/labels";
+import { bundlePieces } from "@/lib/bundles";
 import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
 
 /**
@@ -35,7 +36,7 @@ import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
  */
 /* La última es la de anotaciones: ancha porque lleva texto libre y no una
    cifra, y con 12 caracteres una instrucción del taller sale ilegible. */
-const WIDTHS = [24, 22, 12, 16, 18, 12, 40];
+const WIDTHS = [24, 22, 12, 16, 18, 12, 40, 40];
 
 /** Columnas, por nombre, para no contar posiciones al leer el armado. */
 const A = 1;
@@ -45,6 +46,7 @@ const D = 4;
 const E = 5;
 const F = 6;
 const G = 7;
+const H = 8;
 
 interface OrderSheet {
   code: string;
@@ -72,7 +74,9 @@ interface Line {
   size: { code: string };
   cutTag: { name: string } | null;
   progress: {
+    /** Piezas POR BULTO. Lo que vale la captura es `quantity * bundles`. */
     quantity: number;
+    bundles: number;
     notes: string | null;
     createdAt: Date;
     batch: { number: number; label: string | null };
@@ -305,18 +309,25 @@ function historyRows(lines: Line[]): SheetRow[] {
          pregunta que el acumulado no contesta. */
       { at: B, value: "Corte", style: "tableHeader" },
       { at: C, value: "Talla", style: "tableHeader" },
-      { at: D, value: "Piezas", style: "tableHeaderRight" },
-      { at: E, value: "Quién", style: "tableHeader" },
-      { at: F, value: "Notas", style: "tableHeader" },
+      /* Bultos y piezas por separado, no un total solo: la captura es por
+         bulto y en Excel la pregunta es tanto "cuántas salieron" como "en
+         cuántos bultos", que es contra lo que se cuenta al recibirlos. */
+      { at: D, value: "Bultos", style: "tableHeaderRight" },
+      { at: E, value: "Piezas por bulto", style: "tableHeaderRight" },
+      { at: F, value: "Piezas", style: "tableHeaderRight" },
+      { at: G, value: "Quién", style: "tableHeader" },
+      { at: H, value: "Notas", style: "tableHeader" },
     ],
     ...entries.map(
       ({ entry, sizeCode }): SheetRow => [
         { at: A, value: entry.createdAt, kind: "datetime" },
         { at: B, value: cutBatchLabel(entry.batch.number, entry.batch.label) },
         { at: C, value: sizeCode },
-        { at: D, value: entry.quantity, kind: "number" },
-        { at: E, value: entry.user?.name ?? "" },
-        { at: F, value: entry.notes ?? "" },
+        { at: D, value: entry.bundles, kind: "number" },
+        { at: E, value: entry.quantity, kind: "number" },
+        { at: F, value: bundlePieces(entry), kind: "number" },
+        { at: G, value: entry.user?.name ?? "" },
+        { at: H, value: entry.notes ?? "" },
       ],
     ),
   ];

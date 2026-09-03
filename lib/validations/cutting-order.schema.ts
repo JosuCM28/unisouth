@@ -106,9 +106,14 @@ export type CuttingBatchInput = z.infer<typeof cuttingBatchSchema>;
  * junto—, y hacerlo en una sola transacción evita que media captura quede
  * guardada si se cae el WiFi a la mitad.
  *
- * Los renglones en cero se descartan ANTES de validar: en la pantalla se
- * enseñan todas las tallas de la orden y lo normal es que en una tanda no
- * salgan todas. Exigir un número en cada una obligaría a teclear ceros.
+ * Un renglón es UN BULTO, o varios bultos con la misma cuenta: la cantidad va
+ * por bulto y `bundles` dice cuántos amarraron así. La talla SE PUEDE repetir
+ * entre renglones porque en la mesa es lo normal —de la 43 sale un bulto de 30
+ * y otro de 20— y promediarlos para meterlos en un solo número es justo lo que
+ * la hoja de papel nunca pidió.
+ *
+ * Los renglones en cero se descartan ANTES de validar: se capturan a mano y un
+ * renglón que se agregó y se dejó vacío no dice nada.
  */
 export const batchProgressSchema = z.object({
   orderId: cuidSchema,
@@ -122,9 +127,16 @@ export const batchProgressSchema = z.object({
     .array(
       z.object({
         lineId: cuidSchema,
+        /* Puede ser NEGATIVA: así se corrige un conteo de más sin borrar lo
+           capturado antes, igual que un ajuste del kárdex. */
         quantity: z.coerce
           .number({ message: "Escribe cuántas piezas se cortaron" })
           .int("Las piezas se cuentan enteras"),
+        bundles: z.coerce
+          .number({ message: "Escribe cuántos bultos son" })
+          .int("Los bultos se cuentan enteros")
+          .positive("Al menos un bulto")
+          .default(1),
       }),
     )
     .transform((lines) => lines.filter((line) => line.quantity !== 0))

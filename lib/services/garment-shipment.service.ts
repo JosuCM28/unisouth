@@ -1,6 +1,7 @@
 import type { CutVersion, GarmentShipment } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import type {
   GarmentReturnInput,
   GarmentShipmentInput,
@@ -128,6 +129,7 @@ export class GarmentShipmentService extends BaseService {
             create: input.lines.map((line, index) => ({
               sizeId: line.sizeId,
               sentQuantity: line.sentQuantity,
+              bundles: line.bundles,
               notes: line.notes,
               position: index,
             })),
@@ -160,7 +162,13 @@ export class GarmentShipmentService extends BaseService {
           etapa: stage.name,
           taller: workshop.name,
           vale: document.code,
-          piezas: input.lines.reduce((sum, l) => sum + l.sentQuantity, 0),
+          bultos: input.lines.reduce((sum, l) => sum + l.bundles, 0),
+          piezas: sumBundlePieces(
+            input.lines.map((l) => ({
+              quantity: l.sentQuantity,
+              bundles: l.bundles,
+            })),
+          ),
         },
         sensitivity: "LOW",
       });
@@ -196,7 +204,12 @@ export class GarmentShipmentService extends BaseService {
         cutVersionNotes: string | null;
         cutNotes: string[];
       };
-      lines: { sizeId: string; sentQuantity: number; notes?: string }[];
+      lines: {
+        sizeId: string;
+        sentQuantity: number;
+        bundles: number;
+        notes?: string;
+      }[];
     },
   ) {
     const { order } = input;
@@ -231,12 +244,13 @@ export class GarmentShipmentService extends BaseService {
       notes: `Envío ${input.shipmentCode}`,
       // Sin rollos: lo que sale son prendas cortadas, no tela por descontar.
       lines: [],
+      /* Copia literal de lo capturado, renglón por renglón: la talla que viajó
+         en dos bultos de cuentas distintas sale en el papel como dos renglones,
+         que es como el taller la recibe y la cuenta al firmar. */
       cutLines: input.lines.map((line) => ({
         sizeId: line.sizeId,
         quantity: line.sentQuantity,
-        // Un bulto por talla: cuántos son de verdad se sabe al empacar y el
-        // auxiliar lo corrige en el vale. Poner cero sería mentir.
-        bundles: 1,
+        bundles: line.bundles,
         // El foleo se pone en el vale: al mandar a bordar todavía no se sabe
         // con qué color va a viajar el bulto.
         tagId: undefined,
@@ -304,10 +318,18 @@ export class GarmentShipmentService extends BaseService {
         );
       }
 
+      /* Lo que salió de VERDAD en este renglón: la cantidad es por bulto, y
+         comparar contra ella sin multiplicar rebotaría el retorno completo de
+         un renglón de tres bultos. */
+      const sent = bundlePieces({
+        quantity: line.sentQuantity,
+        bundles: line.bundles,
+      });
+
       // No puede volver más de lo que salió: el taller no fabrica piezas.
-      if (returned + scrap > line.sentQuantity) {
+      if (returned + scrap > sent) {
         throw new BusinessRuleError(
-          `De la talla ${line.size.code} salieron ${line.sentQuantity} piezas y estarías registrando ${returned + scrap}. Revisa el conteo.`,
+          `De la talla ${line.size.code} salieron ${sent} piezas y estarías registrando ${returned + scrap}. Revisa el conteo.`,
         );
       }
 
@@ -428,6 +450,7 @@ export class GarmentShipmentService extends BaseService {
           lines: {
             select: {
               sentQuantity: true,
+              bundles: true,
               returnedQuantity: true,
               scrapQuantity: true,
             },
@@ -436,7 +459,13 @@ export class GarmentShipmentService extends BaseService {
       });
       if (!current) throw new NotFoundError("el envío", id);
 
-      const sent = current.lines.reduce((sum, l) => sum + l.sentQuantity, 0);
+      const sent = sumBundlePieces(
+        current.lines.map((l) => ({
+          quantity: l.sentQuantity,
+          bundles: l.bundles,
+        })),
+      );
+
       const returned = current.lines.reduce(
         (sum, l) => sum + l.returnedQuantity + l.scrapQuantity,
         0,
@@ -463,7 +492,10 @@ export class GarmentShipmentService extends BaseService {
         oldValue: {
           etapa: current.stage.name,
           taller: current.workshop.name,
-          tallas: current.lines.length,
+          /* Renglones y no tallas: la misma talla ocupa varios cuando viajó en
+             bultos de cuentas distintas, y llamarlo "tallas" haría creer que
+             el envío llevaba más de las que llevaba. */
+          renglones: current.lines.length,
           piezas: sent,
           retornos: returned,
           vale: voucher?.code ?? null,
@@ -491,6 +523,7 @@ export class GarmentShipmentService extends BaseService {
         select: {
           sizeId: true,
           sentQuantity: true,
+          bundles: true,
           returnedQuantity: true,
           scrapQuantity: true,
           shipment: {
@@ -524,7 +557,10 @@ export class GarmentShipmentService extends BaseService {
         scrap: 0,
       };
 
-      count.sent += line.sentQuantity;
+      count.sent += bundlePieces({
+        quantity: line.sentQuantity,
+        bundles: line.bundles,
+      });
       count.returned += line.returnedQuantity;
       count.scrap += line.scrapQuantity;
 
@@ -545,12 +581,15 @@ export class GarmentShipmentService extends BaseService {
       where: { shipmentId },
       select: {
         sentQuantity: true,
+        bundles: true,
         returnedQuantity: true,
         scrapQuantity: true,
       },
     });
 
-    const sent = lines.reduce((sum, l) => sum + l.sentQuantity, 0);
+    const sent = sumBundlePieces(
+      lines.map((l) => ({ quantity: l.sentQuantity, bundles: l.bundles })),
+    );
     const back = lines.reduce(
       (sum, l) => sum + l.returnedQuantity + l.scrapQuantity,
       0,

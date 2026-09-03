@@ -1718,8 +1718,21 @@ model CuttingProgress {
   batchId String
   batch   CuttingBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
-  /// Garments cut in this batch. Negative corrects an earlier overcount.
+  /// Garments cut in this batch, PER BUNDLE. Negative corrects an earlier
+  /// overcount.
+  ///
+  /// Per bundle and not a flat total because that is how the table hands the
+  /// cutting over: "de la 43 salieron 3 bultos de 60". What the entry is worth
+  /// is `quantity * bundles`, the same arithmetic as DocumentCutLine, so the
+  /// breakdown reaches the issue voucher without being re-typed.
   quantity Int
+  /// Bundles tied with THIS exact count.
+  ///
+  /// A size can appear twice in the same batch —a bundle of 30 and another of
+  /// 20— and each one is its own row. Collapsing them into a single number
+  /// would force the floor to average by hand what the paper sheet never asked
+  /// them to.
+  bundles  Int @default(1)
   notes    String?
 
   userId String?
@@ -2145,8 +2158,15 @@ model GarmentShipmentLine {
   sizeId String
   size   Size   @relation(fields: [sizeId], references: [id])
 
-  /// Garments that left for this size.
+  /// Garments that left for this size, PER BUNDLE.
+  ///
+  /// Same reading as DocumentCutLine.quantity, because this row IS the row the
+  /// voucher prints: what actually left is `sentQuantity * bundles`. Rows
+  /// captured before bundles existed carry 1 and mean exactly what they meant.
   sentQuantity Int
+  /// Bundles tied with this exact count. The same size travels twice —30 in
+  /// one bundle, 20 in another— and each is its own row.
+  bundles      Int @default(1)
 
   /// Live counters. ONLY written in the same transaction as the GarmentReturn
   /// that justifies them, exactly like Lot.currentQuantity and its Movement.

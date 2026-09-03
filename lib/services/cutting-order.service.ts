@@ -4,6 +4,7 @@ import type {
   CuttingOrderComment,
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import type {
   BatchProgressInput,
@@ -299,12 +300,17 @@ export class CuttingOrderService extends BaseService {
    */
   async addBatchProgress(input: BatchProgressInput) {
     return this.transaction(async (tx) => {
+      /* Ids ÚNICOS: la misma talla viene varias veces cuando de ella salieron
+         dos bultos de cuentas distintas, y contar los renglones capturados
+         contra los que devuelve la base daría un "no existe" que es mentira. */
+      const lineIds = [...new Set(input.lines.map((line) => line.lineId))];
+
       const lines = await tx.cuttingOrderLine.findMany({
-        where: { id: { in: input.lines.map((line) => line.lineId) } },
+        where: { id: { in: lineIds } },
         include: { order: true, size: { select: { code: true } } },
       });
 
-      if (lines.length !== input.lines.length) {
+      if (lines.length !== lineIds.length) {
         throw new NotFoundError("el renglón", "de la captura");
       }
 
@@ -338,27 +344,36 @@ export class CuttingOrderService extends BaseService {
         : await this.createBatch(tx, orderId, input.newBatchLabel);
 
       const byId = new Map(lines.map((line) => [line.id, line]));
-      let total = 0;
 
       for (const entry of input.lines) {
-        /* El `!` es seguro por el conteo de arriba: si algún id no existiera
-           —o viniera repetido— `findMany` habría devuelto menos renglones de
-           los que pide la captura y ya se habría lanzado NotFoundError. */
-        const line = byId.get(entry.lineId)!;
-
         await tx.cuttingProgress.create({
           data: {
             lineId: entry.lineId,
             batchId: batch.id,
             quantity: entry.quantity,
+            bundles: entry.bundles,
             notes: input.notes,
             userId: this.context.userId,
           },
         });
-
-        await this.recalculateLine(tx, entry.lineId, line.size.code);
-        total += entry.quantity;
       }
+
+      /* El acumulado se recalcula UNA vez por talla y DESPUÉS de guardar todas
+         las capturas. Con dos bultos de la misma talla en la misma tanda,
+         recalcular dentro del bucle leería el primero sin el segundo, y el
+         tope de negativos se estaría evaluando contra un total a medias. */
+      for (const lineId of lineIds) {
+        /* El `!` es seguro por el conteo de arriba: si algún id no existiera,
+           `findMany` habría devuelto menos renglones de los que pide la
+           captura y ya se habría lanzado NotFoundError. */
+        const line = byId.get(lineId)!;
+        await this.recalculateLine(tx, lineId, line.size.code);
+      }
+
+      // Cantidad × bultos: sumar la cantidad sin multiplicar dejaría el total
+      // en una fracción de lo que salió de la mesa.
+      const total = sumBundlePieces(input.lines);
+      const bundles = sumBundles(input.lines);
 
       await this.syncStatus(tx, orderId);
 
@@ -369,14 +384,20 @@ export class CuttingOrderService extends BaseService {
         reference: `${order.code} · ${batch.number}º corte`,
         newValue: {
           corte: batch.number,
-          tallas: input.lines.length,
+          tallas: lineIds.length,
+          bultos: bundles,
           piezas: total,
         },
         sensitivity: "LOW",
         reason: input.notes,
       });
 
-      return { batchId: batch.id, pieces: total, sizes: input.lines.length };
+      return {
+        batchId: batch.id,
+        pieces: total,
+        bundles,
+        sizes: lineIds.length,
+      };
     });
   }
 
@@ -432,11 +453,15 @@ export class CuttingOrderService extends BaseService {
    * simultáneas sobre un valor leído antes perderían una de las dos.
    */
   private async recalculateLine(tx: Tx, lineId: string, sizeCode: string) {
-    const total = await tx.cuttingProgress.aggregate({
+    /* Se traen las capturas en vez de pedir un `_sum`: lo que vale cada una es
+       cantidad × bultos y el agregado de Prisma no multiplica. Son las de UNA
+       talla, no las de la orden entera, así que el puñado de filas que llegan
+       cuesta menos que meter SQL crudo aquí. */
+    const entries = await tx.cuttingProgress.findMany({
       where: { lineId },
-      _sum: { quantity: true },
+      select: { quantity: true, bundles: true },
     });
-    const cut = total._sum.quantity ?? 0;
+    const cut = sumBundlePieces(entries);
 
     /* Un avance no puede dejar el total en negativo: sería un corte que se
        deshizo más veces de las que se hizo, y sólo puede ser un error de
@@ -609,8 +634,10 @@ export class CuttingOrderService extends BaseService {
             .map((line) => ({
               sizeId: line.sizeId,
               quantity: line.cutQuantity,
-              // Un bulto por talla: cuántos son de verdad se sabe al empacar, y
-              // el auxiliar lo corrige en el vale. Poner cero sería mentir.
+              /* Un bulto por talla, a diferencia de mandar UN corte: aquí se
+                 manda el acumulado de todos los tendidos y esos bultos ya se
+                 amarraron por separado. Repartir el total en bultos inventados
+                 sería peor que dejar que el auxiliar los anote al empacar. */
               bundles: 1,
               tagId: line.tagId ?? undefined,
               notes: line.notes ?? undefined,
@@ -737,28 +764,50 @@ export class CuttingOrderService extends BaseService {
     lines: { id: string; sizeId: string; tagId: string | null; notes: string | null }[],
     batchId: string,
   ) {
-    const grouped = await tx.cuttingProgress.groupBy({
-      by: ["lineId"],
+    /* En orden de captura: los bultos se amarran y se anotan en el orden en
+       que salen de la mesa, y el vale se lee al lado de ellos. */
+    const entries = await tx.cuttingProgress.findMany({
       where: { batchId },
-      _sum: { quantity: true },
+      orderBy: { createdAt: "asc" },
+      select: { lineId: true, quantity: true, bundles: true },
     });
 
-    const byLine = new Map(
-      grouped.map((row) => [row.lineId, row._sum.quantity ?? 0]),
-    );
+    const byLine = new Map<string, { quantity: number; bundles: number }[]>();
 
-    // Se recorren las TALLAS y no el agrupado para respetar el orden del
+    for (const entry of entries) {
+      const rows = byLine.get(entry.lineId) ?? [];
+      rows.push({ quantity: entry.quantity, bundles: entry.bundles });
+      byLine.set(entry.lineId, rows);
+    }
+
+    // Se recorren las TALLAS y no las capturas para respetar el orden del
     // pedido: el vale se lee contra la orden, talla por talla y en su orden.
-    return lines
-      .map((line) => ({ line, quantity: byLine.get(line.id) ?? 0 }))
-      .filter(({ quantity }) => quantity > 0)
-      .map(({ line, quantity }) => ({
+    return lines.flatMap((line) => {
+      const rows = byLine.get(line.id) ?? [];
+      const net = sumBundlePieces(rows);
+
+      if (net <= 0) return [];
+
+      const captured = rows.filter((row) => row.quantity > 0);
+
+      /* Con una corrección de por medio el desglose deja de describir lo que
+         se va a entregar —el bulto de 30 ya no lleva 30— y el vale se firma
+         contra bultos de verdad. Entonces va el neto en un solo renglón y el
+         auxiliar anota los bultos al empacar. Sin correcciones, que es el caso
+         normal, cada bulto viaja como su propio renglón. */
+      const cutRows =
+        sumBundlePieces(captured) === net
+          ? captured
+          : [{ quantity: net, bundles: 1 }];
+
+      return cutRows.map((row) => ({
         sizeId: line.sizeId,
-        quantity,
-        bundles: 1,
+        quantity: row.quantity,
+        bundles: row.bundles,
         tagId: line.tagId ?? undefined,
         notes: line.notes ?? undefined,
       }));
+    });
   }
 
   /**

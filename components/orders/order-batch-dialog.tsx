@@ -6,11 +6,18 @@ import { Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { addBatchProgressAction } from "@/app/actions/cutting-order.actions";
 import { runAction } from "@/lib/offline/run-action";
+import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import { cutProgress, formatDate } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SearchSelect } from "@/components/shared/search-select";
 import { SubmitButton } from "@/components/shared/submit-button";
+import {
+  emptyRow,
+  SizeBundleRows,
+  usableRows,
+  type SizeBundleRow,
+} from "@/components/orders/size-bundle-rows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,17 +57,19 @@ interface Props {
 }
 
 /**
- * Captura una tanda completa: se elige el corte una vez y se teclean todas las
- * tallas que salieron de él.
+ * Captura una tanda completa: se elige el corte una vez y se anotan los bultos
+ * que salieron de él, uno por renglón.
  *
  * Existe porque el piso no corta talla por talla: tiende la tela, saca unas
- * cuantas de cada una y las anota juntas. Capturarlas de una en una obligaba a
- * abrir un diálogo por talla y, sobre todo, dejaba las piezas sin decir de qué
- * tendido salieron: el acumulado subía y nadie podía responder cuántas dio el
- * segundo corte.
+ * cuantas de cada una, las amarra en bultos y las anota juntas. Capturarlas de
+ * una en una obligaba a abrir un diálogo por talla y, sobre todo, dejaba las
+ * piezas sin decir de qué tendido salieron.
  *
- * Las tallas se enseñan TODAS y se dejan en blanco las que no salieron. Pedir
- * un cero explícito en cada una es teclear de más para decir "nada".
+ * Se captura POR BULTO y no con "un número por talla" porque el bulto es la
+ * unidad física que se amarra, se etiqueta y se entrega: de la 43 puede salir
+ * uno de 30 y otro de 20, y esos son dos renglones. Con un solo número por
+ * talla había que sumarlos a mano y el desglose se perdía antes de llegar al
+ * vale de salida, que es justo donde el taller lo firma.
  */
 export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   const router = useRouter();
@@ -70,22 +79,48 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   const [batchId, setBatchId] = useState(batches[0]?.id ?? NEW_BATCH);
   const [newLabel, setNewLabel] = useState("");
   const [notes, setNotes] = useState("");
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<SizeBundleRow[]>([emptyRow()]);
   const [isSaving, setIsSaving] = useState(false);
 
   const isNewBatch = batchId === NEW_BATCH;
 
-  const captured = sizes
-    .map((size) => ({ size, quantity: Number(quantities[size.lineId]) || 0 }))
-    .filter((row) => row.quantity !== 0);
+  const captured = usableRows(rows);
+  const total = sumBundlePieces(captured);
+  const bundles = sumBundles(captured);
+  const capturedSizes = new Set(captured.map((row) => row.value)).size;
 
-  const total = captured.reduce((sum, row) => sum + row.quantity, 0);
+  const byLine = new Map(sizes.map((size) => [size.lineId, size]));
+
+  /**
+   * Lo que se sabe de la talla del renglón: cuánto lleva y en cuánto quedaría.
+   *
+   * Se suman TODOS los renglones de esa talla y no sólo el de la tarjeta:
+   * cuando de la misma talla salieron dos bultos, el acumulado que interesa es
+   * el de los dos juntos, y enseñar el de uno haría creer que falta el otro.
+   */
+  function hintFor(lineId: string) {
+    const size = byLine.get(lineId);
+    if (!size) return null;
+
+    const typed = sumBundlePieces(
+      captured.filter((row) => row.value === lineId),
+    );
+
+    if (typed !== 0) {
+      return `${size.cut} de ${size.ordered} · quedaría en ${size.cut + typed}`;
+    }
+
+    const { pending, surplus } = cutProgress(size.ordered, size.cut);
+    const rest = surplus > 0 ? `sobran ${surplus}` : `faltan ${pending}`;
+
+    return `${size.cut} de ${size.ordered} · ${rest}`;
+  }
 
   function reset() {
     setBatchId(batches[0]?.id ?? NEW_BATCH);
     setNewLabel("");
     setNotes("");
-    setQuantities({});
+    setRows([emptyRow()]);
   }
 
   function handleOpenChange(next: boolean) {
@@ -95,7 +130,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
 
   async function handleSave() {
     if (captured.length === 0) {
-      toast.error("Captura cuántas piezas salieron de al menos una talla.");
+      toast.error("Agrega al menos un bulto con su talla y su cantidad.");
       return;
     }
 
@@ -107,8 +142,9 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
         newBatchLabel: isNewBatch ? newLabel || undefined : undefined,
         notes: notes || undefined,
         lines: captured.map((row) => ({
-          lineId: row.size.lineId,
+          lineId: row.value,
           quantity: row.quantity,
+          bundles: row.bundles,
         })),
       }),
     );
@@ -120,9 +156,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
     }
 
     toast.success(
-      `${total} piezas en ${captured.length} ${
-        captured.length === 1 ? "talla" : "tallas"
-      }`,
+      `${total} piezas en ${bundles} ${bundles === 1 ? "bulto" : "bultos"}`,
     );
     setOpen(false);
     reset();
@@ -134,7 +168,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
       open={open}
       onOpenChange={handleOpenChange}
       title="Capturar corte"
-      description="Elige el corte y anota cuántas piezas salieron de cada talla."
+      description="Elige el corte y anota los bultos que salieron, uno por renglón."
       trigger={
         <Button className="touch-target">
           <Scissors className="size-4" aria-hidden />
@@ -177,63 +211,17 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
           </div>
         )}
 
-        {/* Una fila por talla, con lo que lleva a la izquierda: quien captura
-            está viendo el bulto y necesita saber si esa talla ya está completa
-            antes de anotar. */}
-        <div className="flex flex-col gap-2">
-          <Label>Piezas de este corte</Label>
-
-          <ul className="flex flex-col gap-2">
-            {sizes.map((size) => {
-              const typed = Number(quantities[size.lineId]) || 0;
-              const { pending, surplus } = cutProgress(size.ordered, size.cut);
-
-              return (
-                <li
-                  key={size.lineId}
-                  className="flex items-center gap-3 border border-border p-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="tabular text-sm font-medium">
-                      Talla {size.sizeCode}
-                    </p>
-                    <p className="tabular text-xs text-muted-foreground">
-                      {size.cut} de {size.ordered}
-                      {surplus > 0
-                        ? ` · sobran ${surplus}`
-                        : ` · faltan ${pending}`}
-                      {/* El acumulado que quedaría va AQUÍ y no en una
-                          columna aparte: como sólo aparece en la talla que se
-                          está tecleando, una columna propia movía ese input y
-                          lo desalineaba de los demás justo mientras se
-                          captura de pie con una mano. */}
-                      {typed !== 0 && ` · quedaría en ${size.cut + typed}`}
-                    </p>
-                  </div>
-
-                  <Input
-                    inputMode="numeric"
-                    placeholder="0"
-                    aria-label={`Piezas de la talla ${size.sizeCode}`}
-                    value={quantities[size.lineId] ?? ""}
-                    onChange={(event) =>
-                      setQuantities((current) => ({
-                        ...current,
-                        [size.lineId]: event.target.value,
-                      }))
-                    }
-                    className="tabular touch-target w-24 shrink-0 text-right"
-                  />
-                </li>
-              );
-            })}
-          </ul>
-
-          <p className="text-xs text-muted-foreground">
-            Deja en blanco las tallas que no salieron en este corte. Para
-            corregir un conteo de más, escribe un número negativo.
-          </p>
-        </div>
+        <SizeBundleRows
+          label="Bultos de este corte"
+          options={sizes.map((size) => ({
+            value: size.lineId,
+            code: `Talla ${size.sizeCode}`,
+          }))}
+          rows={rows}
+          onChange={setRows}
+          renderHint={hintFor}
+          footnote="La misma talla se puede repetir: un bulto de 30 y otro de 20 son dos renglones. Para corregir un conteo de más, escribe una cantidad negativa."
+        />
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="batch-notes">Notas del corte</Label>
@@ -248,8 +236,8 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
 
         {captured.length > 0 && (
           <p className="tabular border border-border bg-muted p-2 text-sm">
-            {total} piezas en {captured.length}{" "}
-            {captured.length === 1 ? "talla" : "tallas"}
+            {total} piezas · {bundles} {bundles === 1 ? "bulto" : "bultos"} ·{" "}
+            {capturedSizes} {capturedSizes === 1 ? "talla" : "tallas"}
           </p>
         )}
 

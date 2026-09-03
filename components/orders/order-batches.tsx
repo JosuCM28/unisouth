@@ -6,16 +6,19 @@ import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_STATUS_STYLES,
 } from "@/lib/constants/labels";
+import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 
-/** Lo que una talla aportó a un corte. */
+/** Un bulto (o varios de la misma cuenta) que una talla aportó a un corte. */
 export interface BatchEntryView {
   id: string;
   sizeCode: string;
+  /** Piezas POR BULTO: lo que vale la captura es `quantity * bundles`. */
   quantity: number;
+  bundles: number;
   createdAt: Date;
   userName: string | null;
   notes: string | null;
@@ -82,10 +85,8 @@ export function OrderBatches({
   return (
     <ul className="flex flex-col gap-3">
       {batches.map((batch) => {
-        const total = batch.entries.reduce(
-          (sum, entry) => sum + entry.quantity,
-          0,
-        );
+        // Cantidad × bultos: la captura guarda lo que lleva CADA bulto.
+        const total = sumBundlePieces(batch.entries);
 
         // Un vale cancelado no cuenta: cancelar es justo cómo se deshace un
         // envío equivocado, y después el corte se puede volver a mandar.
@@ -162,14 +163,23 @@ export function OrderBatches({
                     className="flex items-baseline justify-between gap-3 border-t border-border py-1 text-sm"
                   >
                     <span className="tabular">Talla {row.sizeCode}</span>
-                    <span
-                      className={cn(
-                        "tabular font-medium",
-                        row.quantity < 0 && "text-state-defective",
+                    <span className="tabular flex items-baseline gap-2">
+                      {/* Los bultos sólo cuando son más de uno: con uno solo
+                          es ruido al lado de la cifra que de verdad se lee. */}
+                      {row.bundles > 1 && (
+                        <span className="text-xs text-muted-foreground">
+                          {row.bundles} bultos
+                        </span>
                       )}
-                    >
-                      {row.quantity > 0 ? "+" : ""}
-                      {row.quantity}
+                      <span
+                        className={cn(
+                          "font-medium",
+                          row.quantity < 0 && "text-state-defective",
+                        )}
+                      >
+                        {row.quantity > 0 ? "+" : ""}
+                        {row.quantity}
+                      </span>
                     </span>
                   </li>
                 ))}
@@ -188,7 +198,14 @@ export function OrderBatches({
                   {batch.entries.map((entry) => (
                     <li key={entry.id} className="tabular">
                       Talla {entry.sizeCode}: {entry.quantity > 0 ? "+" : ""}
-                      {entry.quantity} · {formatDateTime(entry.createdAt)}
+                      {entry.quantity}
+                      {/* El desglose del bulto sólo cuando hay más de uno: es
+                          lo que explica de dónde salió el total. */}
+                      {entry.bundles > 1 &&
+                        ` × ${entry.bundles} bultos = ${
+                          entry.quantity * entry.bundles
+                        }`}{" "}
+                      · {formatDateTime(entry.createdAt)}
                       {entry.userName && ` · ${entry.userName}`}
                       {entry.notes && ` · ${entry.notes}`}
                     </li>
@@ -236,13 +253,17 @@ export function OrderBatches({
 
 /** Suma las capturas de una misma talla dentro del corte. */
 function groupBySize(entries: BatchEntryView[]) {
-  const totals = new Map<string, number>();
+  const totals = new Map<string, BatchEntryView[]>();
 
   for (const entry of entries) {
-    totals.set(entry.sizeCode, (totals.get(entry.sizeCode) ?? 0) + entry.quantity);
+    totals.set(entry.sizeCode, [...(totals.get(entry.sizeCode) ?? []), entry]);
   }
 
   return [...totals.entries()]
-    .map(([sizeCode, quantity]) => ({ sizeCode, quantity }))
+    .map(([sizeCode, rows]) => ({
+      sizeCode,
+      quantity: sumBundlePieces(rows),
+      bundles: sumBundles(rows),
+    }))
     .sort((a, b) => a.sizeCode.localeCompare(b.sizeCode, "es", { numeric: true }));
 }

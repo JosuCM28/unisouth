@@ -6,11 +6,18 @@ import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { createGarmentShipmentAction } from "@/app/actions/garment-shipment.actions";
 import { runAction } from "@/lib/offline/run-action";
+import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { todayInputValue } from "@/lib/utils";
 import { FormSelectField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SearchSelect } from "@/components/shared/search-select";
 import { SubmitButton } from "@/components/shared/submit-button";
+import {
+  emptyRow,
+  SizeBundleRows,
+  usableRows,
+  type SizeBundleRow,
+} from "@/components/orders/size-bundle-rows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,11 +42,13 @@ interface Props {
 /**
  * Manda prendas ya cortadas a un taller.
  *
- * Se capturan TODAS las tallas en una sola pantalla porque así es como sale el
- * camión: se cargan los bultos que caben y se anota qué se fue. Obligar a un
- * envío por talla convertiría un viaje en cinco capturas.
+ * Se captura BULTO POR BULTO, un renglón cada uno, porque así es como sale el
+ * camión y como el taller cuenta lo que recibe: de la 43 suben un bulto de 30
+ * y otro de 20, y esos son dos renglones aunque sean la misma talla. Con un
+ * solo número por talla había que promediarlos a mano y el desglose se perdía
+ * antes de llegar al vale que el taller firma.
  *
- * Junto a cada talla se enseña lo ya mandado A ESA ETAPA, no un "disponible"
+ * Junto a cada renglón se enseña lo ya mandado A ESA ETAPA, no un "disponible"
  * global. Lo que sale a bordar son PANELES —tapas, delantero izquierdo— y los
  * demás paneles de esas mismas prendas siguen en la bodega: descontarlas de un
  * saldo único diría que ya no las tienes cuando sí. Por eso mandar 100 de la
@@ -61,16 +70,39 @@ export function OrderShipmentDialog({
   const [sentAt, setSentAt] = useState(todayInputValue());
   const [parts, setParts] = useState("");
   const [reference, setReference] = useState("");
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<SizeBundleRow[]>([emptyRow()]);
   const [isSaving, setIsSaving] = useState(false);
 
-  /* Se ofrecen TODAS las tallas de la orden, incluso las que aún no tienen
-     corte capturado: el conteo del corte no siempre está al día y el camión no
-     espera a que alguien lo teclee. */
-  const total = Object.values(quantities).reduce(
-    (sum, value) => sum + (Number(value) || 0),
-    0,
-  );
+  const captured = usableRows(rows).filter((row) => row.quantity > 0);
+  const total = sumBundlePieces(captured);
+  const bundles = sumBundles(captured);
+
+  const bySize = new Map(sizes.map((size) => [size.sizeId, size]));
+
+  /* Contra lo CORTADO y sólo de la etapa elegida: es la pregunta real —"¿cuánto
+     de la 34 me falta por mandar a bordado?"— y no cuántas prendas quedan en
+     bodega. */
+  function hintFor(sizeId: string) {
+    const size = bySize.get(sizeId);
+    if (!size) return null;
+
+    const alreadySent = stageId ? (size.sentByStage[stageId] ?? 0) : 0;
+    const sending = sumBundlePieces(
+      captured.filter((row) => row.value === sizeId),
+    );
+
+    const bits = [`${size.cut} cortadas`];
+    if (alreadySent > 0) bits.push(`ya van ${alreadySent}`);
+    if (sending > 0) bits.push(`ahora ${sending}`);
+
+    return bits.join(" · ");
+  }
+
+  function reset() {
+    setRows([emptyRow()]);
+    setReference("");
+    setParts("");
+  }
 
   async function handleSave() {
     if (!workshopId || !stageId) {
@@ -78,15 +110,8 @@ export function OrderShipmentDialog({
       return;
     }
 
-    const lines = sizes
-      .map((size) => ({
-        sizeId: size.sizeId,
-        sentQuantity: Number(quantities[size.sizeId] ?? ""),
-      }))
-      .filter((line) => line.sentQuantity > 0);
-
-    if (lines.length === 0) {
-      toast.error("Captura cuántas piezas van de al menos una talla.");
+    if (captured.length === 0) {
+      toast.error("Agrega al menos un bulto con su talla y su cantidad.");
       return;
     }
 
@@ -99,7 +124,11 @@ export function OrderShipmentDialog({
         sentAt,
         parts: parts || undefined,
         reference: reference || undefined,
-        lines,
+        lines: captured.map((row) => ({
+          sizeId: row.value,
+          sentQuantity: row.quantity,
+          bundles: row.bundles,
+        })),
       }),
     );
     setIsSaving(false);
@@ -111,9 +140,7 @@ export function OrderShipmentDialog({
 
     toast.success("Envío registrado. Se creó su vale de salida en borrador.");
     setOpen(false);
-    setQuantities({});
-    setReference("");
-    setParts("");
+    reset();
     router.refresh();
   }
 
@@ -199,62 +226,31 @@ export function OrderShipmentDialog({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <Label>Piezas por talla</Label>
-              {total > 0 && (
-                <span className="tabular text-sm text-muted-foreground">
-                  {total} piezas
-                </span>
-              )}
-            </div>
+          {/* Se ofrecen TODAS las tallas de la orden, incluso las que aún no
+              tienen corte capturado: el conteo del corte no siempre está al
+              día y el camión no espera a que alguien lo teclee. */}
+          <SizeBundleRows
+            label="Bultos que van"
+            options={sizes.map((size) => ({
+              value: size.sizeId,
+              code: size.sizeCode,
+            }))}
+            rows={rows}
+            onChange={setRows}
+            renderHint={hintFor}
+            footnote="La misma talla se puede repetir: un bulto de 30 y otro de 20 son dos renglones, y así salen en el vale."
+          />
 
-            <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
-              {sizes.map((size) => {
-                const alreadySent = stageId
-                  ? (size.sentByStage[stageId] ?? 0)
-                  : 0;
-
-                return (
-                <li
-                  key={size.sizeId}
-                  className="flat-surface flex items-center gap-3 p-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="tabular text-sm font-medium">
-                      {size.sizeCode}
-                    </p>
-                    {/* Contra lo CORTADO y sólo de esta etapa: es la pregunta
-                        real —"¿cuánto de la 34 me falta por mandar a
-                        bordado?"— y no cuántas prendas quedan en bodega. */}
-                    <p className="tabular text-xs text-muted-foreground">
-                      {size.cut} cortadas
-                      {alreadySent > 0 && ` · ya van ${alreadySent}`}
-                    </p>
-                  </div>
-
-                  <Input
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={quantities[size.sizeId] ?? ""}
-                    onChange={(event) =>
-                      setQuantities((current) => ({
-                        ...current,
-                        [size.sizeId]: event.target.value,
-                      }))
-                    }
-                    aria-label={`Piezas de la talla ${size.sizeCode}`}
-                    className="tabular touch-target w-24 text-right"
-                  />
-                </li>
-                );
-              })}
-            </ul>
-          </div>
+          {captured.length > 0 && (
+            <p className="tabular border border-border bg-muted p-2 text-sm">
+              {total} piezas · {bundles} {bundles === 1 ? "bulto" : "bultos"}
+            </p>
+          )}
 
           <SubmitButton
             isSubmitting={isSaving}
             onClick={handleSave}
+            disabled={captured.length === 0}
             className="h-12 w-full"
           >
             Registrar envío

@@ -12,6 +12,7 @@ import {
   GARMENT_SHIPMENT_STATUS_LABELS,
   GARMENT_SHIPMENT_STATUS_STYLES,
 } from "@/lib/constants/labels";
+import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
 import { ShipmentDeleteButton } from "./shipment-delete-button";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -24,7 +25,9 @@ import { Textarea } from "@/components/ui/textarea";
 export interface ShipmentLineView {
   id: string;
   sizeCode: string;
+  /** Piezas POR BULTO: lo que salió es `sentQuantity * bundles`. */
   sentQuantity: number;
+  bundles: number;
   returnedQuantity: number;
   scrapQuantity: number;
 }
@@ -64,9 +67,12 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
   return (
     <ul className="flex flex-col gap-3">
       {shipments.map((shipment) => {
-        const totalSent = shipment.lines.reduce(
-          (sum, line) => sum + line.sentQuantity,
-          0,
+        // Cantidad × bultos: el renglón guarda lo que lleva CADA bulto.
+        const totalSent = sumBundlePieces(
+          shipment.lines.map((line) => ({
+            quantity: line.sentQuantity,
+            bundles: line.bundles,
+          })),
         );
         const shipmentHasReturns = shipment.lines.some(
           (line) => line.returnedQuantity > 0 || line.scrapQuantity > 0,
@@ -133,8 +139,12 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
 
           <ul className="flex flex-col gap-1">
             {shipment.lines.map((line) => {
+              const sent = bundlePieces({
+                quantity: line.sentQuantity,
+                bundles: line.bundles,
+              });
               const pending =
-                line.sentQuantity - line.returnedQuantity - line.scrapQuantity;
+                sent - line.returnedQuantity - line.scrapQuantity;
               const hasReturns =
                 line.returnedQuantity > 0 || line.scrapQuantity > 0;
 
@@ -150,7 +160,13 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
                       alguien capturó una devolución, para no llenar el
                       renglón de ceros que no significan nada. */}
                   <span className="tabular flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{line.sentQuantity} salieron</span>
+                    {/* El desglose del bulto sólo cuando hay más de uno: con
+                        uno solo repetiría la misma cifra dos veces. */}
+                    <span>
+                      {line.bundles > 1 &&
+                        `${line.sentQuantity} × ${line.bundles} bultos = `}
+                      {sent} salieron
+                    </span>
                     {line.returnedQuantity > 0 && (
                       <span>{line.returnedQuantity} volvieron</span>
                     )}

@@ -7,6 +7,7 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   cutBatchLabel,
 } from "@/lib/constants/labels";
+import { bundlePieces } from "@/lib/bundles";
 import { cutProgress, cutTotals, formatDate, formatDateTime } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
 
@@ -212,6 +213,10 @@ export default async function PrintOrderPage({ params }: PageProps) {
                     lista de fechas y hay que deducir dónde acabó una tanda. */}
                 <th className="py-1 pr-2">Corte</th>
                 <th className="py-1 pr-2">Talla</th>
+                {/* Cómo se amarró: la captura es por bulto y sin esta columna
+                    el papel dice 180 sin decir que son 3 bultos de 60, que es
+                    lo que se cuenta al recibirlos. */}
+                <th className="py-1 pr-2 text-right">Bultos</th>
                 <th className="py-1 pr-2 text-right">Piezas</th>
                 <th className="py-1 pr-2">Quién</th>
                 <th className="py-1">Notas</th>
@@ -228,8 +233,13 @@ export default async function PrintOrderPage({ params }: PageProps) {
                   </td>
                   <td className="py-1 pr-2">{entry.sizeCode}</td>
                   <td className="tabular py-1 pr-2 text-right">
+                    {entry.bundles > 1
+                      ? `${entry.bundles} × ${entry.quantity}`
+                      : entry.bundles}
+                  </td>
+                  <td className="tabular py-1 pr-2 text-right">
                     {entry.quantity > 0 ? "+" : ""}
-                    {entry.quantity}
+                    {bundlePieces(entry)}
                   </td>
                   <td className="py-1 pr-2">{entry.user?.name ?? ""}</td>
                   <td className="py-1">{entry.notes ?? ""}</td>
