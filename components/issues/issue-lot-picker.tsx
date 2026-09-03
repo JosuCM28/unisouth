@@ -61,6 +61,8 @@ export function IssueLotPicker({
      capturando: al cambiar de material el selector se remonta y se limpian
      solos. */
   const [query, setQuery] = useState("");
+  /** La cantidad, en su propia caja. Ver `matchesAmount` para el porqué. */
+  const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<string | null>(null);
 
   if (state.kind === "idle") {
@@ -122,22 +124,45 @@ export function IssueLotPicker({
 
   const visible = selectable.filter(
     (lot) =>
-      (!unit || lot.unit === unit) && matchesQuery(lot, query),
+      (!unit || lot.unit === unit) &&
+      matchesAmount(lot, amount) &&
+      matchesQuery(lot, query),
   );
 
   return (
     <div className="flex flex-col gap-2">
       {showSearch && (
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Folio, tono o ubicación…"
-          // `search` y no `text`: el teclado del celular saca la lupa en vez
-          // del "Enter", que aquí no envía nada.
-          inputMode="search"
-          className="touch-target"
-          aria-label="Buscar entre los rollos de este material"
-        />
+        <div className="flex gap-2">
+          {/* La CANTIDAD va en su propia caja y no mezclada con el texto.
+
+              Con una sola caja, teclear "93" traía R-2026-00093 —un rollo de
+              100 metros— porque el folio también contiene "93". Salían rollos
+              que no son de ese metraje, que es justo lo contrario de para lo
+              que se busca. Separadas, cada una hace una cosa y ninguna miente.
+
+              Va primero porque es como se busca a diario: se mira cuánto
+              tiene el rollo, no su folio. */}
+          <Input
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="Cantidad"
+            // El teclado numérico con punto: aquí sólo se escriben cifras.
+            inputMode="decimal"
+            className="touch-target tabular w-28 shrink-0"
+            aria-label="Filtrar por la cantidad del rollo"
+          />
+
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Folio, tono o ubicación…"
+            // `search` y no `text`: el teclado del celular saca la lupa en vez
+            // del "Enter", que aquí no envía nada.
+            inputMode="search"
+            className="touch-target min-w-0 flex-1"
+            aria-label="Buscar entre los rollos de este material"
+          />
+        </div>
       )}
 
       {showUnits && (
@@ -169,6 +194,7 @@ export function IssueLotPicker({
             type="button"
             onClick={() => {
               setQuery("");
+              setAmount("");
               setUnit(null);
             }}
             className="touch-target flex items-center gap-1.5 text-sm underline"
@@ -221,13 +247,58 @@ export function IssueLotPicker({
 }
 
 /**
- * ¿Este rollo casa con lo tecleado?
+ * ¿Este rollo tiene la cantidad que se pidió?
  *
- * Se busca contra folio, tono y ubicación porque son las tres formas en que
- * el auxiliar identifica un rollo concreto: trae la etiqueta en la mano, le
- * pidieron un tono en particular, o sabe en qué rack está. Sin acentos y sin
- * distinguir mayúsculas: nadie teclea "Ubicación A-3" con acento y con el
- * pulgar.
+ * Se teclea "93" y salen los rollos de 93 metros; "20.1" y salen los de 20.1
+ * kilos. Es como se pregunta de verdad en el piso —"¿cuál tenía 93?"— porque
+ * el metraje es lo que se mira para decidir de cuál rollo cortar.
+ *
+ * Compara contra el DISPONIBLE y no contra el saldo: es lo que de verdad se
+ * puede tomar, y es el número que el propio renglón está enseñando a la
+ * derecha. Filtrar por una cifra que no se ve en pantalla haría ver el filtro
+ * como si fallara.
+ */
+function matchesAmount(lot: IssueLotOption, amount: string): boolean {
+  const range = quantityRange(amount);
+  // Sin número —vacío, o a medio teclear como "20."— no se filtra nada. Es
+  // preferible a vaciar la lista mientras el dedo va a medio camino.
+  if (!range) return true;
+
+  return lot.available >= range.from && lot.available < range.to;
+}
+
+/**
+ * El tramo de cantidad que abarca lo tecleado.
+ *
+ * La PRECISIÓN que se escribe es la que se pide, y por eso es un rango y no
+ * una igualdad:
+ *
+ *   "93"   → de 93 a 94     · un rollo de 93.5 es "el de 93 metros"; uno de
+ *                             930 no lo es, y un `includes` de texto lo
+ *                             habría colado.
+ *   "20.1" → de 20.1 a 20.2 · quien escribe el decimal está afinando, no
+ *                             pidiendo todo el rango de los veinte.
+ */
+function quantityRange(raw: string): { from: number; to: number } | null {
+  // Coma decimal: es como se escribe en México y el teclado del celular la
+  // ofrece antes que el punto.
+  const cleaned = raw.trim().replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+
+  const from = Number(cleaned);
+  if (!Number.isFinite(from)) return null;
+
+  const decimals = cleaned.split(".")[1]?.length ?? 0;
+  return { from, to: from + 10 ** -decimals };
+}
+
+/**
+ * ¿Este rollo casa con el texto tecleado?
+ *
+ * Folio, tono y ubicación: las tres formas de identificar un rollo concreto
+ * cuando ya se sabe cuál es —se trae la etiqueta en la mano, se pidió un tono
+ * en particular, o se sabe en qué rack está—. Sin acentos y sin distinguir
+ * mayúsculas: nadie teclea "Ubicación A-3" con acento y con el pulgar.
  */
 function matchesQuery(lot: IssueLotOption, query: string): boolean {
   const needle = normalize(query);
