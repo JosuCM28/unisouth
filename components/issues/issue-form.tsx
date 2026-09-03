@@ -580,6 +580,11 @@ export function IssueForm({
               </FormSelectField>
 
               <IssueLotPicker
+                /* `key` con el material: al cambiar de tela el selector se
+                   remonta y los filtros de la lista se limpian solos. Sin
+                   esto, quedaba tecleado el folio del material anterior y la
+                   lista nueva salía vacía sin decir por qué. */
+                key={pickerMaterialId}
                 state={pickerState}
                 excludeLotIds={usedLotIds}
                 hasClientFilter={Boolean(clientId)}
