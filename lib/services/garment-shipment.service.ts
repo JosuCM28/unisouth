@@ -7,7 +7,6 @@ import type {
   GarmentShipmentInput,
 } from "@/lib/validations/garment-shipment.schema";
 import { BaseService } from "./base.service";
-import { CuttingOrderService } from "./cutting-order.service";
 import { DocumentService } from "./document.service";
 
 /** Lo que se ha mandado de una talla a UNA etapa. */
@@ -68,6 +67,7 @@ export class GarmentShipmentService extends BaseService {
     return this.transaction(async (tx) => {
       const order = await tx.cuttingOrder.findUnique({
         where: { id: input.orderId },
+        include: { lines: { select: { sizeId: true } } },
       });
       if (!order) throw new NotFoundError("la orden", input.orderId);
 
@@ -90,22 +90,24 @@ export class GarmentShipmentService extends BaseService {
       if (!workshop) throw new NotFoundError("el taller", input.workshopId);
       if (!stage) throw new NotFoundError("la etapa", input.stageId);
 
-      /* La talla que no estaba en la orden se le agrega con cero pedidas en
-         vez de rebotar el envío: el camión no espera a que alguien edite la
-         orden, y sin renglón propio esas piezas no aparecerían en el tablero
-         de la orden ni en los saldos por etapa. Lo hace CuttingOrderService,
-         que es la dueña de los renglones de una orden, dentro de esta misma
-         transacción.
+      /* Lo ÚNICO que se valida de las cantidades es que la talla pertenezca a
+         la orden. Sin renglón propio, esas piezas no aparecerían en el tablero
+         de la orden ni en los saldos por etapa: se mandarían al taller y no
+         estarían en ningún lado.
 
          No hay tope contra lo cortado, a propósito: en el piso se manda a
          bordar lo que hace falta y el conteo del corte no siempre está
          capturado al día. Un bloqueo aquí pararía el camión por un dato que se
          captura después. */
-      await new CuttingOrderService(this.context, tx).ensureLines(
-        tx,
-        input.orderId,
-        input.lines.map((line) => ({ sizeId: line.sizeId })),
-      );
+      const orderSizes = new Set(order.lines.map((line) => line.sizeId));
+
+      for (const line of input.lines) {
+        if (!orderSizes.has(line.sizeId)) {
+          throw new BusinessRuleError(
+            "Esa talla no está en la orden. Agrégala a la orden antes de mandarla.",
+          );
+        }
+      }
 
       const code = await this.sequencesWith(tx).next(
         "GARMENT_SHIPMENT",

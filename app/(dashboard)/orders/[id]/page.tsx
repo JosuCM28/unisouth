@@ -150,8 +150,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages, issues, catalogSizes] =
-    await Promise.all([
+  const [balances, shipments, workshops, stages, issues] = await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
       where: { orderId: id },
@@ -197,16 +196,6 @@ export default async function OrderDetailPage({ params }: PageProps) {
         cutLines: { select: { quantity: true } },
       },
     }),
-    /* El catálogo COMPLETO de tallas, no sólo las que la orden pidió.
-       En la mesa sale lo que sale —una 43 en una orden de puras letras— y
-       capturarla no puede obligar a salir a editar la orden con el bulto en la
-       mano. Las inactivas no se ofrecen: se dan de baja justo para dejar de
-       usarse. */
-    prisma.size.findMany({
-      where: { active: true },
-      orderBy: { order: "asc" },
-      select: { id: true, code: true, name: true, group: true },
-    }),
   ]);
 
   const shipmentViews: ShipmentView[] = shipments.map((shipment) => ({
@@ -235,30 +224,22 @@ export default async function OrderDetailPage({ params }: PageProps) {
     })),
   }));
 
-  /* Las tallas que la orden SÍ pidió, en el orden del pedido. Se usa para
-     poner primero lo suyo en los dos selectores: lo del pedido es lo que se
-     teclea a diario, y el resto del catálogo es la salida de emergencia. */
-  const orderedSizeIds = order.lines.map((line) => line.sizeId);
-  const inOrder = new Set(orderedSizeIds);
-
-  /* Primero las de la orden y luego el resto del catálogo, cada bloque en su
-     propio orden: el del pedido y el del catálogo. */
-  const sizeCatalog = [
-    ...orderedSizeIds
-      .filter((sizeId, index) => orderedSizeIds.indexOf(sizeId) === index)
-      .flatMap((sizeId) => catalogSizes.filter((size) => size.id === sizeId)),
-    ...catalogSizes.filter((size) => !inOrder.has(size.id)),
-  ];
-
-  const shippableSizes: ShippableSize[] = sizeCatalog.map((size) => {
-    const balance = balances.get(size.id);
+  /* Una entrada por TALLA y no por renglón: el envío guarda la talla, no el
+     renglón, así que una orden con la 38 en dos renglones ofrecería la misma
+     opción dos veces. `balances` ya trae lo cortado de las dos sumado. */
+  const shippableSizes: ShippableSize[] = order.lines
+    .filter(
+      (line, index) =>
+        order.lines.findIndex((other) => other.sizeId === line.sizeId) === index,
+    )
+    .map((line) => {
+    const balance = balances.get(line.sizeId);
 
     return {
-      sizeId: size.id,
-      sizeCode: size.code,
-      sizeName: size.name,
-      inOrder: inOrder.has(size.id),
-      cut: balance?.cut ?? 0,
+      sizeId: line.sizeId,
+      sizeCode: line.size.code,
+      sizeName: line.size.name,
+      cut: balance?.cut ?? line.cutQuantity,
       /* Lo ya mandado a cada etapa. El diálogo enseña el de la etapa elegida:
          "de la 34 ya van 100 a bordado de 1330 cortadas". */
       sentByStage: Object.fromEntries(
@@ -367,33 +348,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
     pieces: sumBundlePieces(batch.entries),
   }));
 
-  /* Los renglones de la orden primero —uno por renglón, porque una orden puede
-     llevar la misma talla dos veces con foleos distintos— y detrás el resto del
-     catálogo, que todavía no tiene renglón. */
-  const batchSizes: BatchSizeOption[] = [
-    ...order.lines.map((line) => ({
-      key: line.id,
-      lineId: line.id,
-      sizeId: line.sizeId,
-      code: line.size.code,
-      name: line.size.name,
-      ordered: line.orderedQuantity,
-      cut: line.cutQuantity,
-      note: line.notes,
-    })),
-    ...catalogSizes
-      .filter((size) => !inOrder.has(size.id))
-      .map((size) => ({
-        key: size.id,
-        lineId: null,
-        sizeId: size.id,
-        code: size.code,
-        name: size.name,
-        ordered: 0,
-        cut: 0,
-        note: null,
-      })),
-  ];
+  /* Un renglón por RENGLÓN de la orden, no uno por talla: la orden puede
+     llevar la misma talla dos veces con foleos distintos, y juntarlas mandaría
+     a una lo que se capturó para la otra. */
+  const batchSizes: BatchSizeOption[] = order.lines.map((line) => ({
+    lineId: line.id,
+    code: line.size.code,
+    name: line.size.name,
+    ordered: line.orderedQuantity,
+    cut: line.cutQuantity,
+    note: line.notes,
+  }));
 
   return (
     <div className="flex flex-col gap-4">

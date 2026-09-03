@@ -112,6 +112,9 @@ export type CuttingBatchInput = z.infer<typeof cuttingBatchSchema>;
  * y otro de 20— y promediarlos para meterlos en un solo número es justo lo que
  * la hoja de papel nunca pidió.
  *
+ * Sólo se capturan tallas que la orden YA pidió: la captura es el avance de un
+ * pedido, no la puerta por la que se le agregan renglones.
+ *
  * Los renglones en cero se descartan ANTES de validar: se capturan a mano y un
  * renglón que se agregó y se dejó vacío no dice nada.
  */
@@ -126,16 +129,12 @@ export const batchProgressSchema = z.object({
   lines: z
     .array(
       z.object({
-        /* La talla SIEMPRE; el renglón de la orden sólo si ya existe.
-           En la mesa se corta lo que se corta, y a veces sale una talla que la
-           orden no pidió: sin `lineId` el servicio le abre su renglón con cero
-           pedidas, en vez de rebotar la captura y mandar al auxiliar a editar
-           la orden con el bulto en la mano.
-           Cuando el renglón ya existe se manda su id y no sólo la talla: una
-           orden puede llevar la misma talla en dos renglones, y resolver por
-           talla mandaría a uno lo que se capturó en el otro. */
-        sizeId: cuidSchema,
-        lineId: optionalCuid,
+        /* El RENGLÓN de la orden, no la talla: sólo se captura contra lo que
+           la orden pidió. Y es el renglón y no la talla porque una orden puede
+           llevar la misma talla en dos renglones —con foleos o anotaciones
+           distintas—, y resolver por talla mandaría a uno lo capturado en el
+           otro. */
+        lineId: cuidSchema,
         /* Puede ser NEGATIVA: así se corrige un conteo de más sin borrar lo
            capturado antes, igual que un ajuste del kárdex. */
         quantity: z.coerce

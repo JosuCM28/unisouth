@@ -34,21 +34,18 @@ export interface BatchOption {
 }
 
 /**
- * Una talla que se puede capturar: un renglón de la orden, o una del catálogo
- * que la orden todavía no pide.
+ * Un renglón de la orden, tal como se ofrece en el selector.
  *
- * Se ofrece el catálogo entero y no sólo lo pedido porque en la mesa sale lo
- * que sale —una 43 en una orden de puras letras—, y obligar a editar la orden
- * antes de anotar el bulto es lo que devuelve a la gente a la libreta. Al
- * guardar, esa talla entra a la orden con cero pedidas y sus piezas se leen
- * como sobrantes.
+ * Se ofrece un renglón por RENGLÓN y no una entrada por talla: una orden puede
+ * llevar la misma talla dos veces —con foleos o anotaciones distintas— y
+ * juntarlas mandaría a una lo que se capturó para la otra. La anotación viaja
+ * para poder desempatarlas de un vistazo.
+ *
+ * Sólo lo que la orden pidió: la captura es el avance de un pedido, no la
+ * puerta por la que se le agregan tallas.
  */
 export interface BatchSizeOption {
-  /** Identidad de la opción: el renglón si existe, si no la talla. */
-  key: string;
-  /** Null mientras la orden no tenga renglón para esa talla. */
-  lineId: string | null;
-  sizeId: string;
+  lineId: string;
   code: string;
   name: string;
   ordered: number;
@@ -100,7 +97,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
 
   const isNewBatch = batchId === NEW_BATCH;
 
-  const byKey = new Map(sizes.map((size) => [size.key, size]));
+  const byLine = new Map(sizes.map((size) => [size.lineId, size]));
 
   const captured = usableRows(rows);
   const total = sumBundlePieces(captured);
@@ -108,7 +105,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   // Por TALLA y no por renglón: la orden puede llevar la misma dos veces y
   // decir "2 tallas" cuando es una sola se lee como un error de captura.
   const capturedSizes = new Set(
-    captured.map((row) => byKey.get(row.value)?.sizeId),
+    captured.map((row) => byLine.get(row.value)?.code),
   ).size;
 
   /**
@@ -118,19 +115,13 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
    * cuando de la misma talla salieron dos bultos, el acumulado que interesa es
    * el de los dos juntos, y enseñar el de uno haría creer que falta el otro.
    */
-  function hintFor(key: string) {
-    const size = byKey.get(key);
+  function hintFor(lineId: string) {
+    const size = byLine.get(lineId);
     if (!size) return null;
 
-    const typed = sumBundlePieces(captured.filter((row) => row.value === key));
-
-    /* La que la orden no pedía se dice de frente ANTES de guardar: se va a
-       agregar a la orden, y enterarse después de que el pedido creció una
-       talla obliga a ir a buscar quién la metió. */
-    if (!size.lineId) {
-      const tail = typed !== 0 ? ` · entrarían ${typed}` : "";
-      return `no está en la orden · se agrega con 0 pedidas${tail}`;
-    }
+    const typed = sumBundlePieces(
+      captured.filter((row) => row.value === lineId),
+    );
 
     if (typed !== 0) {
       return `${size.cut} de ${size.ordered} · quedaría en ${size.cut + typed}`;
@@ -167,19 +158,11 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
         batchId: isNewBatch ? undefined : batchId,
         newBatchLabel: isNewBatch ? newLabel || undefined : undefined,
         notes: notes || undefined,
-        lines: captured.map((row) => {
-          const size = byKey.get(row.value);
-
-          return {
-            sizeId: size?.sizeId,
-            /* Se manda el renglón cuando ya existe: la orden puede llevar la
-               misma talla dos veces, y dejar que el servidor resuelva por
-               talla mandaría a uno lo que se capturó en el otro. */
-            lineId: size?.lineId ?? undefined,
-            quantity: row.quantity,
-            bundles: row.bundles,
-          };
-        }),
+        lines: captured.map((row) => ({
+          lineId: row.value,
+          quantity: row.quantity,
+          bundles: row.bundles,
+        })),
       }),
     );
     setIsSaving(false);
@@ -248,7 +231,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
         <SizeBundleRows
           label="Bultos de este corte"
           options={sizes.map((size) => ({
-            value: size.key,
+            value: size.lineId,
             code: size.code,
             /* La anotación del renglón desempata dos de la misma talla, y el
                nombre largo hace que se encuentre tecleando "grande". */
