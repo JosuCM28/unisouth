@@ -33,10 +33,14 @@ import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
 import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
 import { OrderSendToIssueDialog } from "@/components/orders/order-send-to-issue-dialog";
-import { OrderShipmentDialog } from "@/components/orders/order-shipment-dialog";
+import {
+  OrderShipmentDialog,
+  type ShippableSize,
+} from "@/components/orders/order-shipment-dialog";
 import {
   OrderBatchDialog,
   type BatchOption,
+  type BatchSizeOption,
 } from "@/components/orders/order-batch-dialog";
 import {
   OrderBatches,
@@ -146,7 +150,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages, issues] = await Promise.all([
+  const [balances, shipments, workshops, stages, issues, catalogSizes] =
+    await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
       where: { orderId: id },
@@ -192,6 +197,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
         cutLines: { select: { quantity: true } },
       },
     }),
+    /* El catálogo COMPLETO de tallas, no sólo las que la orden pidió.
+       En la mesa sale lo que sale —una 43 en una orden de puras letras— y
+       capturarla no puede obligar a salir a editar la orden con el bulto en la
+       mano. Las inactivas no se ofrecen: se dan de baja justo para dejar de
+       usarse. */
+    prisma.size.findMany({
+      where: { active: true },
+      orderBy: { order: "asc" },
+      select: { id: true, code: true, name: true, group: true },
+    }),
   ]);
 
   const shipmentViews: ShipmentView[] = shipments.map((shipment) => ({
@@ -220,13 +235,30 @@ export default async function OrderDetailPage({ params }: PageProps) {
     })),
   }));
 
-  const shippableSizes = order.lines.map((line) => {
-    const balance = balances.get(line.sizeId);
+  /* Las tallas que la orden SÍ pidió, en el orden del pedido. Se usa para
+     poner primero lo suyo en los dos selectores: lo del pedido es lo que se
+     teclea a diario, y el resto del catálogo es la salida de emergencia. */
+  const orderedSizeIds = order.lines.map((line) => line.sizeId);
+  const inOrder = new Set(orderedSizeIds);
+
+  /* Primero las de la orden y luego el resto del catálogo, cada bloque en su
+     propio orden: el del pedido y el del catálogo. */
+  const sizeCatalog = [
+    ...orderedSizeIds
+      .filter((sizeId, index) => orderedSizeIds.indexOf(sizeId) === index)
+      .flatMap((sizeId) => catalogSizes.filter((size) => size.id === sizeId)),
+    ...catalogSizes.filter((size) => !inOrder.has(size.id)),
+  ];
+
+  const shippableSizes: ShippableSize[] = sizeCatalog.map((size) => {
+    const balance = balances.get(size.id);
 
     return {
-      sizeId: line.sizeId,
-      sizeCode: line.size.code,
-      cut: line.cutQuantity,
+      sizeId: size.id,
+      sizeCode: size.code,
+      sizeName: size.name,
+      inOrder: inOrder.has(size.id),
+      cut: balance?.cut ?? 0,
       /* Lo ya mandado a cada etapa. El diálogo enseña el de la etapa elegida:
          "de la 34 ya van 100 a bordado de 1330 cortadas". */
       sentByStage: Object.fromEntries(
@@ -335,12 +367,33 @@ export default async function OrderDetailPage({ params }: PageProps) {
     pieces: sumBundlePieces(batch.entries),
   }));
 
-  const batchSizes = order.lines.map((line) => ({
-    lineId: line.id,
-    sizeCode: line.size.code,
-    ordered: line.orderedQuantity,
-    cut: line.cutQuantity,
-  }));
+  /* Los renglones de la orden primero —uno por renglón, porque una orden puede
+     llevar la misma talla dos veces con foleos distintos— y detrás el resto del
+     catálogo, que todavía no tiene renglón. */
+  const batchSizes: BatchSizeOption[] = [
+    ...order.lines.map((line) => ({
+      key: line.id,
+      lineId: line.id,
+      sizeId: line.sizeId,
+      code: line.size.code,
+      name: line.size.name,
+      ordered: line.orderedQuantity,
+      cut: line.cutQuantity,
+      note: line.notes,
+    })),
+    ...catalogSizes
+      .filter((size) => !inOrder.has(size.id))
+      .map((size) => ({
+        key: size.id,
+        lineId: null,
+        sizeId: size.id,
+        code: size.code,
+        name: size.name,
+        ordered: 0,
+        cut: 0,
+        note: null,
+      })),
+  ];
 
   return (
     <div className="flex flex-col gap-4">

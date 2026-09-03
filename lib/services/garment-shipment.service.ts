@@ -7,6 +7,7 @@ import type {
   GarmentShipmentInput,
 } from "@/lib/validations/garment-shipment.schema";
 import { BaseService } from "./base.service";
+import { CuttingOrderService } from "./cutting-order.service";
 import { DocumentService } from "./document.service";
 
 /** Lo que se ha mandado de una talla a UNA etapa. */
@@ -67,7 +68,6 @@ export class GarmentShipmentService extends BaseService {
     return this.transaction(async (tx) => {
       const order = await tx.cuttingOrder.findUnique({
         where: { id: input.orderId },
-        include: { lines: { select: { sizeId: true } } },
       });
       if (!order) throw new NotFoundError("la orden", input.orderId);
 
@@ -90,20 +90,22 @@ export class GarmentShipmentService extends BaseService {
       if (!workshop) throw new NotFoundError("el taller", input.workshopId);
       if (!stage) throw new NotFoundError("la etapa", input.stageId);
 
-      /* Lo ÚNICO que se valida de las cantidades es que la talla pertenezca a
-         la orden. No hay tope contra lo cortado a propósito: en el piso se
-         manda a bordar lo que hace falta y el conteo del corte no siempre está
+      /* La talla que no estaba en la orden se le agrega con cero pedidas en
+         vez de rebotar el envío: el camión no espera a que alguien edite la
+         orden, y sin renglón propio esas piezas no aparecerían en el tablero
+         de la orden ni en los saldos por etapa. Lo hace CuttingOrderService,
+         que es la dueña de los renglones de una orden, dentro de esta misma
+         transacción.
+
+         No hay tope contra lo cortado, a propósito: en el piso se manda a
+         bordar lo que hace falta y el conteo del corte no siempre está
          capturado al día. Un bloqueo aquí pararía el camión por un dato que se
          captura después. */
-      const orderSizes = new Set(order.lines.map((line) => line.sizeId));
-
-      for (const line of input.lines) {
-        if (!orderSizes.has(line.sizeId)) {
-          throw new BusinessRuleError(
-            "Esa talla no está en la orden. Agrégala a la orden antes de mandarla.",
-          );
-        }
-      }
+      await new CuttingOrderService(this.context, tx).ensureLines(
+        tx,
+        input.orderId,
+        input.lines.map((line) => ({ sizeId: line.sizeId })),
+      );
 
       const code = await this.sequencesWith(tx).next(
         "GARMENT_SHIPMENT",
@@ -535,12 +537,18 @@ export class GarmentShipmentService extends BaseService {
 
     const balances = new Map<string, SizeBalance>();
 
+    /* Se ACUMULA y no se sobrescribe: una orden puede llevar la misma talla en
+       dos renglones —con foleos distintos— y quedarse con el último diría que
+       de la 38 sólo se cortó lo del segundo. */
     for (const line of lines) {
-      balances.set(line.sizeId, {
+      const balance = balances.get(line.sizeId) ?? {
         sizeId: line.sizeId,
-        cut: line.cutQuantity,
+        cut: 0,
         byStage: new Map(),
-      });
+      };
+
+      balance.cut += line.cutQuantity;
+      balances.set(line.sizeId, balance);
     }
 
     for (const line of shipmentLines) {

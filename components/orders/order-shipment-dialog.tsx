@@ -22,9 +22,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/**
+ * Una talla que se puede mandar: el catálogo completo, no sólo lo que la orden
+ * pidió.
+ *
+ * Sale lo que sale, y el camión no espera a que alguien edite la orden para
+ * poder anotar un bulto de la 43. La que no estaba entra a la orden con cero
+ * pedidas al registrar el envío.
+ */
 export interface ShippableSize {
   sizeId: string;
   sizeCode: string;
+  sizeName: string;
+  /** Si la orden ya la pedía. Cambia lo que se le dice al auxiliar. */
+  inOrder: boolean;
   /** Piezas que salieron del corte. La referencia contra la que se compara. */
   cut: number;
   /** Lo ya mandado a cada etapa, por id de etapa. */
@@ -91,7 +102,13 @@ export function OrderShipmentDialog({
       captured.filter((row) => row.value === sizeId),
     );
 
-    const bits = [`${size.cut} cortadas`];
+    /* La que la orden no pedía se dice de frente ANTES de guardar: se va a
+       agregar a la orden, y enterarse después de que el pedido creció una
+       talla obliga a ir a buscar quién la metió. */
+    const bits = size.inOrder
+      ? [`${size.cut} cortadas`]
+      : ["no está en la orden · se agrega con 0 pedidas"];
+
     if (alreadySent > 0) bits.push(`ya van ${alreadySent}`);
     if (sending > 0) bits.push(`ahora ${sending}`);
 
@@ -159,7 +176,7 @@ export function OrderShipmentDialog({
     >
       {sizes.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Esta orden no tiene tallas capturadas todavía.
+          No hay tallas dadas de alta. Créalas en Tallas antes de mandar nada.
         </p>
       ) : (
         <div className="flex flex-col gap-4">
@@ -226,14 +243,16 @@ export function OrderShipmentDialog({
             </div>
           </div>
 
-          {/* Se ofrecen TODAS las tallas de la orden, incluso las que aún no
-              tienen corte capturado: el conteo del corte no siempre está al
-              día y el camión no espera a que alguien lo teclee. */}
+          {/* Se ofrece el catálogo entero, incluso las tallas sin corte
+              capturado: el conteo del corte no siempre está al día y el camión
+              no espera a que alguien lo teclee. Las de la orden van primero. */}
           <SizeBundleRows
             label="Bultos que van"
             options={sizes.map((size) => ({
               value: size.sizeId,
               code: size.sizeCode,
+              hint: size.sizeName,
+              keywords: size.sizeName,
             }))}
             rows={rows}
             onChange={setRows}

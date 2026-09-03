@@ -126,7 +126,16 @@ export const batchProgressSchema = z.object({
   lines: z
     .array(
       z.object({
-        lineId: cuidSchema,
+        /* La talla SIEMPRE; el renglón de la orden sólo si ya existe.
+           En la mesa se corta lo que se corta, y a veces sale una talla que la
+           orden no pidió: sin `lineId` el servicio le abre su renglón con cero
+           pedidas, en vez de rebotar la captura y mandar al auxiliar a editar
+           la orden con el bulto en la mano.
+           Cuando el renglón ya existe se manda su id y no sólo la talla: una
+           orden puede llevar la misma talla en dos renglones, y resolver por
+           talla mandaría a uno lo que se capturó en el otro. */
+        sizeId: cuidSchema,
+        lineId: optionalCuid,
         /* Puede ser NEGATIVA: así se corrige un conteo de más sin borrar lo
            capturado antes, igual que un ajuste del kárdex. */
         quantity: z.coerce

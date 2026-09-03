@@ -14,6 +14,8 @@ export interface SizeRowOption {
   code: string;
   /** Segunda línea del desplegable: el nombre largo, el grupo. */
   hint?: string;
+  /** Texto extra por el que también se busca sin enseñarlo. */
+  keywords?: string;
 }
 
 /** Un renglón a medio teclear. */
@@ -110,6 +112,7 @@ export function SizeBundleRows({
     value: option.value,
     label: option.code,
     hint: option.hint,
+    keywords: option.keywords,
   }));
 
   const usable = usableRows(rows);

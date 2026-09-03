@@ -300,30 +300,6 @@ export class CuttingOrderService extends BaseService {
    */
   async addBatchProgress(input: BatchProgressInput) {
     return this.transaction(async (tx) => {
-      /* Ids ÚNICOS: la misma talla viene varias veces cuando de ella salieron
-         dos bultos de cuentas distintas, y contar los renglones capturados
-         contra los que devuelve la base daría un "no existe" que es mentira. */
-      const lineIds = [...new Set(input.lines.map((line) => line.lineId))];
-
-      const lines = await tx.cuttingOrderLine.findMany({
-        where: { id: { in: lineIds } },
-        include: { order: true, size: { select: { code: true } } },
-      });
-
-      if (lines.length !== lineIds.length) {
-        throw new NotFoundError("el renglón", "de la captura");
-      }
-
-      /* Todas las tallas tienen que ser de la MISMA orden, y de la que dice el
-         formulario: el corte pertenece a una, y aceptar renglones de otra
-         colgaría piezas de una tanda que nunca las cortó. */
-      const orderIds = new Set(lines.map((line) => line.orderId));
-      if (orderIds.size !== 1 || !orderIds.has(input.orderId)) {
-        throw new BusinessRuleError(
-          "Las tallas de una captura tienen que ser de la misma orden.",
-        );
-      }
-
       const orderId = input.orderId;
 
       const order = await tx.cuttingOrder.findUnique({
@@ -336,6 +312,15 @@ export class CuttingOrderService extends BaseService {
         throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
       }
 
+      /* Llaves ÚNICAS: la misma talla viene varias veces cuando de ella
+         salieron dos bultos de cuentas distintas, y su renglón se resuelve una
+         sola vez. La llave es el renglón cuando la orden ya lo tenía. */
+      const keys = [
+        ...new Set(input.lines.map((line) => line.lineId ?? line.sizeId)),
+      ];
+
+      const resolved = await this.ensureLines(tx, orderId, input.lines);
+
       /* Sin corte elegido se abre uno aquí mismo: así el corte nuevo y las
          piezas que lo estrenan se confirman o se revierten juntos, y no queda
          un corte vacío si la captura falla. */
@@ -343,12 +328,10 @@ export class CuttingOrderService extends BaseService {
         ? await this.requireBatch(tx, input.batchId, orderId)
         : await this.createBatch(tx, orderId, input.newBatchLabel);
 
-      const byId = new Map(lines.map((line) => [line.id, line]));
-
       for (const entry of input.lines) {
         await tx.cuttingProgress.create({
           data: {
-            lineId: entry.lineId,
+            lineId: resolved.get(entry.lineId ?? entry.sizeId)!.id,
             batchId: batch.id,
             quantity: entry.quantity,
             bundles: entry.bundles,
@@ -362,12 +345,11 @@ export class CuttingOrderService extends BaseService {
          las capturas. Con dos bultos de la misma talla en la misma tanda,
          recalcular dentro del bucle leería el primero sin el segundo, y el
          tope de negativos se estaría evaluando contra un total a medias. */
-      for (const lineId of lineIds) {
-        /* El `!` es seguro por el conteo de arriba: si algún id no existiera,
-           `findMany` habría devuelto menos renglones de los que pide la
-           captura y ya se habría lanzado NotFoundError. */
-        const line = byId.get(lineId)!;
-        await this.recalculateLine(tx, lineId, line.size.code);
+      for (const key of keys) {
+        /* El `!` es seguro: `ensureLines` devuelve una entrada por cada llave
+           que se le pide, creando el renglón si la orden no lo traía. */
+        const line = resolved.get(key)!;
+        await this.recalculateLine(tx, line.id, line.sizeCode);
       }
 
       // Cantidad × bultos: sumar la cantidad sin multiplicar dejaría el total
@@ -384,7 +366,7 @@ export class CuttingOrderService extends BaseService {
         reference: `${order.code} · ${batch.number}º corte`,
         newValue: {
           corte: batch.number,
-          tallas: lineIds.length,
+          renglones: keys.length,
           bultos: bundles,
           piezas: total,
         },
@@ -396,9 +378,121 @@ export class CuttingOrderService extends BaseService {
         batchId: batch.id,
         pieces: total,
         bundles,
-        sizes: lineIds.length,
+        sizes: keys.length,
       };
     });
+  }
+
+  /**
+   * Los renglones de la orden para lo que se está capturando, abriendo los que
+   * falten. La llave del mapa es `lineId ?? sizeId`, como vino la captura.
+   *
+   * La orden es el PLAN —lo que el cliente pidió— y el corte es lo que de
+   * verdad salió de la mesa. Cuando el piso corta una talla que nadie planeó,
+   * rebotar la captura obliga a salir a editar la orden con el bulto en la
+   * mano; en su lugar la orden crece un renglón con CERO pedidas y las piezas
+   * aparecen donde ya se leían: como sobrantes.
+   *
+   * Cuando la captura trae `lineId` se respeta ese renglón y no se busca por
+   * talla: una orden PUEDE llevar la misma talla en dos renglones —con foleos
+   * o anotaciones distintas— y resolver por talla mandaría a uno lo que se
+   * capturó en el otro.
+   *
+   * Público y con `tx` explícito porque también lo usa el envío a taller: la
+   * misma talla que se puede cortar tiene que poderse mandar, y la dueña de
+   * los renglones de una orden es esta clase.
+   */
+  async ensureLines(
+    tx: Tx,
+    orderId: string,
+    entries: { sizeId: string; lineId?: string | null }[],
+  ): Promise<Map<string, { id: string; sizeCode: string }>> {
+    const resolved = new Map<string, { id: string; sizeCode: string }>();
+
+    const lineIds = [
+      ...new Set(entries.flatMap((entry) => (entry.lineId ? [entry.lineId] : []))),
+    ];
+
+    if (lineIds.length > 0) {
+      /* El `orderId` va en el WHERE y no se comprueba después: el corte
+         pertenece a una orden, y aceptar un renglón de otra colgaría piezas de
+         una tanda que nunca las cortó. */
+      const lines = await tx.cuttingOrderLine.findMany({
+        where: { id: { in: lineIds }, orderId },
+        select: { id: true, size: { select: { code: true } } },
+      });
+
+      if (lines.length !== lineIds.length) {
+        throw new BusinessRuleError(
+          "Alguna talla de la captura no es de esta orden. Vuelve a abrir la orden y captúrala otra vez.",
+        );
+      }
+
+      for (const line of lines) {
+        resolved.set(line.id, { id: line.id, sizeCode: line.size.code });
+      }
+    }
+
+    const bySize = entries.filter((entry) => !entry.lineId);
+    if (bySize.length === 0) return resolved;
+
+    const sizeIds = [...new Set(bySize.map((entry) => entry.sizeId))];
+
+    /* Se vuelve a buscar por talla aunque la pantalla haya dicho que no está:
+       entre que se abrió el diálogo y se guardó, alguien pudo agregarla a la
+       orden, y crearla a ciegas partiría el acumulado en dos renglones. Con la
+       talla repetida gana el primero del pedido, que es el que la pantalla
+       ofrecía como suyo. */
+    const existing = await tx.cuttingOrderLine.findMany({
+      where: { orderId, sizeId: { in: sizeIds } },
+      orderBy: { position: "asc" },
+      select: { id: true, sizeId: true, size: { select: { code: true } } },
+    });
+
+    for (const line of existing) {
+      if (resolved.has(line.sizeId)) continue;
+      resolved.set(line.sizeId, { id: line.id, sizeCode: line.size.code });
+    }
+
+    const missing = sizeIds.filter((sizeId) => !resolved.has(sizeId));
+    if (missing.length === 0) return resolved;
+
+    const sizes = await tx.size.findMany({
+      where: { id: { in: missing } },
+      select: { id: true, code: true, order: true },
+    });
+
+    if (sizes.length !== missing.length) {
+      throw new NotFoundError("la talla", "de la captura");
+    }
+
+    /* Al final del pedido y en el orden del catálogo: las tallas que sí se
+       pidieron conservan su lugar, y las que llegaron por el corte se agrupan
+       detrás en vez de colarse a media tabla. */
+    const last = await tx.cuttingOrderLine.aggregate({
+      where: { orderId },
+      _max: { position: true },
+    });
+
+    let position = (last._max.position ?? -1) + 1;
+
+    for (const size of [...sizes].sort((a, b) => a.order - b.order)) {
+      const line = await tx.cuttingOrderLine.create({
+        data: {
+          orderId,
+          sizeId: size.id,
+          // CERO pedidas: nadie la pidió. Lo que se corte de ella sale como
+          // sobrante, que es exactamente lo que es.
+          orderedQuantity: 0,
+          position: position++,
+        },
+        select: { id: true },
+      });
+
+      resolved.set(size.id, { id: line.id, sizeCode: size.code });
+    }
+
+    return resolved;
   }
 
   /**
