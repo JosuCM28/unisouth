@@ -1706,10 +1706,20 @@ model CuttingOrderLine {
   @@map("cutting_order_lines")
 }
 
-/// LOG. Append-only: each entry is a batch finished on a given day.
+/// LOG of what came off the cutting table, one row per bundle.
 ///
 /// The history is the point: "how many are left" is answered by a number, but
 /// "when did this order stall" needs the entries.
+///
+/// NOT append-only, unlike Movement and AuditLog, and the difference is
+/// deliberate. Saving a batch REPLACES its rows, because the screen that
+/// writes them opens with them loaded and is expected to behave like an edit:
+/// change 60 to 50 and the batch holds 50, not a 60 and a -10. What that
+/// screen must never lose —who changed it and from what figures— is kept in
+/// AuditLog, which IS append-only. A batch already sent out on a voucher
+/// cannot be edited at all: that paper is signed.
+///
+/// Rows of one batch are never touched by another. Each lay-up owns its own.
 model CuttingProgress {
   id     String           @id @default(cuid())
   lineId String

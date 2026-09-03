@@ -15,6 +15,8 @@ import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 /** Un bulto (o varios de la misma cuenta) que una talla aportó a un corte. */
 export interface BatchEntryView {
   id: string;
+  /** El renglón de la orden del que salió. Lo usa el diálogo al corregir. */
+  lineId: string;
   sizeCode: string;
   /** Piezas POR BULTO: lo que vale la captura es `quantity * bundles`. */
   quantity: number;

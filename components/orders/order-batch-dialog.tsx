@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Scissors } from "lucide-react";
+import { AlertTriangle, Scissors } from "lucide-react";
 import { toast } from "sonner";
-import { addBatchProgressAction } from "@/app/actions/cutting-order.actions";
+import { saveBatchProgressAction } from "@/app/actions/cutting-order.actions";
 import { runAction } from "@/lib/offline/run-action";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { cutBatchLabel } from "@/lib/constants/labels";
@@ -23,6 +23,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+/** Un bulto ya capturado en un corte, tal como vuelve a la pantalla. */
+export interface BatchEntry {
+  lineId: string;
+  /** Piezas POR BULTO. */
+  quantity: number;
+  bundles: number;
+}
+
 /** Un corte ya abierto de esta orden, tal como se ofrece en el selector. */
 export interface BatchOption {
   id: string;
@@ -31,6 +39,17 @@ export interface BatchOption {
   openedAt: Date;
   /** Piezas que ya se le capturaron. Sólo para el texto de ayuda. */
   pieces: number;
+  /**
+   * Lo que ya lleva capturado, bulto por bulto.
+   *
+   * Viaja con la opción y no se pide al elegirla: el selector se usa de pie en
+   * la mesa y un viaje al servidor entre tocar el corte y ver sus números es
+   * medio segundo en el que la pantalla parece vacía y alguien vuelve a
+   * teclear lo que ya estaba.
+   */
+  entries: BatchEntry[];
+  /** El vale vivo de este corte. Con uno, el corte ya no se puede cambiar. */
+  issue: { code: string; isDraft: boolean } | null;
 }
 
 /**
@@ -92,10 +111,27 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   const [batchId, setBatchId] = useState(batches[0]?.id ?? NEW_BATCH);
   const [newLabel, setNewLabel] = useState("");
   const [notes, setNotes] = useState("");
-  const [rows, setRows] = useState<SizeBundleRow[]>([emptyRow()]);
+  const [rows, setRows] = useState<SizeBundleRow[]>(() =>
+    rowsOf(batches[0]),
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const isNewBatch = batchId === NEW_BATCH;
+  const selected = batches.find((batch) => batch.id === batchId);
+
+  /* Un corte que ya salió en un vale no se toca: ese papel lleva su desglose
+     bulto por bulto y puede estar firmado. Se dice aquí, con el folio, en vez
+     de dejar teclear y rebotar al guardar. */
+  const blocked = selected?.issue ?? null;
+
+  // Se está corrigiendo, no estrenando: cambia lo que dice la pantalla.
+  const isEditing = (selected?.entries.length ?? 0) > 0;
+
+  /** Al cambiar de corte se trae lo que ese corte ya lleva. */
+  function handleBatchChange(next: string) {
+    setBatchId(next);
+    setRows(rowsOf(batches.find((batch) => batch.id === next)));
+  }
 
   const byLine = new Map(sizes.map((size) => [size.lineId, size]));
 
@@ -107,6 +143,20 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   const capturedSizes = new Set(
     captured.map((row) => byLine.get(row.value)?.code),
   ).size;
+
+  /**
+   * Lo que ya aporta ESTE corte a una talla, según lo guardado.
+   *
+   * Es la pieza que hace que el acumulado no mienta al corregir: guardar
+   * REEMPLAZA lo de este corte, así que el total de la talla no es "lo que
+   * lleva más lo tecleado" —eso contaría dos veces lo que ya estaba— sino lo
+   * que dieron los OTROS cortes más lo que quede aquí.
+   */
+  function alreadyHere(lineId: string) {
+    return sumBundlePieces(
+      (selected?.entries ?? []).filter((entry) => entry.lineId === lineId),
+    );
+  }
 
   /**
    * Lo que se sabe de la talla del renglón: cuánto lleva y en cuánto quedaría.
@@ -123,8 +173,11 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
       captured.filter((row) => row.value === lineId),
     );
 
+    // Lo que dieron los demás cortes: la base sobre la que se suma lo de éste.
+    const others = size.cut - alreadyHere(lineId);
+
     if (typed !== 0) {
-      return `${size.cut} de ${size.ordered} · quedaría en ${size.cut + typed}`;
+      return `${size.cut} de ${size.ordered} · quedaría en ${others + typed}`;
     }
 
     const { pending, surplus } = cutProgress(size.ordered, size.cut);
@@ -137,7 +190,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
     setBatchId(batches[0]?.id ?? NEW_BATCH);
     setNewLabel("");
     setNotes("");
-    setRows([emptyRow()]);
+    setRows(rowsOf(batches[0]));
   }
 
   function handleOpenChange(next: boolean) {
@@ -153,7 +206,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
 
     setIsSaving(true);
     const result = await runAction(() =>
-      addBatchProgressAction({
+      saveBatchProgressAction({
         orderId,
         batchId: isNewBatch ? undefined : batchId,
         newBatchLabel: isNewBatch ? newLabel || undefined : undefined,
@@ -172,8 +225,12 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
       return;
     }
 
+    const bultos = `${bundles} ${bundles === 1 ? "bulto" : "bultos"}`;
+
     toast.success(
-      `${total} piezas en ${bundles} ${bundles === 1 ? "bulto" : "bultos"}`,
+      result.data.replaced
+        ? `Corte corregido: queda en ${total} piezas y ${bultos}`
+        : `${total} piezas en ${bultos}`,
     );
     setOpen(false);
     reset();
@@ -185,7 +242,11 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
       open={open}
       onOpenChange={handleOpenChange}
       title="Capturar corte"
-      description="Elige el corte y anota los bultos que salieron, uno por renglón."
+      description={
+        isEditing
+          ? "Este corte ya tiene bultos capturados. Corrígelos y se guardan tal cual."
+          : "Elige el corte y anota los bultos que salieron, uno por renglón."
+      }
       trigger={
         <Button className="touch-target">
           <Scissors className="size-4" aria-hidden />
@@ -207,10 +268,26 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
               { value: NEW_BATCH, label: "Corte nuevo" },
             ]}
             value={batchId}
-            onChange={setBatchId}
+            onChange={handleBatchChange}
             placeholder="Elige el corte"
             searchPlaceholder="Buscar corte…"
           />
+
+          {blocked && (
+            <p className="flex items-start gap-2 border border-state-reserved bg-card p-3 text-sm">
+              <AlertTriangle
+                className="size-4 shrink-0 text-state-reserved"
+                aria-hidden
+              />
+              <span>
+                Este corte ya salió en{" "}
+                <span className="tabular font-medium">{blocked.code}</span>{" "}
+                ({blocked.isDraft ? "borrador" : "aplicada"}) y no se puede
+                cambiar: ese vale lleva su desglose bulto por bulto. Cancela la
+                salida si necesitas corregirlo.
+              </span>
+            </p>
+          )}
         </div>
 
         {isNewBatch && (
@@ -241,7 +318,11 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
           rows={rows}
           onChange={setRows}
           renderHint={hintFor}
-          footnote="La misma talla se puede repetir: un bulto de 30 y otro de 20 son dos renglones. Para corregir un conteo de más, escribe una cantidad negativa."
+          footnote={
+            isEditing
+              ? "El corte queda EXACTAMENTE con estos renglones: lo que quites aquí desaparece de él. La misma talla se puede repetir."
+              : "La misma talla se puede repetir: un bulto de 30 y otro de 20 son dos renglones."
+          }
         />
 
         <div className="flex flex-col gap-2">
@@ -265,14 +346,33 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
         <SubmitButton
           isSubmitting={isSaving}
           onClick={handleSave}
-          disabled={captured.length === 0}
+          disabled={captured.length === 0 || Boolean(blocked)}
           className="h-12 w-full"
         >
-          Guardar corte
+          {isEditing ? "Guardar cambios" : "Guardar corte"}
         </SubmitButton>
       </div>
     </ResponsiveFormDialog>
   );
+}
+
+/**
+ * Los renglones con los que abre la pantalla para un corte.
+ *
+ * Un corte que ya tiene bultos vuelve con ellos puestos, que es lo que permite
+ * corregirlos: aparecer vacío hacía creer que no había nada capturado y que
+ * volver a teclearlo era lo correcto. Uno recién estrenado —o "Corte nuevo"—
+ * abre con un renglón en blanco, listo para el primer bulto.
+ */
+function rowsOf(batch?: BatchOption): SizeBundleRow[] {
+  if (!batch || batch.entries.length === 0) return [emptyRow()];
+
+  return batch.entries.map((entry) => ({
+    key: crypto.randomUUID(),
+    value: entry.lineId,
+    quantity: String(entry.quantity),
+    bundles: String(entry.bundles),
+  }));
 }
 
 /** Cuándo se abrió el corte y qué lleva, para reconocerlo en el selector. */

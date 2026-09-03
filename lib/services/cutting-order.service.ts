@@ -253,7 +253,15 @@ export class CuttingOrderService extends BaseService {
         );
       }
 
-      const batch = await this.requireBatch(tx, input.batchId, line.orderId);
+      /* La misma puerta que la captura por tanda: a un corte que ya salió en
+         un vale no se le agregan piezas por aquí tampoco. Si no, la regla se
+         cumpliría en una pantalla y se saltaría en la otra sobre los mismos
+         datos. */
+      const batch = await this.requireEditableBatch(
+        tx,
+        input.batchId,
+        line.orderId,
+      );
 
       await tx.cuttingProgress.create({
         data: {
@@ -288,17 +296,27 @@ export class CuttingOrderService extends BaseService {
   }
 
   /**
-   * Captura una tanda completa: un corte y varias tallas de un jalón.
+   * Guarda una tanda completa: un corte y todos sus bultos de un jalón.
    *
    * Es el flujo real del piso —se tiende, salen 5 de la 32 y 5 de la 45, y se
    * anota todo junto—, y por eso va en UNA transacción: media captura guardada
    * porque se cayó el WiFi a la mitad deja la orden diciendo una mentira.
    *
+   * Sobre un corte que YA tenía capturas, REEMPLAZA lo suyo por lo que llega.
+   * Es lo que hace que el diálogo pueda abrirse con lo capturado dentro y
+   * editarse: quien corrige espera que el corte quede como lo dejó en pantalla
+   * —si borra un renglón, desaparece; si cambia 60 por 50, queda 50— y no que
+   * sus números se sumen a los viejos. El rastro de quién lo cambió y desde
+   * qué cifras vive en AuditLog, que ése sí no se toca nunca.
+   *
+   * Sólo se tocan las filas DE ESTE corte. Las de los demás cortes de la orden
+   * ni se leen: cada tendido es suyo.
+   *
    * El estado de la orden se sincroniza UNA vez al final y no por talla: es el
    * mismo cálculo sobre los mismos renglones, y repetirlo por cada una sólo
    * gastaría viajes a la base.
    */
-  async addBatchProgress(input: BatchProgressInput) {
+  async saveBatchProgress(input: BatchProgressInput) {
     return this.transaction(async (tx) => {
       const orderId = input.orderId;
 
@@ -338,8 +356,19 @@ export class CuttingOrderService extends BaseService {
          piezas que lo estrenan se confirman o se revierten juntos, y no queda
          un corte vacío si la captura falla. */
       const batch = input.batchId
-        ? await this.requireBatch(tx, input.batchId, orderId)
+        ? await this.requireEditableBatch(tx, input.batchId, orderId)
         : await this.createBatch(tx, orderId, input.newBatchLabel);
+
+      /* Los renglones que el corte tenía ANTES. Se guardan porque hay que
+         recalcularlos aunque ya no vengan en la captura: si alguien quitó de
+         este corte la talla 38, su acumulado tiene que bajar, y una talla que
+         ya no está en el formulario no aparece en `lineIds`. */
+      const previous = await tx.cuttingProgress.findMany({
+        where: { batchId: batch.id },
+        select: { lineId: true, quantity: true, bundles: true },
+      });
+
+      await tx.cuttingProgress.deleteMany({ where: { batchId: batch.id } });
 
       for (const entry of input.lines) {
         await tx.cuttingProgress.create({
@@ -358,12 +387,19 @@ export class CuttingOrderService extends BaseService {
          las capturas. Con dos bultos de la misma talla en la misma tanda,
          recalcular dentro del bucle leería el primero sin el segundo, y el
          tope de negativos se estaría evaluando contra un total a medias. */
-      for (const lineId of lineIds) {
-        /* El `!` es seguro por el conteo de arriba: si algún id no existiera
-           —o no fuera de esta orden— `findMany` habría devuelto menos
-           renglones y ya se habría lanzado el error. */
-        const line = byId.get(lineId)!;
-        await this.recalculateLine(tx, lineId, line.size.code);
+      const touched = [
+        ...new Set([...lineIds, ...previous.map((row) => row.lineId)]),
+      ];
+
+      for (const lineId of touched) {
+        /* Los que vienen en la captura ya están en `byId`; los que sólo
+           estaban antes —porque se quitaron de este corte— hay que ir por su
+           talla, que es lo único que se necesita para el mensaje de error. */
+        const known = byId.get(lineId);
+        const sizeCode =
+          known?.size.code ?? (await this.sizeCodeOf(tx, lineId));
+
+        await this.recalculateLine(tx, lineId, sizeCode);
       }
 
       // Cantidad × bultos: sumar la cantidad sin multiplicar dejaría el total
@@ -378,6 +414,17 @@ export class CuttingOrderService extends BaseService {
         entityId: orderId,
         action: "UPDATE",
         reference: `${order.code} · ${batch.number}º corte`,
+        /* El ANTES va aquí y en ninguna otra parte: al reemplazar el contenido
+           del corte, la bitácora de auditoría es lo único que queda de las
+           cifras viejas. Sin esto, corregir un corte borraría sin rastro lo
+           que alguien había capturado. */
+        oldValue: previous.length
+          ? {
+              renglones: previous.length,
+              bultos: sumBundles(previous),
+              piezas: sumBundlePieces(previous),
+            }
+          : undefined,
         newValue: {
           corte: batch.number,
           renglones: lineIds.length,
@@ -393,6 +440,10 @@ export class CuttingOrderService extends BaseService {
         pieces: total,
         bundles,
         sizes: lineIds.length,
+        /* Si se corrigió algo o si es captura nueva. La pantalla dice una cosa
+           u otra, y adivinarlo desde el cliente obligaría a repetir aquí la
+           regla de cuándo un corte estaba vacío. */
+        replaced: previous.length > 0,
       };
     });
   }
@@ -426,6 +477,45 @@ export class CuttingOrderService extends BaseService {
         createdById: this.context.userId,
       },
     });
+  }
+
+  /**
+   * El corte al que se puede capturar, si de verdad se le puede capturar.
+   *
+   * Bloquea el que ya salió en un vale VIVO —borrador o aplicado—. Ese papel
+   * lleva el desglose talla por talla y bulto por bulto de este corte, puede
+   * estar impreso y firmado por el taller, y cambiarle las cantidades por
+   * detrás dejaría el papel diciendo una cosa y el sistema otra sin que nadie
+   * se entere. Es la misma regla que ya impide volver a mandarlo: cancelar el
+   * vale es cómo se deshace.
+   */
+  private async requireEditableBatch(tx: Tx, batchId: string, orderId: string) {
+    const batch = await this.requireBatch(tx, batchId, orderId);
+
+    const live = await tx.inventoryDocument.findFirst({
+      where: { cuttingBatchId: batchId, status: { not: "CANCELLED" } },
+      select: { code: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (live) {
+      const state = live.status === "DRAFT" ? "en borrador" : "aplicada";
+      throw new BusinessRuleError(
+        `${cutBatchLabel(batch.number, batch.label)} ya salió en ${live.code} (${state}) y no se puede cambiar. Cancela esa salida si necesitas corregirlo.`,
+      );
+    }
+
+    return batch;
+  }
+
+  /** La talla de un renglón, para el mensaje de error de un recálculo. */
+  private async sizeCodeOf(tx: Tx, lineId: string): Promise<string> {
+    const line = await tx.cuttingOrderLine.findUnique({
+      where: { id: lineId },
+      select: { size: { select: { code: true } } },
+    });
+
+    return line?.size.code ?? "";
   }
 
   /** El corte, comprobando que de verdad sea de esta orden. */

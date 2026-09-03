@@ -296,6 +296,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       .filter((entry) => entry.batchId === batch.id)
       .map((entry) => ({
         id: entry.id,
+        lineId: entry.lineId,
         sizeCode: entry.sizeCode,
         quantity: entry.quantity,
         bundles: entry.bundles,
@@ -339,14 +340,33 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las
      piezas y cuánto lleva cada uno, para reconocerlo en el selector. */
-  const batchOptions: BatchOption[] = batchViews.map((batch) => ({
-    id: batch.id,
-    number: batch.number,
-    label: batch.label,
-    openedAt: batch.openedAt,
-    // Cantidad × bultos, igual que en la tarjeta del corte.
-    pieces: sumBundlePieces(batch.entries),
-  }));
+  const batchOptions: BatchOption[] = batchViews.map((batch) => {
+    // Un vale cancelado no cuenta: cancelar es cómo se deshace un envío
+    // equivocado, y después el corte vuelve a poder corregirse y mandarse.
+    const live = batch.issues.find((issue) => issue.status !== "CANCELLED");
+
+    return {
+      id: batch.id,
+      number: batch.number,
+      label: batch.label,
+      openedAt: batch.openedAt,
+      // Cantidad × bultos, igual que en la tarjeta del corte.
+      pieces: sumBundlePieces(batch.entries),
+      /* Los bultos capturados, para que el diálogo abra con ellos puestos y se
+         puedan corregir en vez de volver a teclearlos. En el orden en que se
+         capturaron, que es como se amarraron en la mesa. */
+      entries: [...batch.entries]
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .map((entry) => ({
+          lineId: entry.lineId,
+          quantity: entry.quantity,
+          bundles: entry.bundles,
+        })),
+      issue: live
+        ? { code: live.code, isDraft: live.status === "DRAFT" }
+        : null,
+    };
+  });
 
   /* Un renglón por RENGLÓN de la orden, no uno por talla: la orden puede
      llevar la misma talla dos veces con foleos distintos, y juntarlas mandaría

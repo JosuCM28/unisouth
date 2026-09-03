@@ -95,14 +95,14 @@ export async function openCuttingBatchAction(input: unknown) {
  * Es la acción principal del piso desde que existen los cortes; la de una sola
  * talla queda para correcciones.
  */
-export async function addBatchProgressAction(input: unknown) {
+export async function saveBatchProgressAction(input: unknown) {
   return executeAction(input, {
     schema: batchProgressSchema,
     permission: "inventory:write",
     revalidate: REVALIDATE,
     successMessage: "Corte capturado",
     handler: ({ input, auditContext }) =>
-      new CuttingOrderService(auditContext).addBatchProgress(input),
+      new CuttingOrderService(auditContext).saveBatchProgress(input),
   });
 }
 
