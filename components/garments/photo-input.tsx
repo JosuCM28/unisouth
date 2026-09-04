@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, ImageOff, Loader2, Trash2 } from "lucide-react";
+import { Camera, ImageOff, ImageUp, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { PhotoInput as Photo } from "@/lib/validations/garment.schema";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 /**
  * Lo que el formulario decide hacer con la foto.
@@ -43,6 +44,14 @@ interface Props {
  * Se convierte SIEMPRE a JPEG, incluso si llegó PNG: una foto de una prenda no
  * tiene transparencia que perder, y el PNG de una cámara pesa varias veces más
  * sin verse mejor.
+ *
+ * Hay DOS caminos y dos `<input>` separados, no uno solo. El de la cámara lleva
+ * `capture="environment"`, que en el celular le ordena al navegador abrir la
+ * cámara SALTÁNDOSE el selector de archivos: perfecto para fotografiar la
+ * prenda que se tiene enfrente, e inútil cuando la foto ya está en la galería o
+ * llegó por WhatsApp. Son dos elementos y no un atributo que se prende y apaga
+ * porque cambiar `capture` sobre el mismo input no es fiable en los navegadores
+ * de Android: varios siguen abriendo la cámara con el atributo ya quitado.
  */
 export function PhotoInput({
   label,
@@ -51,8 +60,10 @@ export function PhotoInput({
   currentPhotoId,
   hint,
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
   const [isReading, setIsReading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const preview = previewOf(value, currentPhotoId);
 
@@ -60,7 +71,7 @@ export function PhotoInput({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Eso no es una imagen. Elige una foto.");
+      toast.error("Eso no es una imagen. Elige un archivo JPG, PNG o WebP.");
       return;
     }
 
@@ -73,11 +84,21 @@ export function PhotoInput({
       toast.error("No se pudo leer la foto. Intenta con otra.");
     } finally {
       setIsReading(false);
-      /* Se limpia el input para que elegir DOS VECES el mismo archivo vuelva a
-         disparar el evento: sin esto, quitar la foto y volver a elegir la misma
-         no hace nada y parece que la app se trabó. */
-      if (inputRef.current) inputRef.current.value = "";
+      /* Se limpian los inputs para que elegir DOS VECES el mismo archivo vuelva
+         a disparar el evento: sin esto, quitar la foto y volver a elegir la
+         misma no hace nada y parece que la app se trabó. */
+      if (cameraRef.current) cameraRef.current.value = "";
+      if (libraryRef.current) libraryRef.current.value = "";
     }
+  }
+
+  /* Arrastrar y soltar es para el escritorio, donde la foto llega de una
+     carpeta o de un correo y abrir el explorador es un paso de más. En el
+     celular estos eventos no se disparan, así que no estorban. */
+  function handleDrop(event: React.DragEvent) {
+    event.preventDefault();
+    setIsDragging(false);
+    void handleFile(event.dataTransfer.files?.[0]);
   }
 
   return (
@@ -85,7 +106,18 @@ export function PhotoInput({
       <Label>{label}</Label>
 
       <div className="flat-surface flex items-center gap-3 p-2">
-        <div className="flex size-20 shrink-0 items-center justify-center border border-border bg-muted">
+        <div
+          className={cn(
+            "flex size-20 shrink-0 items-center justify-center border bg-muted transition-colors",
+            isDragging ? "border-primary bg-primary/10" : "border-border",
+          )}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+        >
           {preview ? (
             /* `<img>` y no `next/image`: la foto ya viene reducida desde el
                celular y la ruta que la sirve exige sesión, así que el
@@ -104,7 +136,7 @@ export function PhotoInput({
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <input
-            ref={inputRef}
+            ref={cameraRef}
             type="file"
             accept="image/*"
             /* Abre la cámara trasera en el celular en vez del carrete: la foto
@@ -114,20 +146,43 @@ export function PhotoInput({
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
 
-          <Button
-            type="button"
-            variant="outline"
-            className="touch-target w-full"
-            disabled={isReading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {isReading ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Camera className="size-4" aria-hidden />
-            )}
-            {buttonLabel(isReading, Boolean(preview))}
-          </Button>
+          <input
+            ref={libraryRef}
+            type="file"
+            /* SIN `capture`: éste es el que abre la galería del celular o el
+               explorador de la computadora, para las fotos que ya existen. */
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="touch-target w-full"
+              disabled={isReading}
+              onClick={() => cameraRef.current?.click()}
+            >
+              {isReading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Camera className="size-4" aria-hidden />
+              )}
+              {cameraLabel(isReading, Boolean(preview))}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="touch-target w-full"
+              disabled={isReading}
+              onClick={() => libraryRef.current?.click()}
+            >
+              <ImageUp className="size-4" aria-hidden />
+              Elegir archivo
+            </Button>
+          </div>
 
           {preview && (
             <Button
@@ -148,11 +203,11 @@ export function PhotoInput({
   );
 }
 
-/** Qué dice el botón según en qué está el campo. */
-function buttonLabel(isReading: boolean, hasPhoto: boolean): string {
+/** Qué dice el botón de la cámara según en qué está el campo. */
+function cameraLabel(isReading: boolean, hasPhoto: boolean): string {
   if (isReading) return "Preparando…";
 
-  return hasPhoto ? "Cambiar foto" : "Tomar foto";
+  return hasPhoto ? "Cambiar" : "Tomar foto";
 }
 
 /**
