@@ -183,7 +183,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
        envío a taller no salen aquí a propósito: ya se pintan en "En talleres"
        y aparecerían dos veces. */
     prisma.inventoryDocument.findMany({
-      where: { cuttingOrderId: id },
+      where: {
+        OR: [
+          { cuttingOrderId: id },
+          /* Y los vales que llegaron por su envío a taller: ésos no traen la
+             liga a la orden —el envío ya la tiene por su lado— y por eso
+             faltaban en este bloque. Se cruzan por el envío, que es la llave
+             que de verdad existe. */
+          { shipments: { some: { orderId: id } } },
+        ],
+      },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
@@ -193,7 +202,17 @@ export default async function OrderDetailPage({ params }: PageProps) {
         cuttingBatchId: true,
         receivedBy: true,
         _count: { select: { cutLines: true } },
-        cutLines: { select: { quantity: true } },
+        // `bundles` junto a la cantidad: el renglón guarda lo que lleva CADA
+        // bulto, y sumar sólo la cantidad enseñaba una fracción de lo que salió.
+        cutLines: { select: { quantity: true, bundles: true } },
+        shipments: {
+          take: 1,
+          select: {
+            code: true,
+            workshop: { select: { name: true } },
+            stage: { select: { name: true } },
+          },
+        },
       },
     }),
   ]);
@@ -327,21 +346,40 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* Las salidas que siguen en pie. Es el indicador que contesta "¿esta orden
      ya salió?": una cancelada no cuenta porque cancelar es justo cómo se
-     deshace un envío equivocado. */
-  const liveIssues = issues.filter((issue) => issue.status !== "CANCELLED");
+     deshace un envío equivocado.
 
-  const issueViews: IssueView[] = issues.map((issue) => ({
-    id: issue.id,
-    code: issue.code,
-    status: issue.status,
-    date: issue.date,
-    receivedBy: issue.receivedBy,
-    // El corte del que salió, por su nombre de piso ("1er corte"). Sin corte
-    // el vale cubre la orden completa, que también hay que poder distinguir.
-    batchLabel: batchLabelOf(order.batches, issue.cuttingBatchId),
-    pieces: issue.cutLines.reduce((sum, line) => sum + line.quantity, 0),
-    sizes: issue._count.cutLines,
-  }));
+     Los vales de envío a taller se excluyen de la CUENTA aunque sí se listen
+     abajo: la pregunta es "¿ya entregué esta orden?", y mandar unos paneles a
+     bordar no la contesta que sí. Si contaran, el aviso de "esta orden ya
+     tiene salidas vivas" saltaría cada vez que algo sale a maquila. */
+  const liveIssues = issues.filter(
+    (issue) => issue.status !== "CANCELLED" && issue.shipments.length === 0,
+  );
+
+  const issueViews: IssueView[] = issues.map((issue) => {
+    const shipment = issue.shipments[0];
+
+    return {
+      id: issue.id,
+      code: issue.code,
+      status: issue.status,
+      date: issue.date,
+      receivedBy: issue.receivedBy,
+      // El corte del que salió, por su nombre de piso ("1er corte"). Sin corte
+      // el vale cubre la orden completa, que también hay que poder distinguir.
+      batchLabel: batchLabelOf(order.batches, issue.cuttingBatchId),
+      // Cantidad × bultos: "64 en 2 bultos" son 128 prendas, no 64.
+      pieces: sumBundlePieces(issue.cutLines),
+      sizes: issue._count.cutLines,
+      shipment: shipment
+        ? {
+            code: shipment.code,
+            workshopName: shipment.workshop.name,
+            stageName: shipment.stage.name,
+          }
+        : null,
+    };
+  });
 
   /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las
      piezas y cuánto lleva cada uno, para reconocerlo en el selector. */
@@ -553,6 +591,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <section className="flat-surface p-4">
           <h2 className="mb-3 text-sm font-semibold">
             Salidas de esta orden
+            {/* La cuenta es de las salidas de la orden, no de los envíos a
+                taller: por eso puede decir "1 sin cancelar" con tres vales
+                listados abajo. */}
             {liveIssues.length > 0 && (
               <span className="ml-2 rounded bg-state-available px-1.5 py-0.5 text-xs font-medium text-state-available-foreground">
                 {liveIssues.length === 1
