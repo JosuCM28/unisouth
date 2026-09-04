@@ -39,12 +39,61 @@ export interface ShippableSize {
   sentByStage: Record<string, number>;
 }
 
+/** Un bulto ya capturado que se copia al abrir el diálogo. */
+export interface ShipmentPrefillRow {
+  sizeId: string;
+  /** Piezas POR BULTO, igual que en la captura del corte. */
+  quantity: number;
+  bundles: number;
+}
+
+/** El corte del que se copian los bultos. */
+export interface ShipmentBatchPrefill {
+  /** Cómo se llama en pantalla: "Corte 1", "Corte 2 · muestra". */
+  label: string;
+  rows: ShipmentPrefillRow[];
+  /** Lo que el corte tiene NETO, correcciones incluidas. Para poder avisar. */
+  netPieces: number;
+}
+
 interface Props {
   orderId: string;
   orderCode: string;
   sizes: ShippableSize[];
   workshops: { id: string; name: string }[];
   stages: { id: string; name: string }[];
+  /**
+   * Los bultos de un corte, precargados.
+   *
+   * Es el atajo que pidió el piso: lo que se manda al taller son casi siempre
+   * LOS MISMOS bultos que salieron del tendido, y volver a teclear diez
+   * renglones que ya están capturados es trabajo doble y la vía más corta a un
+   * error de dedo. Se copian tal cual —talla, piezas por bulto y número de
+   * bultos— y desde ahí se corrigen o se agregan más.
+   *
+   * Sin esto viaja un renglón vacío, que es el alta desde cero de siempre.
+   */
+  batch?: ShipmentBatchPrefill;
+  /** Para meter el botón dentro de la tarjeta de un corte. */
+  trigger?: React.ReactNode;
+}
+
+/**
+ * Los renglones con los que abre el diálogo.
+ *
+ * Un corte sin bultos copiables cae en el renglón vacío en vez de dejar la
+ * lista en blanco: el bloque sin tarjetas obliga a buscar el botón "Agregar
+ * talla" antes de poder teclear nada.
+ */
+function initialRows(batch?: ShipmentBatchPrefill): SizeBundleRow[] {
+  if (!batch || batch.rows.length === 0) return [emptyRow()];
+
+  return batch.rows.map((row) => ({
+    key: crypto.randomUUID(),
+    value: row.sizeId,
+    quantity: String(row.quantity),
+    bundles: String(row.bundles),
+  }));
 }
 
 /**
@@ -70,6 +119,8 @@ export function OrderShipmentDialog({
   sizes,
   workshops,
   stages,
+  batch,
+  trigger,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -78,8 +129,13 @@ export function OrderShipmentDialog({
   const [sentAt, setSentAt] = useState(todayInputValue());
   const [parts, setParts] = useState("");
   const [reference, setReference] = useState("");
-  const [rows, setRows] = useState<SizeBundleRow[]>([emptyRow()]);
+  const [rows, setRows] = useState<SizeBundleRow[]>(() => initialRows(batch));
   const [isSaving, setIsSaving] = useState(false);
+
+  /* Lo que de verdad se copió, para poder compararlo con el neto del corte.
+     No se asume igual: un corte con una corrección en negativo vale menos que
+     la suma de sus bultos positivos, y callarlo mandaría de más al taller. */
+  const copied = batch ? sumBundlePieces(batch.rows) : 0;
 
   const captured = usableRows(rows).filter((row) => row.quantity > 0);
   const total = sumBundlePieces(captured);
@@ -106,8 +162,11 @@ export function OrderShipmentDialog({
     return bits.join(" · ");
   }
 
+  /* Vuelve a los bultos del corte, no a la nada: el diálogo de un corte existe
+     para ofrecerlos, y dejarlo vacío después de guardar lo convertiría en el
+     alta desde cero de la que se quería salir. */
   function reset() {
-    setRows([emptyRow()]);
+    setRows(initialRows(batch));
     setReference("");
     setParts("");
   }
@@ -156,13 +215,15 @@ export function OrderShipmentDialog({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={setOpen}
-      title={`Mandar a taller · ${orderCode}`}
+      title={`Mandar a taller · ${batch ? batch.label : orderCode}`}
       description="Prendas ya cortadas que salen a un proceso. No mueve tela."
       trigger={
-        <Button variant="outline" className="touch-target">
-          <Send className="size-4" aria-hidden />
-          Mandar a taller
-        </Button>
+        trigger ?? (
+          <Button variant="outline" className="touch-target">
+            <Send className="size-4" aria-hidden />
+            Mandar a taller
+          </Button>
+        )
       }
     >
       {sizes.length === 0 ? (
@@ -233,6 +294,27 @@ export function OrderShipmentDialog({
               />
             </div>
           </div>
+
+          {/* Qué se copió y de dónde. Se dice en pantalla porque los renglones
+              aparecen llenos sin que nadie los haya tecleado, y sin esta línea
+              parecen capturados por otra persona. */}
+          {batch && batch.rows.length > 0 && (
+            <p className="border border-border bg-muted p-2 text-xs">
+              Se copiaron los {batch.rows.length}{" "}
+              {batch.rows.length === 1 ? "bulto" : "bultos"} del {batch.label}.
+              Cambia lo que no vaya y agrega lo que falte.
+              {copied !== batch.netPieces && (
+                <>
+                  {" "}
+                  <span className="font-medium">
+                    Ojo: el corte quedó en {batch.netPieces}{" "}
+                    {batch.netPieces === 1 ? "pieza" : "piezas"} por
+                    correcciones capturadas después, y aquí van {copied}.
+                  </span>
+                </>
+              )}
+            </p>
+          )}
 
           {/* Se ofrecen TODAS las tallas de la orden, incluso las que aún no
               tienen corte capturado: el conteo del corte no siempre está al

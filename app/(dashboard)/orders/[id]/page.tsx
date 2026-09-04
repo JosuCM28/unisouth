@@ -280,7 +280,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
      desde las tallas porque la bitácora cuelga del renglón, no del corte. */
   const history = order.lines
     .flatMap((line) =>
-      line.progress.map((entry) => ({ ...entry, sizeCode: line.size.code })),
+      line.progress.map((entry) => ({
+        ...entry,
+        sizeId: line.sizeId,
+        sizeCode: line.size.code,
+      })),
     )
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -297,6 +301,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       .map((entry) => ({
         id: entry.id,
         lineId: entry.lineId,
+        sizeId: entry.sizeId,
         sizeCode: entry.sizeCode,
         quantity: entry.quantity,
         bundles: entry.bundles,
@@ -777,11 +782,18 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <h2 className="mb-3 text-sm font-semibold">
           Cortes ({batchViews.length})
         </h2>
+        {/* Los catálogos y las tallas viajan hasta aquí porque cada corte
+            ofrece mandarse a taller con sus propios bultos ya cargados: el
+            diálogo es el mismo del encabezado, sólo que abierto con el
+            tendido puesto. */}
         <OrderBatches
           batches={batchViews}
           orderId={order.id}
           orderCode={order.code}
           canSend={!isCancelled}
+          shippableSizes={shippableSizes}
+          workshops={workshops}
+          stages={stages}
         />
       </section>
     </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Truck } from "lucide-react";
+import { Send, Truck } from "lucide-react";
 import type { DocumentStatus } from "@prisma/client";
 import {
   cutBatchLabel,
@@ -11,12 +11,19 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
+import {
+  OrderShipmentDialog,
+  type ShipmentPrefillRow,
+  type ShippableSize,
+} from "./order-shipment-dialog";
 
 /** Un bulto (o varios de la misma cuenta) que una talla aportó a un corte. */
 export interface BatchEntryView {
   id: string;
   /** El renglón de la orden del que salió. Lo usa el diálogo al corregir. */
   lineId: string;
+  /** La talla, por id: es lo que el envío a taller guarda de cada renglón. */
+  sizeId: string;
   sizeCode: string;
   /** Piezas POR BULTO: lo que vale la captura es `quantity * bundles`. */
   quantity: number;
@@ -68,12 +75,20 @@ export function OrderBatches({
   orderId,
   orderCode,
   canSend = false,
+  shippableSizes = [],
+  workshops = [],
+  stages = [],
 }: {
   batches: BatchView[];
   orderId: string;
   orderCode: string;
   /** Si se ofrece mandar cortes a salidas. Falso en una orden cancelada. */
   canSend?: boolean;
+  /* Lo que necesita el diálogo de taller para poder abrirse desde el corte:
+     las tallas de la orden con lo ya mandado a cada etapa, y los catálogos. */
+  shippableSizes?: ShippableSize[];
+  workshops?: { id: string; name: string }[];
+  stages?: { id: string; name: string }[];
 }) {
   if (batches.length === 0) {
     return (
@@ -96,6 +111,27 @@ export function OrderBatches({
         const sizes = groupBySize(batch.entries).filter(
           (row) => row.quantity > 0,
         );
+
+        /* Los bultos que se copiarían a un envío a taller: uno por captura,
+           tal como se tecleó en la mesa. Sin agrupar por talla a propósito —de
+           la 43 salieron un bulto de 30 y otro de 20, y así es como el taller
+           los cuenta al recibirlos—.
+
+           Sólo los positivos: una corrección en negativo es un ajuste del
+           conteo, no un bulto que alguien pueda subir al camión. Cuando las
+           hay, el diálogo avisa que el neto del corte no cuadra con lo
+           copiado. */
+        const shipmentRows: ShipmentPrefillRow[] = batch.entries
+          .filter((entry) => entry.quantity > 0)
+          .map((entry) => ({
+            sizeId: entry.sizeId,
+            quantity: entry.quantity,
+            bundles: entry.bundles,
+          }));
+
+        const canShip =
+          canSend && shipmentRows.length > 0 && shippableSizes.length > 0;
+        const canSendToIssue = canSend && !live && sizes.length > 0;
 
         return (
           <li key={batch.id} className="flat-surface flex flex-col gap-2 p-3">
@@ -216,35 +252,68 @@ export function OrderBatches({
               </details>
             )}
 
-            {/* Mandar ESTE corte, no la orden entera.
+            {/* Las dos formas de sacar ESTE corte, no la orden entera.
 
                 El taller entrega por tendidos: corta el primero, lo entrega, y
-                sigue con el segundo. Sin este botón había que mandar todo lo
+                sigue con el segundo. Sin estos botones había que mandar todo lo
                 cortado hasta la fecha, y el segundo vale volvía a incluir lo
-                que ya se había llevado el primero.
+                que ya se había llevado el primero. */}
+            {(canShip || canSendToIssue) && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                {/* A taller, con los bultos de este corte ya cargados.
 
-                Con una salida viva no se ofrece: mandarlo otra vez entregaría
-                dos veces las mismas prendas. El chip de arriba dice cuál es el
-                vale, y cancelarlo vuelve a habilitar el botón. */}
-            {canSend && !live && sizes.length > 0 && (
-              <OrderSendToIssueDialog
-                orderId={orderId}
-                orderCode={orderCode}
-                sizes={sizes}
-                batch={{
-                  id: batch.id,
-                  label: cutBatchLabel(batch.number, batch.label),
-                }}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="touch-target w-full sm:w-auto"
-                  >
-                    <Truck className="size-4" aria-hidden />
-                    Mandar a salida
-                  </Button>
-                }
-              />
+                    A diferencia de la salida, aquí NO se bloquea por haber
+                    mandado antes: los mismos paneles van a serigrafiado y
+                    después a armado, y son dos envíos legítimos del mismo
+                    corte. Lo que sale son partes de la prenda, no la prenda. */}
+                {canShip && (
+                  <OrderShipmentDialog
+                    orderId={orderId}
+                    orderCode={orderCode}
+                    sizes={shippableSizes}
+                    workshops={workshops}
+                    stages={stages}
+                    batch={{
+                      label: cutBatchLabel(batch.number, batch.label),
+                      rows: shipmentRows,
+                      netPieces: total,
+                    }}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        className="touch-target w-full sm:w-auto"
+                      >
+                        <Send className="size-4" aria-hidden />
+                        Mandar a taller
+                      </Button>
+                    }
+                  />
+                )}
+
+                {/* Con una salida viva no se ofrece: mandarlo otra vez
+                    entregaría dos veces las mismas prendas. El chip de arriba
+                    dice cuál es el vale, y cancelarlo vuelve a habilitarlo. */}
+                {canSendToIssue && (
+                  <OrderSendToIssueDialog
+                    orderId={orderId}
+                    orderCode={orderCode}
+                    sizes={sizes}
+                    batch={{
+                      id: batch.id,
+                      label: cutBatchLabel(batch.number, batch.label),
+                    }}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        className="touch-target w-full sm:w-auto"
+                      >
+                        <Truck className="size-4" aria-hidden />
+                        Mandar a salida
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
             )}
           </li>
         );
