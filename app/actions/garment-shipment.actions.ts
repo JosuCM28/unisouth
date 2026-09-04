@@ -16,8 +16,13 @@ import { GarmentShipmentService } from "@/lib/services/garment-shipment.service"
 
 /* La ficha de la orden es donde se ve el tablero, así que se revalida por id
    además de las listas: mandar un envío cambia justo la pantalla de la que se
-   disparó. */
-const REVALIDATE = ["/orders", "/dashboard"];
+   disparó.
+
+   `/issues` y `/documents` entran porque un envío LEVANTA SU VALE, y ese vale
+   vive en esas dos listas. Sin ellas, mandar al taller y entrar al registro de
+   salidas enseñaba la lista de antes: el vale existía en la base pero no se
+   veía, y parecía que el envío no había dejado rastro. */
+const REVALIDATE = ["/orders", "/dashboard", "/issues", "/documents"];
 
 export async function createGarmentShipmentAction(input: unknown) {
   return executeAction(input, {
@@ -45,14 +50,14 @@ export async function addGarmentReturnAction(input: unknown) {
 /**
  * Borra un envío capturado por error.
  *
- * Revalida también /documents e /issues: su vale se cancela con él y tiene que
- * dejar de verse vivo en el registro sin que nadie recargue a mano.
+ * Su vale se cancela con él y tiene que dejar de verse vivo en el registro sin
+ * que nadie recargue a mano; de eso ya se encarga `REVALIDATE`.
  */
 export async function removeGarmentShipmentAction(input: unknown) {
   return executeAction(input, {
     schema: removeGarmentShipmentSchema,
     permission: "inventory:write",
-    revalidate: [...REVALIDATE, "/documents", "/issues"],
+    revalidate: REVALIDATE,
     successMessage: "Envío eliminado",
     handler: ({ input, auditContext }) =>
       new GarmentShipmentService(auditContext).remove(input.id),

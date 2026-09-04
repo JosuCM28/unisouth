@@ -30,6 +30,7 @@ interface PageProps {
   searchParams: Promise<{
     q?: string;
     status?: string;
+    origin?: string;
     page?: string;
     all?: string;
   }>;
@@ -54,7 +55,9 @@ export default async function IssuesPage({ searchParams }: PageProps) {
   // cliente, tela y los rollos y tallas que llevó; el chip acota por estado.
   const filters = parseIssueFilters(params);
   const where = issueWhere(filters);
-  const isFiltered = Boolean(filters.search || filters.status);
+  const isFiltered = Boolean(
+    filters.search || filters.status || filters.fromWorkshop,
+  );
 
   const [total, issues] = await Promise.all([
     prisma.inventoryDocument.count({ where }),
@@ -71,6 +74,19 @@ export default async function IssuesPage({ searchParams }: PageProps) {
       include: {
         client: { select: { name: true } },
         cutFabric: { select: { name: true } },
+        /* El envío a taller que levantó este vale, si nació de uno.
+
+           `take: 1` porque en la práctica es uno solo: cada envío genera SU
+           vale. La relación es de varios porque el esquema no puede impedir lo
+           contrario, no porque se espere. */
+        shipments: {
+          take: 1,
+          select: {
+            code: true,
+            workshop: { select: { name: true } },
+            stage: { select: { name: true } },
+          },
+        },
       },
     }),
   ]);
@@ -133,6 +149,7 @@ export default async function IssuesPage({ searchParams }: PageProps) {
                   receivedBy: issue.receivedBy,
                   cutFabricName: issue.cutFabric?.name ?? null,
                   cutDescription: issue.cutDescription,
+                  shipment: toShipmentBadge(issue.shipments[0]),
                   summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,
                 }}
               />
@@ -151,6 +168,21 @@ export default async function IssuesPage({ searchParams }: PageProps) {
       />
     </div>
   );
+}
+
+/** Lo que la tarjeta necesita del envío para delatarse como salida a taller. */
+function toShipmentBadge(
+  shipment:
+    | { code: string; workshop: { name: string }; stage: { name: string } }
+    | undefined,
+) {
+  if (!shipment) return null;
+
+  return {
+    code: shipment.code,
+    workshopName: shipment.workshop.name,
+    stageName: shipment.stage.name,
+  };
 }
 
 /** Entero positivo o nada. Cualquier basura en la URL se ignora. */

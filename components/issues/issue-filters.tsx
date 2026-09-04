@@ -1,35 +1,41 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, Send, X } from "lucide-react";
 import type { DocumentStatus } from "@prisma/client";
 import { DOCUMENT_STATUS_LABELS } from "@/lib/constants/labels";
+import { WORKSHOP_ORIGIN } from "@/lib/repositories/issue-filters";
 import { cn } from "@/lib/utils";
 
 /** Los tres estados, en el orden en que ocurren en la vida del vale. */
 const STATUS_ORDER: DocumentStatus[] = ["DRAFT", "APPLIED", "CANCELLED"];
 
 /**
- * Chips de estado de las salidas.
+ * Chips de estado y de origen de las salidas.
  *
  * Van como chips siempre visibles y no en un `<select>`: "¿cuáles quedaron en
  * borrador?" es la pregunta con la que se depura la captura del día, y un
  * select la esconde detrás de dos toques.
  *
- * El estado vive en la URL para que la lista siga siendo Server Component y el
- * resultado se pueda compartir y sobreviva a un refresh —clave con el WiFi de
- * la bodega—. `replace` y no `push`: filtrar no debería llenar el historial.
+ * "A taller" se suma a los tres estados porque responde la otra pregunta
+ * frecuente —"¿qué anda en maquila?"— y hasta ahora no había forma de hacerla:
+ * esos vales llevan folio OUT igual que todos los demás.
+ *
+ * Los filtros viven en la URL para que la lista siga siendo Server Component y
+ * el resultado se pueda compartir y sobreviva a un refresh —clave con el WiFi
+ * de la bodega—. `replace` y no `push`: filtrar no debería llenar el historial.
  */
 export function IssueFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = searchParams.get("status");
+  const fromWorkshop = searchParams.get("origin") === WORKSHOP_ORIGIN;
 
-  function setStatus(value: string | null) {
+  function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set("status", value);
-    else params.delete("status");
+    if (value) params.set(key, value);
+    else params.delete(key);
     // Al cambiar el filtro se vuelve a la primera página: si no, queda en la 4
     // de un resultado que ahora tiene una sola.
     params.delete("page");
@@ -48,9 +54,20 @@ export function IssueFilters() {
           key={status}
           label={DOCUMENT_STATUS_LABELS[status]}
           active={active === status}
-          onClick={() => setStatus(active === status ? null : status)}
+          onClick={() =>
+            setParam("status", active === status ? null : status)
+          }
         />
       ))}
+
+      <Chip
+        label="A taller"
+        icon={Send}
+        active={fromWorkshop}
+        onClick={() =>
+          setParam("origin", fromWorkshop ? null : WORKSHOP_ORIGIN)
+        }
+      />
 
       {hasFilters && (
         <Chip label="Limpiar" icon={X} onClick={() => router.replace(pathname)} />

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, HandHelping, Scissors, User } from "lucide-react";
+import { CalendarDays, HandHelping, Scissors, Send, User } from "lucide-react";
 import type { DocumentStatus, Unit } from "@prisma/client";
 import {
   DOCUMENT_STATUS_LABELS,
@@ -28,6 +28,19 @@ export interface IssueRow {
   /** Tela del desglose de corte: identifica el vale cuando no lleva rollos. */
   cutFabricName: string | null;
   cutDescription: string | null;
+  /**
+   * El envío a taller que levantó este vale, cuando nació de uno.
+   *
+   * Sin esto los vales de maquila eran indistinguibles del resto: mismo folio
+   * OUT, y lo único que los delataba era el nombre de quien recibió, que
+   * también puede ser una persona de la casa. Quien busca "¿qué anda en el
+   * taller?" tenía que abrirlos uno por uno.
+   */
+  shipment: {
+    code: string;
+    workshopName: string;
+    stageName: string;
+  } | null;
   summary: IssueSummary;
 }
 
@@ -65,6 +78,16 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
             >
               {DOCUMENT_STATUS_LABELS[issue.status]}
             </span>
+
+            {/* Va arriba, junto al folio, y no abajo con los demás chips: es
+                lo que contesta "¿esta salida de qué es?" antes de leer nada
+                más, y en una lista de cincuenta se recorre con la vista por
+                esa columna. */}
+            {issue.shipment && (
+              <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+                <Send className="size-3 shrink-0" aria-hidden />A taller
+              </span>
+            )}
           </div>
 
           {/* La tela de los rollos; si el vale es sólo de cortes, la del
@@ -126,6 +149,26 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        {/* Etapa y taller juntos —"SERIGRAFIADO · ING.OMAR"— porque así se
+            nombra el envío en el piso y así va impreso en el vale. El folio
+            del envío al lado, que es por donde se cruza con la ficha de la
+            orden.
+
+            No se liga a la orden aunque se sepa cuál es: la tarjeta entera ya
+            es un enlace al vale, y un `<a>` dentro de otro es HTML inválido
+            —el navegador rompe la tarjeta—. Para llegar a la orden está su
+            folio en "Ref.". */}
+        {issue.shipment && (
+          <>
+            <Chip
+              icon={Send}
+              label={`${issue.shipment.stageName} · ${issue.shipment.workshopName}`}
+            />
+            <span className="tabular flex max-w-full items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+              <span className="truncate">{issue.shipment.code}</span>
+            </span>
+          </>
+        )}
         {issue.clientName && <Chip icon={User} label={issue.clientName} />}
         {issue.reference && (
           <span className="tabular flex max-w-full items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
