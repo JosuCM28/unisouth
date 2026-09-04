@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { FolderArchiveButton } from "@/components/orders/folder-archive-button";
 import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
-import { OrderListItem } from "@/components/orders/order-list-item";
+import { OrderTable } from "@/components/orders/order-table";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -162,13 +162,21 @@ export default async function OrderFolderPage({ params }: PageProps) {
           />
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {folder.orders.map((order) => (
-            <li key={order.id}>
-              <OrderListItem order={order} />
-            </li>
-          ))}
-        </ul>
+        /* En tabla desde `md:`, igual que la lista general: aquí se comparan
+           las órdenes del pedido entre sí —cuál va más atrasada, cuál vence
+           antes— y para comparar hacen falta columnas alineadas.
+
+           Sin `server`: las órdenes del pedido llegan TODAS en la consulta de
+           arriba, así que la página la reparte el navegador. Pedirle a
+           Postgres que recorte una docena de filas sería un viaje de más.
+
+           Sin columna de pedido: todas son de éste. */
+        <OrderTable
+          orders={folder.orders.map((order) => ({
+            ...order,
+            folderName: null,
+          }))}
+        />
       )}
     </div>
   );

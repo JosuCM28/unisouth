@@ -138,7 +138,13 @@ export function DataTable<TData>({
   getRowId,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 1 });
+  /* Arranca con el tamaño que pidió la pantalla, no con uno fijo.
+
+     Estaba puesto en 1, y como el estado es lo que TanStack obedece —la prop
+     sólo decidía si paginar o no—, las listas que reparten en el navegador
+     salían de una fila por página. Se veía como si la lista estuviera casi
+     vacía y el resto se alcanzaba picando "Siguiente" una vez por registro. */
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
 
   /**
    * ¿Reparte esta tabla las filas en el navegador?

@@ -6,12 +6,11 @@ import { requirePermission } from "@/lib/core/session";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Pager } from "@/components/shared/pager";
 import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import { FolderCard } from "@/components/orders/folder-card";
 import { OrderFilters } from "@/components/orders/order-filters";
-import { OrderListItem } from "@/components/orders/order-list-item";
+import { OrderTable } from "@/components/orders/order-table";
 import {
   cuttingOrderWhere,
   LOOSE_ORDERS,
@@ -21,6 +20,9 @@ import {
 export const metadata: Metadata = { title: "Órdenes" };
 
 const PAGE_SIZE = 50;
+
+/** Los tamaños que ofrece el selector de la tabla. Cualquier otro se ignora. */
+const PAGE_SIZES = [10, 25, 50, 100];
 
 /**
  * Cuántos pedidos se asoman en esta pantalla.
@@ -43,6 +45,7 @@ interface PageProps {
     to?: string;
     folder?: string;
     archived?: string;
+    filas?: string;
   }>;
 }
 
@@ -59,8 +62,13 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
   const accumulate = params.all === "1";
-  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
-  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
+  const skip = accumulate ? 0 : (page - 1) * pageSize;
+  const take = accumulate ? Math.min(page * pageSize, 300) : pageSize;
 
   const filters = parseCuttingOrderFilters(params);
   const showArchived = params.archived === "1";
@@ -120,7 +128,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
     new OrderFolderRepository().countWithTotals(folderFilters),
   ]);
 
-  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(total / pageSize) || 1;
   const hasFilters = isSearching || Boolean(filters.folderId);
   const isEmpty = orders.length === 0 && folders.length === 0;
 
@@ -209,30 +217,23 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                 {isSearching ? "Órdenes" : "Órdenes sueltas"}
               </h2>
             )}
-            <ul className="flex flex-col gap-2">
-              {orders.map((order) => (
-                <li key={order.id}>
-                  <OrderListItem
-                    order={order}
-                    // El pedido sólo se etiqueta al buscar, que es cuando
-                    // aparecen mezcladas órdenes de dentro y de fuera.
-                    folderName={isSearching ? order.folder?.name : null}
-                  />
-                </li>
-              ))}
-            </ul>
+            {/* Tabla desde `md:` y tarjetas en celular: lo resuelve la tabla,
+                no esta página. El paginador viaja dentro, por eso ya no hay
+                `Pager` aquí abajo. */}
+            <OrderTable
+              orders={orders.map((order) => ({
+                ...order,
+                folderName: order.folder?.name ?? null,
+              }))}
+              server={{ page, totalPages, total, pageSize }}
+              // El pedido sólo se etiqueta al buscar, que es cuando aparecen
+              // mezcladas órdenes de dentro y de fuera de una carpeta.
+              showFolder={isSearching}
+              isFiltered={hasFilters}
+            />
           </section>
         )
       )}
-
-      <Pager
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        itemLabel={{ one: "orden", many: "órdenes" }}
-        basePath="/orders"
-        params={params}
-      />
     </div>
   );
 }
