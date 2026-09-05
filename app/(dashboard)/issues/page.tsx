@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PackageMinus, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getIssueSummaries } from "@/lib/issue-summary";
 import { parseIssueFilters, issueWhere } from "@/lib/repositories/issue-filters";
 import { PageHeader } from "@/components/layout/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Pager } from "@/components/shared/pager";
 import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
-import { IssueCard } from "@/components/issues/issue-card";
 import { IssueFilters } from "@/components/issues/issue-filters";
+import {
+  IssueTable,
+  type IssueTableRow,
+} from "@/components/issues/issue-table";
 import { requirePermission } from "@/lib/core/session";
 
 export const metadata: Metadata = { title: "Salidas" };
 
 const PAGE_SIZE = 50;
+
+/** Los tamaños que ofrece el selector de la tabla. Cualquier otro se ignora. */
+const PAGE_SIZES = [10, 25, 50, 100];
 
 /** Un vale sin renglones ni cortes: la tarjeta lo avisa en vez de reventar. */
 const EMPTY_SUMMARY = {
@@ -33,6 +37,7 @@ interface PageProps {
     origin?: string;
     page?: string;
     all?: string;
+    filas?: string;
   }>;
 }
 
@@ -48,8 +53,13 @@ export default async function IssuesPage({ searchParams }: PageProps) {
      esta página, porque cada toque es una navegación y lo ya mostrado no
      sobrevive en estado del cliente. Se topa para no bajar la tabla entera. */
   const accumulate = params.all === "1";
-  const skip = accumulate ? 0 : (page - 1) * PAGE_SIZE;
-  const take = accumulate ? Math.min(page * PAGE_SIZE, 300) : PAGE_SIZE;
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
+  const skip = accumulate ? 0 : (page - 1) * pageSize;
+  const take = accumulate ? Math.min(page * pageSize, 300) : pageSize;
 
   // El buscador pega contra folio, encabezado de corte, quién entregó/recibió,
   // cliente, tela y los rollos y tallas que llevó; el chip acota por estado.
@@ -96,7 +106,22 @@ export default async function IssuesPage({ searchParams }: PageProps) {
      renglones de las 50 salidas sólo para sumarlos aquí. */
   const summaries = await getIssueSummaries(issues.map((issue) => issue.id));
 
-  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
+  const rows: IssueTableRow[] = issues.map((issue) => ({
+    id: issue.id,
+    code: issue.code,
+    status: issue.status,
+    date: issue.date,
+    concept: issue.concept,
+    reference: issue.reference,
+    clientName: issue.client?.name ?? null,
+    receivedBy: issue.receivedBy,
+    cutFabricName: issue.cutFabric?.name ?? null,
+    cutDescription: issue.cutDescription,
+    shipment: toShipmentBadge(issue.shipments[0]),
+    summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,
+  }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -121,50 +146,13 @@ export default async function IssuesPage({ searchParams }: PageProps) {
         <IssueFilters />
       </div>
 
-      {issues.length === 0 ? (
-        <div className="flat-surface">
-          <EmptyState
-            icon={PackageMinus}
-            title={isFiltered ? "Ninguna salida coincide" : "Aún no hay salidas"}
-            description={
-              isFiltered
-                ? "Prueba con menos palabras o quita el filtro de estado."
-                : "Registra la primera cuando producción se lleve material."
-            }
-          />
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {issues.map((issue) => (
-            <li key={issue.id}>
-              <IssueCard
-                issue={{
-                  id: issue.id,
-                  code: issue.code,
-                  status: issue.status,
-                  date: issue.date,
-                  concept: issue.concept,
-                  reference: issue.reference,
-                  clientName: issue.client?.name ?? null,
-                  receivedBy: issue.receivedBy,
-                  cutFabricName: issue.cutFabric?.name ?? null,
-                  cutDescription: issue.cutDescription,
-                  shipment: toShipmentBadge(issue.shipments[0]),
-                  summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <Pager
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        itemLabel={{ one: "salida", many: "salidas" }}
-        basePath="/issues"
-        params={params}
+      {/* Tabla desde `md:` y tarjetas en celular: lo resuelve la tabla, no
+          esta página. El paginador viaja dentro, por eso ya no hay `Pager`
+          aquí abajo. */}
+      <IssueTable
+        issues={rows}
+        server={{ page, totalPages, total, pageSize }}
+        isFiltered={isFiltered}
       />
     </div>
   );
