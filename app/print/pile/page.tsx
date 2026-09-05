@@ -55,9 +55,9 @@ export default async function PrintPilePage({ searchParams }: PageProps) {
     );
   }
 
-  /* El QR lleva al material, no al recorte con el que se imprimió: la hoja
-     impresa sólo identifica la tela, y es la ficha la que responde con datos
-     vivos lo que se pregunta frente a la estiba —cuánto queda y de quién es. */
+  /* El QR lleva al material, no al recorte con el que se imprimió: la hoja ya
+     dice de qué cliente y ubicación es, y la ficha responde la pregunta que se
+     hace frente a la estiba —qué tela es y cuánta queda. */
   const qrSvg = await generatePileQr({ materialCode: data.material.code });
 
   return (
@@ -70,7 +70,7 @@ export default async function PrintPilePage({ searchParams }: PageProps) {
         <PrintButton />
       </div>
 
-      <PileSheet material={data.material} qrSvg={qrSvg} />
+      <PileSheet data={data} qrSvg={qrSvg} />
     </main>
   );
 }
