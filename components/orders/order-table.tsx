@@ -11,7 +11,11 @@ import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { EmptyState } from "@/components/shared/empty-state";
 import { usePageParam } from "@/components/shared/use-page-param";
 import { OrderDeleteButton } from "./order-delete-button";
-import { OrderListItem, type OrderListEntry } from "./order-list-item";
+import {
+  OrderListItem,
+  orderFabric,
+  type OrderListEntry,
+} from "./order-list-item";
 
 /** Una orden en la tabla: lo mismo que pinta la tarjeta, más su pedido. */
 export interface OrderTableRow extends OrderListEntry {
@@ -139,10 +143,12 @@ export function OrderTable({
     {
       id: "material",
       header: "Tela",
-      accessorFn: (order) => order.material?.name ?? "",
+      // Cae a la tela escrita a mano cuando la orden no trae material del
+      // catálogo: si no, la columna sale vacía en órdenes que sí tienen tela.
+      accessorFn: (order) => orderFabric(order) ?? "",
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {row.original.material?.name ?? "—"}
+          {orderFabric(row.original) ?? "—"}
         </span>
       ),
     },

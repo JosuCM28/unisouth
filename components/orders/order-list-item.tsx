@@ -19,6 +19,13 @@ export interface OrderListEntry {
   dueDate: Date | null;
   client: { name: string } | null;
   material: { name: string } | null;
+  /**
+   * La tela apuntada a mano, cuando no existe en el catálogo.
+   *
+   * Convive con `material` porque el pedido no espera al alta del material:
+   * se escribe el nombre y se sigue. Para pintarla, usa `orderFabric`.
+   */
+  cutFabricText: string | null;
   lines: Array<{ orderedQuantity: number; cutQuantity: number }>;
   /**
    * Cuántos comentarios internos trae.
@@ -27,6 +34,21 @@ export interface OrderListEntry {
    * pantalla que no los consulta no debe pintar un contador en blanco.
    */
   _count?: { comments: number };
+}
+
+/**
+ * Con qué tela se corta la orden.
+ *
+ * El material del catálogo manda; si no lo hay, se cae a la tela escrita a
+ * mano. Sin esa caída la columna sale vacía en órdenes que SÍ tienen tela,
+ * sólo que capturada como texto porque todavía no existe como material.
+ */
+export function orderFabric(
+  order: Pick<OrderListEntry, "material" | "cutFabricText">,
+): string | null {
+  if (order.material) return order.material.name;
+  const handwritten = order.cutFabricText?.trim();
+  return handwritten ? handwritten : null;
 }
 
 interface Props {
@@ -50,6 +72,7 @@ export function OrderListItem({ order, folderName }: Props) {
   const cut = order.lines.reduce((sum, line) => sum + line.cutQuantity, 0);
   const { pending, surplus } = cutProgress(ordered, cut);
   const commentCount = order._count?.comments ?? 0;
+  const fabric = orderFabric(order);
 
   return (
     <div className="flat-surface relative flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent">
@@ -81,7 +104,7 @@ export function OrderListItem({ order, folderName }: Props) {
 
         <p className="truncate text-xs text-muted-foreground">
           {order.client?.name ?? "Sin cliente"}
-          {order.material && ` · ${order.material.name}`}
+          {fabric && ` · ${fabric}`}
           {` · ${formatDate(order.orderedAt)}`}
         </p>
 
