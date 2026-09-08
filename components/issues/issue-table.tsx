@@ -197,7 +197,7 @@ export function IssueTable({ issues, server, isFiltered = false }: Props) {
             title={isFiltered ? "Ninguna salida coincide" : "Aún no hay salidas"}
             description={
               isFiltered
-                ? "Prueba con menos palabras o quita el filtro de estado."
+                ? "Prueba con menos palabras, amplía el rango de fechas o quita el filtro de estado."
                 : "Registra la primera cuando producción se lleve material."
             }
           />

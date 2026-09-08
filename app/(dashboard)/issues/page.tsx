@@ -36,6 +36,8 @@ interface PageProps {
     q?: string;
     status?: string;
     origin?: string;
+    from?: string;
+    to?: string;
     page?: string;
     all?: string;
     filas?: string;
@@ -63,11 +65,16 @@ export default async function IssuesPage({ searchParams }: PageProps) {
   const take = accumulate ? Math.min(page * pageSize, 300) : pageSize;
 
   // El buscador pega contra folio, encabezado de corte, quién entregó/recibió,
-  // cliente, tela y los rollos y tallas que llevó; el chip acota por estado.
+  // cliente, tela y los rollos y tallas que llevó; los chips acotan por estado
+  // y por origen, y el rango por la fecha del vale.
   const filters = parseIssueFilters(params);
   const where = issueWhere(filters);
   const isFiltered = Boolean(
-    filters.search || filters.status || filters.fromWorkshop,
+    filters.search ||
+      filters.status ||
+      filters.fromWorkshop ||
+      filters.from ||
+      filters.to,
   );
 
   const [total, issues] = await Promise.all([

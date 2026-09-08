@@ -1,4 +1,5 @@
 import type { DocumentStatus, Prisma } from "@prisma/client";
+import { fromDateInputValue } from "@/lib/utils";
 
 /**
  * Filtros del listado de salidas.
@@ -25,10 +26,23 @@ export interface IssueFilters {
    * separarlos sin abrirlos uno por uno.
    */
   fromWorkshop?: boolean;
+  /**
+   * Rango de fechas del vale, como `YYYY-MM-DD` los dos.
+   *
+   * Van sueltos y no como un solo par obligatorio porque casi siempre se pide
+   * medio rango: "de este mes para acá" es `from` sin `to`, y "todo lo de
+   * antes del cierre" es `to` sin `from`. Exigir los dos obligaría a inventar
+   * una fecha en el extremo que no importa.
+   */
+  from?: string;
+  to?: string;
 }
 
 /** Estados válidos. Cualquier otra cosa en la URL se ignora en vez de tronar. */
 const STATUSES = new Set<DocumentStatus>(["DRAFT", "APPLIED", "CANCELLED"]);
+
+/** El formato que produce un `<input type="date">`, que es el único origen. */
+const DATE_PARAM = /^\d{4}-\d{2}-\d{2}$/;
 
 /** El valor que enciende el filtro de envíos a taller, tal cual va en la URL. */
 export const WORKSHOP_ORIGIN = "taller";
@@ -48,7 +62,22 @@ export function parseIssueFilters(
         ? (status as DocumentStatus)
         : undefined,
     fromWorkshop: params.origin === WORKSHOP_ORIGIN || undefined,
+    from: dateParam(params.from),
+    to: dateParam(params.to),
   };
+}
+
+/**
+ * Una fecha del rango, o nada.
+ *
+ * Se descarta aquí lo que no tenga forma de fecha en vez de dejarlo pasar: si
+ * viajara una cadena rota, el `where` la ignoraría igual pero la pantalla se
+ * declararía filtrada y diría "ninguna salida coincide" sobre una lista que en
+ * realidad no está acotada por nada.
+ */
+function dateParam(value: string | undefined): string | undefined {
+  if (!value || !DATE_PARAM.test(value)) return undefined;
+  return value;
 }
 
 /**
@@ -69,6 +98,26 @@ export function issueWhere(
      columna propia en el documento: el vínculo ya existe desde el envío, y
      duplicarlo en el vale abriría la puerta a que los dos se contradigan. */
   if (filters.fromWorkshop) where.shipments = { some: {} };
+
+  /* El rango se toma sobre la fecha del VALE y no sobre la de captura: el
+     corte del mes se arma con el día en que el material salió por la puerta,
+     aunque se haya capturado al día siguiente.
+
+     Los extremos se abren al día completo en la zona de la fábrica. Con las
+     fechas crudas, `to` sería la medianoche de ese día y una salida de las 6
+     de la tarde quedaba fuera de su propio día —el error se ve al filtrar
+     "hasta hoy" y no encontrar lo que se acaba de capturar. */
+  const from = filters.from
+    ? fromDateInputValue(filters.from, "start")
+    : undefined;
+  const to = filters.to ? fromDateInputValue(filters.to, "end") : undefined;
+
+  if (from || to) {
+    where.date = {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    };
+  }
 
   if (filters.search) {
     // AND de ORs: cada palabra tiene que aparecer en ALGÚN campo. Así

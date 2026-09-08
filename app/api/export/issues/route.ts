@@ -83,6 +83,8 @@ export async function GET(request: Request) {
     q: url.searchParams.get("q") ?? undefined,
     status: url.searchParams.get("status") ?? undefined,
     origin: url.searchParams.get("origin") ?? undefined,
+    from: url.searchParams.get("from") ?? undefined,
+    to: url.searchParams.get("to") ?? undefined,
   });
 
   const issues = await prisma.inventoryDocument.findMany({
