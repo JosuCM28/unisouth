@@ -7,6 +7,7 @@ import {
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
 import type { IssueSummary } from "@/lib/issue-summary";
+import { issueFabric } from "@/lib/issue-fabric";
 import { cn, formatDate, formatQuantity } from "@/lib/utils";
 
 export interface IssueRow {
@@ -27,6 +28,14 @@ export interface IssueRow {
   receivedBy: string | null;
   /** Tela del desglose de corte: identifica el vale cuando no lleva rollos. */
   cutFabricName: string | null;
+  /**
+   * La tela apuntada a mano, cuando no existe en el catálogo.
+   *
+   * Convive con `cutFabricName` porque el trabajo no espera al alta del
+   * material: se escribe el nombre y se sigue. Para pintarla usa
+   * `issueFabric`, que decide entre los tres orígenes.
+   */
+  cutFabricText: string | null;
   cutDescription: string | null;
   /**
    * El envío a taller que levantó este vale, cuando nació de uno.
@@ -60,6 +69,7 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
   const { summary } = issue;
   const unitLabel = summary.unit ? UNIT_SHORT_LABELS[summary.unit as Unit] : "";
   const title = issue.concept ?? issue.cutDescription;
+  const fabric = issueFabric(issue);
 
   return (
     <Link
@@ -91,16 +101,10 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
           </div>
 
           {/* La tela de los rollos; si el vale es sólo de cortes, la del
-              desglose, que es lo único que dice de qué se trata. */}
-          {summary.materialNames.length > 0 && (
-            <p className="mt-1 truncate text-sm font-medium">
-              {summary.materialNames.join(" · ")}
-            </p>
-          )}
-          {summary.materialNames.length === 0 && issue.cutFabricName && (
-            <p className="mt-1 truncate text-sm font-medium">
-              {issue.cutFabricName}
-            </p>
+              desglose —del catálogo o escrita a mano—, que es lo único que
+              dice de qué se trata. */}
+          {fabric && (
+            <p className="mt-1 truncate text-sm font-medium">{fabric}</p>
           )}
 
           {title && (

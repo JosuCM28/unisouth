@@ -126,6 +126,7 @@ export default async function IssuesPage({ searchParams }: PageProps) {
     clientName: issue.client?.name ?? null,
     receivedBy: issue.receivedBy,
     cutFabricName: issue.cutFabric?.name ?? null,
+    cutFabricText: issue.cutFabricText,
     cutDescription: issue.cutDescription,
     shipment: toShipmentBadge(issue.shipments[0]),
     summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,

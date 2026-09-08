@@ -10,6 +10,7 @@ import {
 import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 import { DOCUMENT_STATUS_LABELS, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { getIssueSummaries } from "@/lib/issue-summary";
+import { issueFabric } from "@/lib/issue-fabric";
 import { issueWhere, parseIssueFilters } from "@/lib/repositories/issue-filters";
 
 /**
@@ -120,7 +121,12 @@ export async function GET(request: Request) {
       status: issue.status,
       date: issue.date,
       concept: issue.concept ?? issue.cutDescription ?? "",
-      material: materialOf(summary?.materialNames ?? [], issue.cutFabric?.name),
+      material:
+        issueFabric({
+          summary: { materialNames: summary?.materialNames ?? [] },
+          cutFabricName: issue.cutFabric?.name ?? null,
+          cutFabricText: issue.cutFabricText,
+        }) ?? "",
       client: issue.client?.name ?? "Fábrica",
       handedOverBy: issue.handedOverBy ?? "",
       receivedBy: issue.receivedBy ?? "",
@@ -138,14 +144,4 @@ export async function GET(request: Request) {
   });
 
   return xlsxResponse(toXlsxWithNotice(rows, COLUMNS, "Salidas"), "salidas");
-}
-
-/**
- * La tela del vale, con la misma regla que la tabla: manda la de los rollos y,
- * si no llevó rollos, vale la del desglose de corte.
- */
-function materialOf(materialNames: string[], cutFabricName?: string): string {
-  if (materialNames.length > 0) return materialNames.join(" · ");
-
-  return cutFabricName ?? "";
 }

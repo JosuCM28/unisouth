@@ -9,6 +9,7 @@ import {
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
 import { cn, formatDate, formatQuantity } from "@/lib/utils";
+import { issueFabric } from "@/lib/issue-fabric";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { usePageParam } from "@/components/shared/use-page-param";
@@ -111,10 +112,13 @@ export function IssueTable({ issues, server, isFiltered = false }: Props) {
     {
       id: "material",
       header: "Tela",
-      accessorFn: (issue) => materialOf(issue),
+      // Ordena por el MISMO texto que se pinta: si el accessor mirara sólo el
+      // catálogo, las telas escritas a mano se irían todas juntas al final
+      // como si estuvieran vacías.
+      accessorFn: (issue) => issueFabric(issue) ?? "",
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {materialOf(row.original) || "—"}
+          {issueFabric(row.original) ?? "—"}
         </span>
       ),
     },
@@ -206,21 +210,6 @@ export function IssueTable({ issues, server, isFiltered = false }: Props) {
       renderMobileRow={(issue) => <IssueCard issue={issue} />}
     />
   );
-}
-
-/**
- * La tela del vale.
- *
- * La de los rollos manda, y si no llevó rollos —al taller salen prendas ya
- * cortadas— vale la del desglose de corte, que es lo único que dice de qué
- * está hecho lo que salió.
- */
-function materialOf(issue: IssueTableRow): string {
-  if (issue.summary.materialNames.length > 0) {
-    return issue.summary.materialNames.join(" · ");
-  }
-
-  return issue.cutFabricName ?? "";
 }
 
 /** Etapa y taller juntos, para poder ordenar por ellos. */
