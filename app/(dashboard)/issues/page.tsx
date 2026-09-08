@@ -6,6 +6,7 @@ import { getIssueSummaries } from "@/lib/issue-summary";
 import { parseIssueFilters, issueWhere } from "@/lib/repositories/issue-filters";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
+import { ExportButton } from "@/components/shared/export-button";
 import { Button } from "@/components/ui/button";
 import { IssueFilters } from "@/components/issues/issue-filters";
 import {
@@ -139,10 +140,17 @@ export default async function IssuesPage({ searchParams }: PageProps) {
       />
 
       <div className="flex flex-col gap-2">
-        <SearchInput
-          placeholder="Folio, orden, tela, prenda, quién recibió…"
-          className="w-full md:max-w-sm"
-        />
+        {/* El botón arrastra la búsqueda y los chips que estén puestos: quien
+            acota a "Ternium a taller" y baja el archivo espera ESO, no el
+            registro completo —y un Excel que no corresponde a la pantalla se
+            ve igual de correcto, así que nadie nota el error. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            placeholder="Folio, orden, tela, prenda, quién recibió…"
+            className="flex-1 md:max-w-sm"
+          />
+          <ExportButton href="/api/export/issues" label="Excel" />
+        </div>
         <IssueFilters />
       </div>
 
