@@ -3,12 +3,13 @@
 import { Plus, Trash2 } from "lucide-react";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { SearchSelect } from "@/components/shared/search-select";
+import { SizeNote, type SizeAnnotation } from "@/components/orders/size-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /** Una talla que se puede elegir en un renglón. */
-export interface SizeRowOption {
+export interface SizeRowOption extends SizeAnnotation {
   /** Lo que el formulario manda: el id de la talla o el del renglón. */
   value: string;
   code: string;
@@ -119,6 +120,9 @@ export function SizeBundleRows({
   const pieces = sumBundlePieces(usable);
   const bundles = sumBundles(usable);
 
+  // La anotación del renglón elegido, para pintarla dentro de su tarjeta.
+  const byValue = new Map(options.map((option) => [option.value, option]));
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -139,6 +143,7 @@ export function SizeBundleRows({
           const quantity = Number(row.quantity) || 0;
           const count = row.bundles.trim() === "" ? 1 : Number(row.bundles) || 0;
           const total = quantity * count;
+          const option = byValue.get(row.value);
 
           return (
             <li key={row.key} className="flat-surface flex flex-col gap-2 p-2">
@@ -163,6 +168,11 @@ export function SizeBundleRows({
                   <Trash2 className="size-4" aria-hidden />
                 </Button>
               </div>
+
+              {/* Lo que se le anotó a esta talla al levantar la orden, pegado
+                  a su renglón: es la instrucción que hay que tener enfrente
+                  justo antes de teclear cuántas salieron. */}
+              <SizeNote note={option?.note} tag={option?.tag} />
 
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">

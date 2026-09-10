@@ -71,6 +71,8 @@ export interface BatchSizeOption {
   cut: number;
   /** Lo que distingue dos renglones de la misma talla en una orden. */
   note: string | null;
+  /** La etiqueta de corte del renglón, si se le puso una. */
+  tag: { name: string; color: string } | null;
 }
 
 /**
@@ -112,7 +114,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   const [newLabel, setNewLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<SizeBundleRow[]>(() =>
-    rowsOf(batches[0]),
+    rowsOf(batches[0], sizes),
   );
   const [isSaving, setIsSaving] = useState(false);
 
@@ -130,7 +132,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   /** Al cambiar de corte se trae lo que ese corte ya lleva. */
   function handleBatchChange(next: string) {
     setBatchId(next);
-    setRows(rowsOf(batches.find((batch) => batch.id === next)));
+    setRows(rowsOf(batches.find((batch) => batch.id === next), sizes));
   }
 
   const byLine = new Map(sizes.map((size) => [size.lineId, size]));
@@ -190,7 +192,7 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
     setBatchId(batches[0]?.id ?? NEW_BATCH);
     setNewLabel("");
     setNotes("");
-    setRows(rowsOf(batches[0]));
+    setRows(rowsOf(batches[0], sizes));
   }
 
   function handleOpenChange(next: boolean) {
@@ -314,14 +316,16 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
                nombre largo hace que se encuentre tecleando "grande". */
             hint: size.note ?? size.name,
             keywords: size.name,
+            note: size.note,
+            tag: size.tag,
           }))}
           rows={rows}
           onChange={setRows}
           renderHint={hintFor}
           footnote={
             isEditing
-              ? "El corte queda EXACTAMENTE con estos renglones: lo que quites aquí desaparece de él. La misma talla se puede repetir."
-              : "La misma talla se puede repetir: un bulto de 30 y otro de 20 son dos renglones."
+              ? "El corte queda EXACTAMENTE con estos renglones: lo que quites —o dejes en 0— desaparece de él. La misma talla se puede repetir."
+              : "Las tallas en 0 no se guardan: teclea sólo las que salieron. La misma talla se puede repetir —un bulto de 30 y otro de 20 son dos renglones—."
           }
         />
 
@@ -359,20 +363,45 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
 /**
  * Los renglones con los que abre la pantalla para un corte.
  *
- * Un corte que ya tiene bultos vuelve con ellos puestos, que es lo que permite
- * corregirlos: aparecer vacío hacía creer que no había nada capturado y que
- * volver a teclearlo era lo correcto. Uno recién estrenado —o "Corte nuevo"—
- * abre con un renglón en blanco, listo para el primer bulto.
+ * Abre con TODAS las tallas de la orden puestas en 0, en el orden en que se
+ * levantó. Antes abría con un renglón en blanco y había que elegir la talla en
+ * el desplegable una por una: en una orden de doce tallas eran doce búsquedas
+ * y, sobre todo, no había forma de ver de un vistazo cuáles faltaban por
+ * capturar. Con la lista completa enfrente sólo se teclea sobre el 0 de las
+ * que salieron, y la talla que se quedó en 0 se ve.
+ *
+ * El 0 no se guarda: un renglón sin piezas se descarta al guardar, así que
+ * dejar la lista completa no mete tallas vacías al corte.
+ *
+ * Lo ya capturado manda. Una talla que este corte ya lleva vuelve con SUS
+ * números —incluidos sus dos bultos si se capturó dos veces— y no con el 0: la
+ * pantalla es también la de corregir, y precargar 0 encima de lo guardado
+ * borraría el corte al guardar.
  */
-function rowsOf(batch?: BatchOption): SizeBundleRow[] {
-  if (!batch || batch.entries.length === 0) return [emptyRow()];
+function rowsOf(
+  batch: BatchOption | undefined,
+  sizes: BatchSizeOption[],
+): SizeBundleRow[] {
+  const entries = batch?.entries ?? [];
 
-  return batch.entries.map((entry) => ({
-    key: crypto.randomUUID(),
-    value: entry.lineId,
-    quantity: String(entry.quantity),
-    bundles: String(entry.bundles),
-  }));
+  const rows = sizes.flatMap((size) => {
+    const captured = entries.filter((entry) => entry.lineId === size.lineId);
+
+    if (captured.length === 0) {
+      return [{ ...emptyRow(), value: size.lineId, quantity: "0" }];
+    }
+
+    return captured.map((entry) => ({
+      key: crypto.randomUUID(),
+      value: entry.lineId,
+      quantity: String(entry.quantity),
+      bundles: String(entry.bundles),
+    }));
+  });
+
+  // Sin tallas que precargar —no debería pasar en una orden viva— queda la
+  // tarjeta en blanco de siempre: un bloque vacío no invita a teclear.
+  return rows.length > 0 ? rows : [emptyRow()];
 }
 
 /** Cuándo se abrió el corte y qué lleva, para reconocerlo en el selector. */

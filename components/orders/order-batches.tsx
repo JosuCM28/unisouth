@@ -10,6 +10,7 @@ import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SizeNote, type SizeAnnotation } from "./size-note";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 import {
   OrderShipmentDialog,
@@ -18,7 +19,7 @@ import {
 } from "./order-shipment-dialog";
 
 /** Un bulto (o varios de la misma cuenta) que una talla aportó a un corte. */
-export interface BatchEntryView {
+export interface BatchEntryView extends SizeAnnotation {
   id: string;
   /** El renglón de la orden del que salió. Lo usa el diálogo al corregir. */
   lineId: string;
@@ -198,10 +199,20 @@ export function OrderBatches({
                 {groupBySize(batch.entries).map((row) => (
                   <li
                     key={row.sizeCode}
-                    className="flex items-baseline justify-between gap-3 border-t border-border py-1 text-sm"
+                    /* `items-start` y no `items-baseline`: con la anotación
+                       debajo de la talla, alinear por la base dejaba el número
+                       de la derecha a media altura del bloque. */
+                    className="flex items-start justify-between gap-3 border-t border-border py-1 text-sm"
                   >
-                    <span className="tabular">Talla {row.sizeCode}</span>
-                    <span className="tabular flex items-baseline gap-2">
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="tabular">Talla {row.sizeCode}</span>
+                      {/* La anotación con la que se levantó la orden, también
+                          en el corte ya guardado: al revisar lo capturado se
+                          quiere saber qué llevaba esa talla sin subir a la
+                          sección de Tallas. */}
+                      <SizeNote note={row.note} tag={row.tag} />
+                    </span>
+                    <span className="tabular flex shrink-0 items-baseline gap-2">
                       {/* Los bultos sólo cuando son más de uno: con uno solo
                           es ruido al lado de la cifra que de verdad se lee. */}
                       {row.bundles > 1 && (
@@ -235,7 +246,12 @@ export function OrderBatches({
                 <ul className="mt-1 flex flex-col gap-1 border-t border-border pt-1">
                   {batch.entries.map((entry) => (
                     <li key={entry.id} className="tabular">
-                      Talla {entry.sizeCode}: {entry.quantity > 0 ? "+" : ""}
+                      Talla {entry.sizeCode}
+                      {/* La anotación del renglón, aquí sí una por captura:
+                          es lo que desempata dos bultos de la misma talla que
+                          arriba se leen sumados. */}
+                      {entry.note && ` (${entry.note})`}:{" "}
+                      {entry.quantity > 0 ? "+" : ""}
                       {entry.quantity}
                       {/* El desglose del bulto sólo cuando hay más de uno: es
                           lo que explica de dónde salió el total. */}
@@ -335,6 +351,12 @@ function groupBySize(entries: BatchEntryView[]) {
       sizeCode,
       quantity: sumBundlePieces(rows),
       bundles: sumBundles(rows),
+      /* La anotación del primer renglón que la traiga. Dos renglones de la
+         misma talla se suman en una sola fila, y encimar dos textos ahí
+         volvería ilegible justo lo que se quería leer de un vistazo: el
+         desglose completo sigue en "Ver las capturas". */
+      note: rows.find((row) => row.note)?.note ?? null,
+      tag: rows.find((row) => row.tag)?.tag ?? null,
     }))
     .sort((a, b) => a.sizeCode.localeCompare(b.sizeCode, "es", { numeric: true }));
 }

@@ -291,6 +291,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
         ...entry,
         sizeId: line.sizeId,
         sizeCode: line.size.code,
+        /* La anotación del renglón viaja con cada captura: el corte guardado
+           la pinta al lado de su talla para no tener que subir a Tallas. */
+        lineNote: line.notes,
+        lineTag: line.cutTag,
       })),
     )
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -315,6 +319,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
         createdAt: entry.createdAt,
         userName: entry.user?.name ?? null,
         notes: entry.notes,
+        note: entry.lineNote,
+        tag: entry.lineTag,
       })),
     issues: issues
       .filter((issue) => issue.cuttingBatchId === batch.id)
@@ -391,6 +397,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     ordered: line.orderedQuantity,
     cut: line.cutQuantity,
     note: line.notes,
+    tag: line.cutTag,
   }));
 
   return (
