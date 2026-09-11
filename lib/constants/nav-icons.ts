@@ -21,6 +21,7 @@ import {
   ScanLine,
   Truck,
   ShoppingCart,
+  UserCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -60,6 +61,9 @@ export const NAV_ICONS = {
   audit: ClipboardList,
   reports: ChartColumn,
   warehouses: Building2,
+  /* `users` ya lo ocupa Clientes. El engrane distingue "las personas que
+     entran al sistema" de "las empresas que mandan a maquilar". */
+  accounts: UserCog,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

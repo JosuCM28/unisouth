@@ -78,6 +78,10 @@ export const auth = betterAuth({
     admin({
       defaultRole: "READ_ONLY",
       adminRoles: ["ADMIN"],
+      /* En español y sin hablar de "soporte": aquí a quien hay que buscar es
+         al administrador del almacén, que está a dos pasillos. */
+      bannedUserMessage:
+        "Tu cuenta está suspendida. Habla con el administrador del almacén.",
     }),
     // nextCookies SIEMPRE al final: es quien escribe las cookies en la
     // respuesta y debe correr después de todos los demás plugins.

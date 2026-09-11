@@ -123,3 +123,12 @@ export const LOGIN_LIMIT: RateLimitOptions = { limit: 8, windowSeconds: 300 };
 
 /** Exportaciones: son consultas pesadas que recorren tablas completas. */
 export const EXPORT_LIMIT: RateLimitOptions = { limit: 10, windowSeconds: 60 };
+
+/**
+ * Administración de cuentas: estrecho a propósito.
+ *
+ * Crear usuarios y cambiar contraseñas son las acciones que a alguien con una
+ * sesión de administrador robada le serviría repetir en ráfaga. Veinte por
+ * minuto le alcanzan de sobra a un humano dando de alta al turno completo.
+ */
+export const SENSITIVE_LIMIT: RateLimitOptions = { limit: 20, windowSeconds: 60 };

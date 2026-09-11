@@ -217,6 +217,20 @@ export const NAVIGATION: NavSection[] = [
       },
     ],
   },
+  {
+    /* Hasta abajo y en su propia sección: no es parte de la operación del
+       almacén, y como `user:manage` sólo lo trae ADMIN, para todos los demás
+       roles la sección entera desaparece —ni siquiera ven el encabezado. */
+    label: "Administración",
+    items: [
+      {
+        href: "/users",
+        label: "Usuarios",
+        icon: "accounts",
+        permission: "user:manage",
+      },
+    ],
+  },
 ];
 
 /**

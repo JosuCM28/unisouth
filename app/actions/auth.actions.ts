@@ -46,13 +46,42 @@ export async function loginAction(input: unknown): Promise<ActionResult<null>> {
     });
 
     return ok(null, "Bienvenido");
-  } catch {
+  } catch (error) {
+    /* La cuenta suspendida SÍ se nombra. Con el mensaje genérico el
+       suspendido cree que olvidó su contraseña y va a pedir que se la
+       restablezcan, y el administrador acaba explicando lo mismo cada vez.
+       El precio —confirmarle a un extraño que ese correo existe— es
+       aceptable en una app interna a la que sólo se llega desde la red de la
+       fábrica. */
+    if (isBanned(error)) {
+      await recordFailure(ip, `Cuenta suspendida: ${parsed.data.email}`);
+
+      return fail(
+        "Tu cuenta está suspendida. Habla con el administrador del almacén.",
+        "BANNED_USER",
+      );
+    }
+
     await recordFailure(ip, `Credenciales incorrectas para ${parsed.data.email}`);
 
     // Mensaje deliberadamente vago: decir "ese correo no existe" le confirma
     // a un extraño qué cuentas están dadas de alta.
     return fail("Correo o contraseña incorrectos.", "INVALID_CREDENTIALS");
   }
+}
+
+/**
+ * ¿El rechazo fue por suspensión?
+ *
+ * BetterAuth lo lanza como `APIError` con el código en el cuerpo. Se lee a
+ * mano en vez de con `instanceof` para no atar esta action a una clase
+ * interna de la librería que puede cambiar de lugar entre versiones.
+ */
+function isBanned(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+
+  const body = (error as { body?: { code?: unknown } }).body;
+  return body?.code === "BANNED_USER";
 }
 
 /**

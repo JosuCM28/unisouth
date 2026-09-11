@@ -24,7 +24,12 @@ interface ResponsiveFormDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
-  trigger: ReactNode;
+  /**
+   * Quién lo abre. Opcional: un diálogo que se gobierna desde fuera —el
+   * menú de una fila que decide cuál de cuatro abrir— no tiene un elemento
+   * propio que disparar, y `DialogTrigger asChild` sin hijo revienta.
+   */
+  trigger?: ReactNode;
   children: ReactNode;
 }
 
@@ -48,7 +53,7 @@ export function ResponsiveFormDialog({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogTrigger asChild>{trigger}</DialogTrigger>
+        {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
         <DialogContent className="keyboard-aware-dialog max-h-[85dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -64,7 +69,7 @@ export function ResponsiveFormDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
       {/* `dvh` y no `vh`: con la barra del navegador visible, `vh` mide de más
           y la hoja se sale por abajo. La clase la usa globals.css para subirla
           por encima del teclado. */}

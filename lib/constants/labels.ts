@@ -19,6 +19,7 @@ import type {
   TaskStatus,
   Unit,
 } from "@prisma/client";
+import type { UserStatus } from "./user-status";
 
 /**
  * Traducciones de los enums.
@@ -474,3 +475,23 @@ export function cutBatchLabel(number: number, label?: string | null): string {
   if (label) return label;
   return `${CUT_ORDINALS[number] ?? `${number}º`} corte`;
 }
+
+/**
+ * Estado de una cuenta de usuario.
+ *
+ * "Dado de baja" y no "Eliminado" a propósito: el registro NO se borra —sus
+ * rollos y movimientos lo siguen nombrando— y llamarle eliminado haría creer
+ * al administrador que ya no se puede recuperar.
+ */
+export const USER_STATUS_LABELS: Record<UserStatus, string> = {
+  ACTIVE: "Activo",
+  SUSPENDED: "Suspendido",
+  DELETED: "Dado de baja",
+};
+
+/** Verde · ámbar · rojo: se lee de un vistazo cuál es el caso grave. */
+export const USER_STATUS_STYLES: Record<UserStatus, string> = {
+  ACTIVE: "bg-state-available text-state-available-foreground",
+  SUSPENDED: "bg-state-reserved text-state-reserved-foreground",
+  DELETED: "bg-state-defective text-state-defective-foreground",
+};
