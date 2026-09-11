@@ -16,7 +16,7 @@ const updateProductionRunSchema = z.object({
 export async function createProductionRunAction(input: unknown) {
   return executeAction(input, {
     schema: productionRunSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Producción creada",
     handler: ({ input, auditContext }) =>
@@ -27,7 +27,7 @@ export async function createProductionRunAction(input: unknown) {
 export async function updateProductionRunAction(input: unknown) {
   return executeAction(input, {
     schema: updateProductionRunSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Producción actualizada",
     handler: ({ input, auditContext }) =>
@@ -38,7 +38,7 @@ export async function updateProductionRunAction(input: unknown) {
 export async function cancelProductionRunAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Producción cancelada",
     handler: ({ input, auditContext }) =>

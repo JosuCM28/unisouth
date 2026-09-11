@@ -47,6 +47,26 @@ export const PERMISSIONS = [
   "inventory:write",
   "inventory:adjust",
   "catalog:write",
+  /* El marco de CÓMO se produce: ficha técnica, escalado de tallas, foleo del
+     corte, taller que borda, corrida de producción, las reglas fijas del
+     cliente y las bodegas donde se guarda.
+
+     Se separó de `inventory:browse` porque el auxiliar de almacén recibe,
+     acomoda y surte, pero no decide cómo se hace la prenda ni dónde se
+     definen las bodegas. Sin esta capacidad aparte los dos casos eran
+     indistinguibles: una sola llave abría los 18 destinos. */
+  "production:browse",
+  "production:write",
+  /* Mirar hacia atrás sobre el almacén COMPLETO: el kárdex global y los
+     reportes. Es distinto de consultar el historial de un rollo concreto
+     —eso vive en su ficha y basta con `inventory:browse`—: aquí se recorre
+     todo junto, que es trabajo de supervisión, no de captura. */
+  "reporting:read",
+  /* El padrón de ayudantes de descarga. Va aparte porque no es inventario ni
+     producción: es la base con la que se calcula su bonificación, y Dirección
+     la administra sin recorrer el almacén. */
+  "staff:browse",
+  "staff:write",
   "bom:write",
   "calculation:run",
   "purchase:request",
@@ -69,17 +89,28 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Todo, incluido usuarios y configuración.
   ADMIN: PERMISSIONS,
 
-  /* Es quien mueve el material: entradas, salidas, cortes, conteos, ajustes.
-     Llega a todo el menú salvo Auditoría —de ahí que traiga `bom:write`,
-     `calculation:run` y `purchase:request`— porque en la práctica el auxiliar
-     es quien detecta que falta tela y quien levanta la requisición.
+  /* Es quien MUEVE EL MATERIAL, y nada más: recibe, acomoda, surte y
+     documenta. Su menú son trece destinos —Tablero, Inventario, Escanear,
+     Tareas, Materiales, Prendas, Ubicaciones, Clientes, Proveedores,
+     Recepciones, Salidas, Órdenes y Documentos— y dentro de ellos puede todo:
+     dar de alta rollos, cortar, recontar, ajustar y mantener los catálogos
+     que se eligen al capturar.
 
-     Lo que NO tiene y no debe tener:
+     Lo que NO tiene y por qué:
+     · `production:browse/write` — no decide cómo se hace la prenda. Fichas
+                        técnicas, tallas, foleos, talleres, corridas, reglas y
+                        bodegas son del lado de producción.
+     · `reporting:read` — el kárdex global y los reportes son supervisión. El
+                        historial del rollo que tiene en la mano lo sigue
+                        viendo en su ficha, que es lo que necesita en el piso.
+     · `staff:browse/write` — el padrón de ayudantes es base de bonificación.
+     · `bom:write` / `calculation:run` — no edita fichas ni corre cálculos.
+                        La explosión de insumos DENTRO de una salida sí la
+                        hace: ésa pide `inventory:write`, porque es surtir.
+     · `purchase:request` — levantar requisiciones pasó a Compras.
      · `audit:read`   — la bitácora de "quién metió mano" existe para vigilar
                         justo a quien captura; que la vea el capturista la
                         vuelve inútil.
-     · `purchase:approve` — pedir no es autorizar. Quien detecta el faltante no
-                        firma su propia compra.
      · `user:manage`  — con esto podría subirse a ADMIN y entrar a la
                         auditoría por la puerta de atrás. */
   WAREHOUSE: [
@@ -88,15 +119,17 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory:write",
     "inventory:adjust",
     "catalog:write",
-    "bom:write",
-    "calculation:run",
-    "purchase:request",
   ],
 
-  // Consulta inventario, mantiene fichas técnicas y corre cálculos.
+  /* Consulta inventario, mantiene fichas técnicas y corre cálculos. Ve el
+     lado de producción y los reportes, pero no los edita: dar de alta un
+     taller o una corrida sigue siendo de quien administra. */
   PRODUCTION: [
     "inventory:read",
     "inventory:browse",
+    "production:browse",
+    "reporting:read",
+    "staff:browse",
     "bom:write",
     "calculation:run",
   ],
@@ -104,6 +137,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   PURCHASING: [
     "inventory:read",
     "inventory:browse",
+    "production:browse",
+    "reporting:read",
+    "staff:browse",
     "purchase:request",
     "purchase:approve",
   ],
@@ -111,8 +147,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   /* Dirección tiene un menú corto y a propósito: escanear un rollo, el
      pizarrón de tareas, el padrón de ayudantes y el motor de cálculo. Ahí sí
      captura —mueve tarjetas, da de alta un ayudante, corre un cálculo—, pero
-     NO recorre el almacén: sin `inventory:browse` se le caen del menú los 18
-     destinos de rollos, catálogos y documentos.
+     NO recorre el almacén: sin `inventory:browse` se le caen del menú los
+     destinos de rollos, catálogos y documentos, y sin `production:browse`
+     tampoco ve el lado de producción.
 
      Tampoco lleva `audit:read`: la bitácora queda sólo en ADMIN. */
   MANAGEMENT: [
@@ -120,9 +157,17 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory:write",
     "catalog:write",
     "calculation:run",
+    "staff:browse",
+    "staff:write",
   ],
 
-  READ_ONLY: ["inventory:read", "inventory:browse"],
+  READ_ONLY: [
+    "inventory:read",
+    "inventory:browse",
+    "production:browse",
+    "reporting:read",
+    "staff:browse",
+  ],
 };
 
 /** Convierte el String de la base a un Role válido. */

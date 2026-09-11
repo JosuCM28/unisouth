@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/core/session";
+import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
 import {
   PURCHASE_STATUS_LABELS, PURCHASE_STATUS_STYLES, UNIT_SHORT_LABELS,
@@ -22,7 +22,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PurchaseRequestPage({ params }: PageProps) {
   const { id } = await params;
-  const user = await requireUser();
+
+  /* Era la única pantalla del tablero sin guarda de capacidad: bastaba tener
+     sesión y adivinar el id para leer una requisición completa, con sus
+     materiales y sus cantidades. El listado sí la pedía. */
+  const user = await requirePermission("purchase:request");
 
   const request = await prisma.purchaseRequest.findUnique({
     where: { id },

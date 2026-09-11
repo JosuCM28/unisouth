@@ -83,11 +83,16 @@ const explodeSchema = z.object({
  * descuenta exactamente lo mismo que dijo el cálculo, merma incluida. Si las
  * dos fórmulas vivieran por separado, tarde o temprano dirían números
  * distintos y nadie sabría cuál creer.
+ *
+ * Pide `inventory:write` y NO `calculation:run` aunque por dentro corra el
+ * motor: esto es surtir, no hacer un estudio. El auxiliar de almacén no tiene
+ * el módulo de Cálculo y aun así tiene que poder explotar una salida, que es
+ * de lo que más hace.
  */
 export async function explodeForIssueAction(input: unknown) {
   return executeAction(input, {
     schema: explodeSchema,
-    permission: "calculation:run",
+    permission: "inventory:write",
     handler: async ({ input, auditContext }) => {
       const { requirements } = await new CalculationService(auditContext).run({
         // El cálculo queda guardado como simulación con nombre propio: deja

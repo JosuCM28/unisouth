@@ -24,7 +24,7 @@ const toggleSchema = z.object({ id: cuidSchema, active: z.boolean() });
 
 export async function createStandingRuleAction(input: unknown) {
   return executeAction(input, {
-    schema: standingRuleSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: standingRuleSchema, permission: "production:write", revalidate: REVALIDATE,
     successMessage: "Regla registrada",
     handler: ({ input, auditContext }) => new StandingRuleService(auditContext).create(input),
   });
@@ -32,7 +32,7 @@ export async function createStandingRuleAction(input: unknown) {
 
 export async function updateStandingRuleAction(input: unknown) {
   return executeAction(input, {
-    schema: updateStandingRuleSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: updateStandingRuleSchema, permission: "production:write", revalidate: REVALIDATE,
     successMessage: "Regla actualizada",
     handler: ({ input, auditContext }) => new StandingRuleService(auditContext).update(input.id, input.data),
   });
@@ -41,14 +41,14 @@ export async function updateStandingRuleAction(input: unknown) {
 /** Apagar es lo normal para dejar de verla; borrar es para las que sobran. */
 export async function toggleStandingRuleAction(input: unknown) {
   return executeAction(input, {
-    schema: toggleSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: toggleSchema, permission: "production:write", revalidate: REVALIDATE,
     handler: ({ input, auditContext }) => new StandingRuleService(auditContext).toggle(input.id, input.active),
   });
 }
 
 export async function removeStandingRuleAction(input: unknown) {
   return executeAction(input, {
-    schema: removeSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: removeSchema, permission: "production:write", revalidate: REVALIDATE,
     successMessage: "Regla eliminada",
     handler: ({ input, auditContext }) => new StandingRuleService(auditContext).remove(input.id, input.reason),
   });

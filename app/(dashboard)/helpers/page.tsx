@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = { title: "Ayudantes" };
 
 export default async function HelpersPage() {
-  await requirePermission("inventory:read");
+  await requirePermission("staff:browse");
 
   const helpers = await new HelperRepository().findAllWithWork();
 

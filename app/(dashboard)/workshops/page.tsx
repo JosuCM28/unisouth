@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Talleres" };
  * No se paginan: son unos cuantos y van a seguir siendo unos cuantos.
  */
 export default async function WorkshopsPage() {
-  await requirePermission("inventory:browse");
+  await requirePermission("production:browse");
 
   const [workshops, stages] = await Promise.all([
     prisma.workshop.findMany({

@@ -46,7 +46,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/calculations",
         label: "Cálculo",
         icon: "calculator",
-        permission: "inventory:read",
+        permission: "calculation:run",
         showOnMobileBar: true,
       },
     ],
@@ -66,12 +66,15 @@ export const NAVIGATION: NavSection[] = [
         /* Lo que SIEMPRE aplica: "el corte de Ternium lleva bolsa y bordado".
            Va junto a Tareas y no en Catálogos porque no es una lista de la
            que se elige al capturar, es algo que se consulta antes de trabajar.
-           Pide `inventory:read` y no `browse`: de nada sirve una regla que
-           Dirección o el de sólo lectura no pueden leer. */
+
+           El CATÁLOGO de reglas es de producción, que es quien las dicta. Al
+           auxiliar no le hace falta: las reglas que aplican al trabajo que
+           está capturando le aparecen solas en la pantalla de captura, vía
+           `applicableRulesAction`, que sólo pide `inventory:read`. */
         href: "/rules",
         label: "Reglas",
         icon: "rules",
-        permission: "inventory:read",
+        permission: "production:browse",
       },
     ],
   },
@@ -88,7 +91,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/products",
         label: "Productos",
         icon: "products",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         /* Junto a Productos y no en Documentos: es un catálogo, no un papel
@@ -103,25 +106,25 @@ export const NAVIGATION: NavSection[] = [
         href: "/sizes",
         label: "Tallas",
         icon: "sizes",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         href: "/cut-tags",
         label: "Foleos",
         icon: "cutTags",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         href: "/workshops",
         label: "Talleres",
         icon: "workshops",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         href: "/warehouses",
         label: "Almacenes",
         icon: "warehouses",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         href: "/locations",
@@ -139,7 +142,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/production-runs",
         label: "Producciones",
         icon: "productionRuns",
-        permission: "inventory:browse",
+        permission: "production:browse",
       },
       {
         href: "/partners",
@@ -151,7 +154,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/helpers",
         label: "Ayudantes",
         icon: "helpers",
-        permission: "inventory:read",
+        permission: "staff:browse",
       },
     ],
   },
@@ -189,7 +192,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/movements",
         label: "Movimientos",
         icon: "movements",
-        permission: "inventory:browse",
+        permission: "reporting:read",
       },
       {
         href: "/documents",
@@ -207,7 +210,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/reports",
         label: "Reportes",
         icon: "reports",
-        permission: "inventory:browse",
+        permission: "reporting:read",
       },
       {
         href: "/audit",

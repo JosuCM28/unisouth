@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   // Recorre el kárdex completo: sin límite es un vector de denegación.
   await enforceRateLimit("export:reports", EXPORT_LIMIT);
 
-  await requirePermission("inventory:browse");
+  await requirePermission("reporting:read");
 
   const days = parseRangeDays(new URL(request.url).searchParams.get("dias"));
   const report = await new ReportService().getReport(days);

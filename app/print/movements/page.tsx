@@ -22,7 +22,7 @@ interface PageProps {
 
 /** El kárdex filtrado, en papel o PDF. La contraparte del Excel. */
 export default async function PrintMovementsPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:browse");
+  await requirePermission("reporting:read");
 
   const params = await searchParams;
   const movements = await new MovementRepository().findAllForExport(

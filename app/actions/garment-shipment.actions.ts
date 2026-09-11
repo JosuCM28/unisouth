@@ -85,7 +85,7 @@ const CATALOG_REVALIDATE = ["/workshops", "/orders"];
 export async function createWorkshopAction(input: unknown) {
   return executeAction(input, {
     schema: workshopSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller creado",
     handler: ({ input }) => prisma.workshop.create({ data: input }),
@@ -95,7 +95,7 @@ export async function createWorkshopAction(input: unknown) {
 export async function updateWorkshopAction(input: unknown) {
   return executeAction(input, {
     schema: z.object({ id: cuidSchema, data: workshopSchema }),
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller actualizado",
     handler: ({ input }) =>
@@ -107,7 +107,7 @@ export async function updateWorkshopAction(input: unknown) {
 export async function removeWorkshopAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller dado de baja",
     handler: ({ input }) =>
@@ -121,7 +121,7 @@ export async function removeWorkshopAction(input: unknown) {
 export async function createProcessStageAction(input: unknown) {
   return executeAction(input, {
     schema: processStageSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa creada",
     handler: ({ input }) => prisma.processStage.create({ data: input }),
@@ -131,7 +131,7 @@ export async function createProcessStageAction(input: unknown) {
 export async function updateProcessStageAction(input: unknown) {
   return executeAction(input, {
     schema: z.object({ id: cuidSchema, data: processStageSchema }),
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa actualizada",
     handler: ({ input }) =>
@@ -142,7 +142,7 @@ export async function updateProcessStageAction(input: unknown) {
 export async function removeProcessStageAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa dada de baja",
     handler: ({ input }) =>

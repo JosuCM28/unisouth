@@ -15,7 +15,7 @@ const updateCutTagSchema = z.object({ id: cuidSchema, data: cutTagSchema });
 export async function createCutTagAction(input: unknown) {
   return executeAction(input, {
     schema: cutTagSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Foleo agregado",
     handler: ({ input, auditContext }) =>
@@ -26,7 +26,7 @@ export async function createCutTagAction(input: unknown) {
 export async function updateCutTagAction(input: unknown) {
   return executeAction(input, {
     schema: updateCutTagSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Foleo actualizado",
     handler: ({ input, auditContext }) =>
@@ -37,7 +37,7 @@ export async function updateCutTagAction(input: unknown) {
 export async function removeCutTagAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Foleo dado de baja",
     handler: ({ input, auditContext }) =>

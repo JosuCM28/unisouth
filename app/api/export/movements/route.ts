@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   // Recorren tablas completas: sin límite, son un vector de denegación.
   await enforceRateLimit("export:movements", EXPORT_LIMIT);
 
-  await requirePermission("inventory:browse");
+  await requirePermission("reporting:read");
 
   const items = await new MovementRepository().findAllForExport(
     movementFiltersFromRequest(request),

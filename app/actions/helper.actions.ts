@@ -12,7 +12,7 @@ const updateHelperSchema = z.object({ id: cuidSchema, data: helperSchema });
 
 export async function createHelperAction(input: unknown) {
   return executeAction(input, {
-    schema: helperSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: helperSchema, permission: "staff:write", revalidate: REVALIDATE,
     successMessage: "Ayudante registrado",
     handler: ({ input, auditContext }) => new HelperService(auditContext).create(input),
   });
@@ -20,7 +20,7 @@ export async function createHelperAction(input: unknown) {
 
 export async function updateHelperAction(input: unknown) {
   return executeAction(input, {
-    schema: updateHelperSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: updateHelperSchema, permission: "staff:write", revalidate: REVALIDATE,
     successMessage: "Ayudante actualizado",
     handler: ({ input, auditContext }) => new HelperService(auditContext).update(input.id, input.data),
   });
@@ -28,7 +28,7 @@ export async function updateHelperAction(input: unknown) {
 
 export async function removeHelperAction(input: unknown) {
   return executeAction(input, {
-    schema: removeSchema, permission: "catalog:write", revalidate: REVALIDATE,
+    schema: removeSchema, permission: "staff:write", revalidate: REVALIDATE,
     successMessage: "Ayudante dado de baja",
     handler: ({ input, auditContext }) => new HelperService(auditContext).remove(input.id, input.reason),
   });

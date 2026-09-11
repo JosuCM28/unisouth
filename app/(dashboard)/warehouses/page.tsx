@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Almacenes" };
  * antes de bajar a filas y racks.
  */
 export default async function WarehousesPage() {
-  await requirePermission("inventory:browse");
+  await requirePermission("production:browse");
 
   const warehouses = await new WarehouseRepository().findAllWithStock();
 

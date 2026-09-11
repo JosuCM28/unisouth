@@ -20,14 +20,14 @@ export const metadata: Metadata = { title: "Reglas" };
 /**
  * Reglas fijas del almacén.
  *
- * Se pide `inventory:read` y no `browse`: esto no es recorrer el almacén, es
- * consultar lo que siempre aplica. Dirección y los roles de sólo lectura
- * también necesitan poder leerlas —de nada sirve una regla que su público no
- * puede ver—. Escribirlas ya es otra cosa y pide `catalog:write`.
+ * El CATÁLOGO pide `production:browse`: quien dicta las reglas es producción,
+ * no el almacén. Al auxiliar no le hace falta esta pantalla porque las reglas
+ * que aplican al trabajo que está capturando le aparecen solas ahí mismo, vía
+ * `applicableRulesAction`, que sólo pide `inventory:read`.
  */
 export default async function RulesPage({ searchParams }: PageProps) {
-  const user = await requirePermission("inventory:read");
-  const canEdit = roleHasPermission(user.role, "catalog:write");
+  const user = await requirePermission("production:browse");
+  const canEdit = roleHasPermission(user.role, "production:write");
 
   const { client: clientFilter } = await searchParams;
 

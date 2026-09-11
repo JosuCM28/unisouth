@@ -19,10 +19,11 @@ interface PageProps {
 }
 
 export default async function ProductsPage({ searchParams }: PageProps) {
-  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
-     no está en su menú, y ésta es la línea que de verdad la cierra —el
-     enlace oculto es comodidad visual, no seguridad. */
-  await requirePermission("inventory:browse");
+  /* Esto es del lado de producción, no del almacén: el auxiliar recibe y
+     surte, pero no decide cómo se hace la prenda. Sin `production:browse`
+     la pantalla no está en su menú, y ésta es la línea que de verdad la
+     cierra —el enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("production:browse");
 
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;

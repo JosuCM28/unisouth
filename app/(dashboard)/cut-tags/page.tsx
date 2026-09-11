@@ -19,8 +19,8 @@ export const metadata: Metadata = { title: "Foleos" };
  * No se pagina: son una docena de colores y van a seguir siendo una docena.
  */
 export default async function CutTagsPage() {
-  // Leer catálogos va con inventory:read, igual que tallas y materiales.
-  await requirePermission("inventory:browse");
+  // El foleo es del corte, no del almacén: va con tallas y talleres.
+  await requirePermission("production:browse");
 
   const tags = await prisma.cutTagOption.findMany({
     where: { deletedAt: null },

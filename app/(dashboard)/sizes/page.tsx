@@ -11,10 +11,11 @@ import { requirePermission } from "@/lib/core/session";
 export const metadata: Metadata = { title: "Tallas" };
 
 export default async function SizesPage() {
-  /* Dirección no recorre el almacén: sin `inventory:browse` esta pantalla
-     no está en su menú, y ésta es la línea que de verdad la cierra —el
-     enlace oculto es comodidad visual, no seguridad. */
-  await requirePermission("inventory:browse");
+  /* Esto es del lado de producción, no del almacén: el auxiliar recibe y
+     surte, pero no decide cómo se hace la prenda. Sin `production:browse`
+     la pantalla no está en su menú, y ésta es la línea que de verdad la
+     cierra —el enlace oculto es comodidad visual, no seguridad. */
+  await requirePermission("production:browse");
 
   // Size.consumptionFactor es Decimal y SizeFormDialog es cliente: sin
   // convertir, React no puede serializarlo al pasar la frontera.

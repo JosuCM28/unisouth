@@ -14,7 +14,7 @@ const REVALIDATE = ["/warehouses", "/locations", "/lots", "/dashboard"];
 export async function createWarehouseAction(input: unknown) {
   return executeAction(input, {
     schema: warehouseSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Almacén creado",
     handler: ({ input, auditContext }) =>
@@ -25,7 +25,7 @@ export async function createWarehouseAction(input: unknown) {
 export async function updateWarehouseAction(input: unknown) {
   return executeAction(input, {
     schema: updateWarehouseSchema,
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Almacén actualizado",
     handler: ({ input, auditContext }) =>
@@ -36,7 +36,7 @@ export async function updateWarehouseAction(input: unknown) {
 export async function removeWarehouseAction(input: unknown) {
   return executeAction(input, {
     schema: z.object({ id: z.string().min(1) }),
-    permission: "catalog:write",
+    permission: "production:write",
     revalidate: REVALIDATE,
     successMessage: "Almacén dado de baja",
     handler: ({ input, auditContext }) =>

@@ -241,17 +241,43 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | Rol | Qué puede |
 |---|---|
 | `ADMIN` | Todo, incluido usuarios y configuración |
-| `WAREHOUSE` | Todo el menú salvo Auditoría: entradas, salidas, cortes, conteos, ajustes, catálogos, fichas técnicas, cálculos y levantar requisiciones (no autorizarlas) |
-| `PRODUCTION` | Consultar inventario, editar fichas técnicas, correr cálculos |
+| `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos. Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
+| `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · Ayudantes. Edita tareas, ayudantes y cálculos; NO recorre el almacén ni ve auditoría |
 | `READ_ONLY` | Sólo lectura |
 
-`inventory:read` es consultar un dato; **`inventory:browse` es recorrer el
-almacén** (rollos, catálogos, documentos, reportes). Están separados porque
-Dirección entra sólo a lo suyo: sin `browse` se le caen del menú 18 destinos.
+**Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, foleos,
+talleres, corridas, reglas y bodegas son del lado de producción: el auxiliar
+recibe, acomoda y surte, pero no decide cómo se hace la prenda. El kárdex
+global y los reportes son supervisión —el historial del rollo que trae en la
+mano lo sigue viendo en su ficha, que es lo que necesita en el piso—. Los
+ayudantes son base de bonificación. Y ya no levanta requisiciones ni corre
+cálculos: la explosión de insumos **dentro de una salida** sí la hace, y por
+eso `explodeForIssueAction` pide `inventory:write` y no `calculation:run`.
+
+Las **Reglas** le siguen llegando donde importan: el catálogo desaparece de su
+menú, pero las que aplican al trabajo que está capturando le aparecen solas en
+la pantalla de captura vía `applicableRulesAction`, que pide `inventory:read`.
+
+Cinco capacidades separan lo anterior:
+
+| Capacidad | Qué gobierna |
+|---|---|
+| `inventory:read` | Consultar un dato suelto: escanear un rollo, el pizarrón de tareas |
+| `inventory:browse` | **Recorrer el almacén**: rollos, documentos y los catálogos que se eligen al capturar (materiales, prendas, ubicaciones, clientes, proveedores) |
+| `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, foleos, talleres, corridas, reglas y bodegas |
+| `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
+| `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
+
+`catalog:write` quedó acotado a los cinco catálogos del piso; cada dominio que
+salió tiene su propia llave de escritura, para que "no verlo" y "no poder
+escribirlo" sean lo mismo.
+
 El destino de entrada tras el login NO es `/dashboard` fijo — lo resuelve
-`landingRoute()` con el primer destino que el rol puede ver.
+`landingRoute()` con el primer destino que el rol puede ver. La barra inferior
+del celular se filtra igual: WAREHOUSE ve tres botones, no cuatro, porque
+Cálculo dejó de ser suyo.
 
 Los permisos son capacidades (`inventory:write`, `inventory:adjust`,
 `catalog:write`…), no pantallas. `executeAction` exige el permiso antes de
@@ -287,7 +313,9 @@ Tokens en `app/globals.css` con `@theme inline` de Tailwind v4 y colores en
 ## 10. Móvil primero — el registro se hace en celular
 
 - **Barra inferior fija** de máximo 4 destinos: Tablero · Inventario ·
-  Escanear · Cálculo. Es la navegación principal en el piso.
+  Escanear · Cálculo. Es la navegación principal en el piso. Se filtra por
+  rol, así que el auxiliar de almacén ve tres —Cálculo no es suyo— y Dirección
+  ve dos.
 - **Sidebar sólo en `md:` hacia arriba.** En celular no existe.
 - **Área táctil mínima 44px.** Usa la utilidad `.touch-target`.
 - Respeta el notch: `.safe-top` y `.safe-bottom` con `env(safe-area-inset-*)`.

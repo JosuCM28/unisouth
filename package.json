@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "verify:integrity": "tsx scripts/verify-integrity.ts",
     "verify:users": "tsx scripts/verify-users.ts",
+    "verify:roles": "tsx scripts/verify-roles.ts",
     "user:create": "tsx scripts/create-user.ts",
     "user:list": "tsx scripts/manage-users.ts list",
     "user:role": "tsx scripts/manage-users.ts role",
