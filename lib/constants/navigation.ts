@@ -180,10 +180,13 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:browse",
       },
       {
+        /* Pide `orders:browse` y no `inventory:browse` como sus vecinas: es
+           el único destino al que entra Sólo lectura, que mira el avance de
+           un pedido sin recorrer el almacén. */
         href: "/orders",
         label: "Órdenes",
         icon: "orders",
-        permission: "inventory:browse",
+        permission: "orders:browse",
       },
       {
         // El kárdex, no los vales: aquí sólo aparece lo que YA afectó
@@ -249,11 +252,12 @@ export const MOBILE_BAR_ITEMS: NavItem[] = NAVIGATION.flatMap((section) =>
 /**
  * A dónde entra cada quien al iniciar sesión.
  *
- * No puede ser `/dashboard` fijo: Dirección no tiene `inventory:browse`, así
- * que el tablero le está cerrado y aterrizaría en un error de permiso justo
- * después de escribir bien su contraseña. Se resuelve tomando el PRIMER
- * destino que su rol sí puede ver, que por el orden de NAVIGATION es el más
- * importante para ese rol.
+ * No puede ser `/dashboard` fijo: ni Dirección ni Sólo lectura tienen
+ * `inventory:browse`, así que el tablero les está cerrado y aterrizarían en
+ * un error de permiso justo después de escribir bien su contraseña. Se
+ * resuelve tomando el PRIMER destino que su rol sí puede ver, que por el
+ * orden de NAVIGATION es el más importante para ese rol —Escanear para
+ * Dirección, Órdenes para Sólo lectura.
  */
 export function landingRoute(
   role: string,

@@ -76,6 +76,7 @@ export function OrderBatches({
   orderId,
   orderCode,
   canSend = false,
+  canOpenDocuments = false,
   shippableSizes = [],
   workshops = [],
   stages = [],
@@ -85,6 +86,13 @@ export function OrderBatches({
   orderCode: string;
   /** Si se ofrece mandar cortes a salidas. Falso en una orden cancelada. */
   canSend?: boolean;
+  /**
+   * Si el folio de la salida lleva al vale.
+   *
+   * El vale vive en Documentos y pide `inventory:browse`; quien sólo mira
+   * órdenes ve el folio como texto en vez de un enlace a un error.
+   */
+  canOpenDocuments?: boolean;
   /* Lo que necesita el diálogo de taller para poder abrirse desde el corte:
      las tallas de la orden con lo ya mandado a cada etapa, y los catálogos. */
   shippableSizes?: ShippableSize[];
@@ -168,22 +176,11 @@ export function OrderBatches({
             {batch.issues.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {batch.issues.map((issue) => (
-                  <Link
+                  <IssueChip
                     key={issue.id}
-                    href={`/documents/${issue.id}`}
-                    className="flex items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-xs"
-                  >
-                    <Truck className="size-3 shrink-0" aria-hidden />
-                    <span className="tabular">{issue.code}</span>
-                    <span
-                      className={cn(
-                        "rounded px-1",
-                        DOCUMENT_STATUS_STYLES[issue.status],
-                      )}
-                    >
-                      {DOCUMENT_STATUS_LABELS[issue.status]}
-                    </span>
-                  </Link>
+                    issue={issue}
+                    canOpen={canOpenDocuments}
+                  />
                 ))}
               </div>
             )}
@@ -335,6 +332,42 @@ export function OrderBatches({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * El folio de la salida del corte: enlace o texto, según quién mira.
+ *
+ * El vale vive en Documentos, que pide `inventory:browse`. Quien sólo sigue
+ * el avance de la orden necesita saber QUE ya salió y con qué folio —eso se
+ * lee igual sin enlace—, no navegar hasta el papel.
+ */
+function IssueChip({
+  issue,
+  canOpen,
+}: {
+  issue: BatchIssueView;
+  canOpen: boolean;
+}) {
+  const className =
+    "flex items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-xs";
+
+  const content = (
+    <>
+      <Truck className="size-3 shrink-0" aria-hidden />
+      <span className="tabular">{issue.code}</span>
+      <span className={cn("rounded px-1", DOCUMENT_STATUS_STYLES[issue.status])}>
+        {DOCUMENT_STATUS_LABELS[issue.status]}
+      </span>
+    </>
+  );
+
+  if (!canOpen) return <span className={className}>{content}</span>;
+
+  return (
+    <Link href={`/documents/${issue.id}`} className={className}>
+      {content}
+    </Link>
   );
 }
 

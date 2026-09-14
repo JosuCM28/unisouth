@@ -54,7 +54,17 @@ export interface ShipmentView {
  * borda los paneles y los manda a donde siguen, así que no vuelven aquí. El
  * botón de retorno sólo aparece cuando de verdad hace falta capturar uno.
  */
-export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
+export function OrderShipments({
+  shipments,
+  canWrite = false,
+  canOpenDocuments = false,
+}: {
+  shipments: ShipmentView[];
+  /** Si se ofrece capturar retornos y borrar envíos. Por omisión no. */
+  canWrite?: boolean;
+  /** Si el folio del vale lleva a Documentos. Pide `inventory:browse`. */
+  canOpenDocuments?: boolean;
+}) {
   if (shipments.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -111,29 +121,28 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
               {/* El vale que se imprime y se firma. Va aquí porque es el papel
                   que acompaña al bulto, no un detalle del registro. */}
               {shipment.document && (
-                <Link
-                  href={`/documents/${shipment.document.id}`}
-                  className="touch-target flex items-center gap-1.5 text-sm text-muted-foreground"
-                >
-                  <FileText className="size-4" aria-hidden />
-                  <span className="tabular">{shipment.document.code}</span>
-                </Link>
+                <ShipmentVoucher
+                  document={shipment.document}
+                  canOpen={canOpenDocuments}
+                />
               )}
 
-              <ShipmentDeleteButton
-                shipmentId={shipment.id}
-                shipmentCode={shipment.code}
-                sentQuantity={totalSent}
-                hasReturns={shipmentHasReturns}
-                voucher={
-                  shipment.document
-                    ? {
-                        code: shipment.document.code,
-                        isDraft: shipment.document.isDraft,
-                      }
-                    : null
-                }
-              />
+              {canWrite && (
+                <ShipmentDeleteButton
+                  shipmentId={shipment.id}
+                  shipmentCode={shipment.code}
+                  sentQuantity={totalSent}
+                  hasReturns={shipmentHasReturns}
+                  voucher={
+                    shipment.document
+                      ? {
+                          code: shipment.document.code,
+                          isDraft: shipment.document.isDraft,
+                        }
+                      : null
+                  }
+                />
+              )}
             </div>
           </div>
 
@@ -182,7 +191,7 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
                     )}
                   </span>
 
-                  {pending > 0 && shipment.status !== "CANCELLED" && (
+                  {canWrite && pending > 0 && shipment.status !== "CANCELLED" && (
                     <ReturnDialog
                       lineId={line.id}
                       sizeCode={line.sizeCode}
@@ -197,6 +206,45 @@ export function OrderShipments({ shipments }: { shipments: ShipmentView[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * El folio del vale: enlace para quien puede abrirlo, texto para quien no.
+ *
+ * El dato que hace falta es el folio —"salió con el IN-2026-0341"—, y ése se
+ * lee igual sin enlace. Mandar a Documentos a quien no tiene `inventory:browse`
+ * sólo lo llevaría a un error de permiso.
+ */
+function ShipmentVoucher({
+  document,
+  canOpen,
+}: {
+  document: { id: string; code: string };
+  canOpen: boolean;
+}) {
+  const content = (
+    <>
+      <FileText className="size-4" aria-hidden />
+      <span className="tabular">{document.code}</span>
+    </>
+  );
+
+  if (!canOpen) {
+    return (
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={`/documents/${document.id}`}
+      className="touch-target flex items-center gap-1.5 text-sm text-muted-foreground"
+    >
+      {content}
+    </Link>
   );
 }
 

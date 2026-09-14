@@ -78,7 +78,7 @@ export async function GET(request: Request) {
   // Recorren tablas completas: sin límite, son un vector de denegación.
   await enforceRateLimit("export:orders", EXPORT_LIMIT);
 
-  await requirePermission("inventory:browse");
+  await requirePermission("orders:browse");
 
   const url = new URL(request.url);
   const filters = parseCuttingOrderFilters({

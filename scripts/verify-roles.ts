@@ -68,15 +68,10 @@ const ESPERADO: Record<Role, string[]> = {
   // El menú corto del contrato: cuatro destinos, ni uno más.
   MANAGEMENT: ["Escanear", "Cálculo", "Tareas", "Ayudantes"],
 
-  READ_ONLY: [
-    "Tablero", "Inventario", "Escanear",
-    "Tareas", "Reglas",
-    "Materiales", "Productos", "Prendas", "Tallas", "Foleos", "Talleres",
-    "Almacenes", "Ubicaciones", "Clientes", "Producciones", "Proveedores",
-    "Ayudantes",
-    "Recepciones", "Salidas", "Órdenes", "Movimientos", "Documentos",
-    "Reportes",
-  ],
+  /* Un solo destino: entra a mirar cómo va un pedido y de ahí no se mueve.
+     Dentro de Órdenes tampoco puede tocar nada, porque no lleva
+     `inventory:write`: eso lo cuida la pantalla escondiendo los botones. */
+  READ_ONLY: ["Órdenes"],
 };
 
 let fallos = 0;

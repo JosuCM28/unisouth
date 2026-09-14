@@ -55,6 +55,13 @@ interface Props {
   order: OrderListEntry;
   /** Pedido al que pertenece. Sólo se pinta donde no sea obvio. */
   folderName?: string | null;
+  /**
+   * Si se ofrece borrar la orden.
+   *
+   * Por omisión NO, para que quien sólo consulta nunca vea el bote de basura
+   * aunque una pantalla nueva se olvide de pasarlo.
+   */
+  canWrite?: boolean;
 }
 
 /**
@@ -64,7 +71,11 @@ interface Props {
  * pedido— y si cada una la dibujara por su cuenta acabarían mostrando cosas
  * distintas de la misma orden.
  */
-export function OrderListItem({ order, folderName }: Props) {
+export function OrderListItem({
+  order,
+  folderName,
+  canWrite = false,
+}: Props) {
   const ordered = order.lines.reduce(
     (sum, line) => sum + line.orderedQuantity,
     0,
@@ -178,12 +189,14 @@ export function OrderListItem({ order, folderName }: Props) {
         </div>
 
         {/* Por encima de la capa del enlace, o el toque abriría la orden. */}
-        <OrderDeleteButton
-          orderId={order.id}
-          orderCode={order.code}
-          cutQuantity={cut}
-          className="relative z-20"
-        />
+        {canWrite && (
+          <OrderDeleteButton
+            orderId={order.id}
+            orderCode={order.code}
+            cutQuantity={cut}
+            className="relative z-20"
+          />
+        )}
       </div>
     </div>
   );

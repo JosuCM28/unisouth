@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ClipboardList, FolderPlus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -57,7 +58,11 @@ interface PageProps {
  * diario: cuánto falta por cortar.
  */
 export default async function OrdersPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:browse");
+  const user = await requirePermission("orders:browse");
+  /* Quien sólo mira el avance no ve un solo botón de captura: ofrecerle
+     "Nueva" para que le rebote `executeAction` es prometerle algo que no
+     puede hacer. La barrera de verdad sigue estando en el servidor. */
+  const canWrite = roleHasPermission(user.role, "inventory:write");
 
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
@@ -138,20 +143,22 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         title="Órdenes"
         description="Qué pidieron y cuánto falta por cortar"
         action={
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="touch-target">
-              <Link href="/orders/folders/new">
-                <FolderPlus className="size-4" aria-hidden />
-                Pedido
-              </Link>
-            </Button>
-            <Button asChild className="touch-target">
-              <Link href="/orders/new">
-                <Plus className="size-4" aria-hidden />
-                Nueva
-              </Link>
-            </Button>
-          </div>
+          canWrite ? (
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" className="touch-target">
+                <Link href="/orders/folders/new">
+                  <FolderPlus className="size-4" aria-hidden />
+                  Pedido
+                </Link>
+              </Button>
+              <Button asChild className="touch-target">
+                <Link href="/orders/new">
+                  <Plus className="size-4" aria-hidden />
+                  Nueva
+                </Link>
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -186,7 +193,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           <ul className="flex flex-col gap-2">
             {folders.map((folder) => (
               <li key={folder.id}>
-                <FolderCard folder={folder} />
+                <FolderCard folder={folder} canWrite={canWrite} />
               </li>
             ))}
           </ul>
@@ -200,11 +207,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           <EmptyState
             icon={ClipboardList}
             title={hasFilters ? "Ninguna orden coincide" : "Aún no hay órdenes"}
-            description={
-              hasFilters
-                ? "Prueba con otro rango de fechas, otro cliente u otro estado."
-                : "Da de alta lo que pidió el cliente y ve descontando conforme se corta."
-            }
+            description={emptyDescription(hasFilters, canWrite)}
           />
         </div>
       ) : (
@@ -230,12 +233,27 @@ export default async function OrdersPage({ searchParams }: PageProps) {
               // mezcladas órdenes de dentro y de fuera de una carpeta.
               showFolder={isSearching}
               isFiltered={hasFilters}
+              canWrite={canWrite}
             />
           </section>
         )
       )}
     </div>
   );
+}
+
+/**
+ * El texto del vacío, que depende de quién mira.
+ *
+ * A quien captura se le dice qué hacer; a quien sólo consulta no, porque el
+ * botón que necesitaría para hacerlo ni siquiera está en su pantalla.
+ */
+function emptyDescription(hasFilters: boolean, canWrite: boolean): string {
+  if (hasFilters) {
+    return "Prueba con otro rango de fechas, otro cliente u otro estado.";
+  }
+  if (!canWrite) return "Cuando se den de alta, aparecerán aquí.";
+  return "Da de alta lo que pidió el cliente y ve descontando conforme se corta.";
 }
 
 /** Entero positivo o nada. Cualquier basura en la URL se ignora. */

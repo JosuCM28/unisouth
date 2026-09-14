@@ -90,7 +90,7 @@ export async function GET(
 ) {
   // Recorre la orden entera: sin límite es un vector de denegación.
   await enforceRateLimit("export:order", EXPORT_LIMIT);
-  await requirePermission("inventory:browse");
+  await requirePermission("orders:browse");
 
   const { id } = await params;
 

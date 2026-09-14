@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, FolderOpen, FolderPlus } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -34,7 +35,10 @@ interface PageProps {
  * pedidos—, y de paso deja cada pantalla contestando una sola pregunta.
  */
 export default async function OrderFoldersPage({ searchParams }: PageProps) {
-  await requirePermission("inventory:browse");
+  const user = await requirePermission("orders:browse");
+  // Sin `inventory:write` la pantalla es un tablero de consulta: los pedidos
+  // se abren y se leen, pero no se dan de alta ni se borran.
+  const canWrite = roleHasPermission(user.role, "inventory:write");
 
   const params = await searchParams;
   const page = parsePositiveInt(params.page) ?? 1;
@@ -77,12 +81,14 @@ export default async function OrderFoldersPage({ searchParams }: PageProps) {
         title="Pedidos"
         description="Lo que pidió cada cliente, agrupado"
         action={
-          <Button asChild className="touch-target">
-            <Link href="/orders/folders/new">
-              <FolderPlus className="size-4" aria-hidden />
-              Nuevo
-            </Link>
-          </Button>
+          canWrite ? (
+            <Button asChild className="touch-target">
+              <Link href="/orders/folders/new">
+                <FolderPlus className="size-4" aria-hidden />
+                Nuevo
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -99,18 +105,14 @@ export default async function OrderFoldersPage({ searchParams }: PageProps) {
           <EmptyState
             icon={FolderOpen}
             title={isFiltered ? "Ningún pedido coincide" : "Aún no hay pedidos"}
-            description={
-              isFiltered
-                ? "Prueba con otras palabras o incluye los archivados."
-                : "Agrupa las órdenes de un mismo cliente para seguirlas juntas."
-            }
+            description={emptyDescription(isFiltered, canWrite)}
           />
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {folders.map((folder) => (
             <li key={folder.id}>
-              <FolderCard folder={folder} />
+              <FolderCard folder={folder} canWrite={canWrite} />
             </li>
           ))}
         </ul>
@@ -126,6 +128,18 @@ export default async function OrderFoldersPage({ searchParams }: PageProps) {
       />
     </div>
   );
+}
+
+/**
+ * El texto del vacío, que depende de quién mira.
+ *
+ * A quien no puede crear pedidos no se le pide que agrupe órdenes: el botón
+ * que haría falta no está en su pantalla.
+ */
+function emptyDescription(isFiltered: boolean, canWrite: boolean): string {
+  if (isFiltered) return "Prueba con otras palabras o incluye los archivados.";
+  if (!canWrite) return "Cuando se den de alta, aparecerán aquí.";
+  return "Agrupa las órdenes de un mismo cliente para seguirlas juntas.";
 }
 
 /** Entero positivo o nada. Cualquier basura en la URL se ignora. */

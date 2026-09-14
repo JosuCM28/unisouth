@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ClipboardList, Pencil, Plus } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { prisma } from "@/lib/prisma";
 import { cutProgress, formatDate, toDateInputValue } from "@/lib/utils";
@@ -35,7 +36,11 @@ export async function generateMetadata({
  * pedido?"— sin tener que abrir orden por orden y sumar a mano.
  */
 export default async function OrderFolderPage({ params }: PageProps) {
-  await requirePermission("inventory:browse");
+  const user = await requirePermission("orders:browse");
+  /* La ficha del pedido contesta "¿cómo va?", y eso se puede contestar sin
+     poder tocarlo: quien no captura la lee entera —totales, órdenes, avance—
+     pero sin editar, archivar ni borrar. */
+  const canWrite = roleHasPermission(user.role, "inventory:write");
 
   const { id } = await params;
 
@@ -77,6 +82,7 @@ export default async function OrderFolderPage({ params }: PageProps) {
         title={folder.name}
         description={`${folder.code}${folder.client ? ` · ${folder.client.name}` : ""}`}
         action={
+          canWrite &&
           !isArchived && (
             <Button asChild className="touch-target">
               <Link href={newOrderHref}>
@@ -103,22 +109,25 @@ export default async function OrderFolderPage({ params }: PageProps) {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" className="touch-target">
-            <Link href={`/orders/folders/${folder.id}/edit`}>
-              <Pencil className="size-4" aria-hidden />
-              Editar
-            </Link>
-          </Button>
-          <FolderArchiveButton folderId={folder.id} isArchived={isArchived} />
-          {/* Aquí es donde se vacía el pedido —orden por orden, abajo— así que
-              aquí tiene que estar el botón que se desbloquea al terminar. */}
-          <FolderDeleteButton
-            folderId={folder.id}
-            folderCode={folder.code}
-            orderCount={folder.orders.length}
-          />
-        </div>
+        {canWrite && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="touch-target">
+              <Link href={`/orders/folders/${folder.id}/edit`}>
+                <Pencil className="size-4" aria-hidden />
+                Editar
+              </Link>
+            </Button>
+            <FolderArchiveButton folderId={folder.id} isArchived={isArchived} />
+            {/* Aquí es donde se vacía el pedido —orden por orden, abajo— así
+                que aquí tiene que estar el botón que se desbloquea al
+                terminar. */}
+            <FolderDeleteButton
+              folderId={folder.id}
+              folderCode={folder.code}
+              orderCount={folder.orders.length}
+            />
+          </div>
+        )}
       </div>
 
       {(folder.reference || folder.dueDate || folder.notes) && (
@@ -148,8 +157,13 @@ export default async function OrderFolderPage({ params }: PageProps) {
           <EmptyState
             icon={ClipboardList}
             title="Este pedido no tiene órdenes"
-            description="Agrega la primera orden de corte del pedido."
+            description={
+              canWrite
+                ? "Agrega la primera orden de corte del pedido."
+                : "Cuando se den de alta, aparecerán aquí."
+            }
             action={
+              canWrite &&
               !isArchived && (
                 <Button asChild className="touch-target">
                   <Link href={newOrderHref}>
@@ -176,6 +190,7 @@ export default async function OrderFolderPage({ params }: PageProps) {
             ...order,
             folderName: null,
           }))}
+          canWrite={canWrite}
         />
       )}
     </div>

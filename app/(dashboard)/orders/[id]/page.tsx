@@ -83,14 +83,23 @@ export async function generateMetadata({
  * saber qué queda pendiente sin tener que sumar a mano.
  */
 export default async function OrderDetailPage({ params }: PageProps) {
-  await requirePermission("inventory:browse");
+  await requirePermission("orders:browse");
 
   const { id } = await params;
-  // Para saber si se le ofrece escribir comentarios internos: leerlos sólo
-  // pide `browse`, que la línea de arriba ya exigió.
+
   const user = await getCurrentUser();
-  const canComment = user
+  /* Ésta es la pantalla que Sólo lectura sí puede abrir, y la abre ENTERA:
+     tallas, cortes, envíos, salidas y comentarios. Lo que no tiene es un solo
+     botón de captura —ni capturar corte, ni editar, ni mover, ni cancelar—
+     porque sin `inventory:write` todos le rebotarían en `executeAction`. */
+  const canWrite = user
     ? roleHasPermission(user.role, "inventory:write")
+    : false;
+  /* Las ligas al vale de salida salen del mundo de las órdenes: el documento
+     pide `inventory:browse`. A quien no la trae se le pinta el folio como
+     texto —que es el dato que necesita— en vez de un enlace a un error. */
+  const canOpenDocuments = user
+    ? roleHasPermission(user.role, "inventory:browse")
     : false;
 
   const order = await prisma.cuttingOrder.findUnique({
@@ -262,6 +271,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const cut = order.lines.reduce((s, l) => s + l.cutQuantity, 0);
   const { pending, surplus } = cutProgress(ordered, cut);
   const isCancelled = order.status === "CANCELLED";
+  /* Una orden cancelada no se toca, y quien sólo consulta tampoco la toca:
+     las dos condiciones gobiernan los mismos botones, así que viven juntas. */
+  const canEdit = canWrite && !isCancelled;
+  // Sin un solo botón que ofrecer, el encabezado no pinta el hueco.
+  const hasActions = canWrite || !isCancelled;
 
   /* Lo que viajaría a un vale de salida: sólo las tallas con corte, porque
      lo que sale por la puerta son las prendas que ya existen. Se calcula
@@ -416,51 +430,72 @@ export default async function OrderDetailPage({ params }: PageProps) {
         title={order.code}
         description={order.description ?? "Sin descripción"}
         action={
-          !isCancelled ? (
+          hasActions ? (
             <div className="flex flex-wrap gap-2">
               {/* Va PRIMERO y es el único botón sólido: capturar el corte es
                   lo que se viene a hacer a esta pantalla; imprimir y editar
                   son lo de después. */}
-              <OrderBatchDialog
-                orderId={order.id}
-                batches={batchOptions}
-                sizes={batchSizes}
-              />
-              <Button asChild variant="outline" className="touch-target">
-                <a href={`/print/order/${order.id}`} target="_blank" rel="noopener">
-                  <Printer className="size-4" aria-hidden />
-                  Imprimir
-                </a>
-              </Button>
+              {canEdit && (
+                <OrderBatchDialog
+                  orderId={order.id}
+                  batches={batchOptions}
+                  sizes={batchSizes}
+                />
+              )}
+              {/* Imprimir y Excel son lo único que alcanza quien sólo
+                  consulta: las dos piden `orders:browse`, la misma llave con
+                  la que entró a esta pantalla. */}
+              {!isCancelled && (
+                <Button asChild variant="outline" className="touch-target">
+                  <a
+                    href={`/print/order/${order.id}`}
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <Printer className="size-4" aria-hidden />
+                    Imprimir
+                  </a>
+                </Button>
+              )}
               {/* La misma hoja que Imprimir, pero en Excel: es lo que se
                   manda por correo sin tener que escanear el papel. Va
                   `exact` porque los filtros de la lista no significan nada
                   dentro de una orden. */}
-              <ExportButton
-                href={`/api/export/orders/${order.id}`}
-                label="Excel"
-                exact
-              />
-              <Button asChild variant="outline" className="touch-target">
-                <Link href={`/orders/${order.id}/edit`}>
-                  <Pencil className="size-4" aria-hidden />
-                  Editar
-                </Link>
-              </Button>
+              {!isCancelled && (
+                <ExportButton
+                  href={`/api/export/orders/${order.id}`}
+                  label="Excel"
+                  exact
+                />
+              )}
+              {canEdit && (
+                <Button asChild variant="outline" className="touch-target">
+                  <Link href={`/orders/${order.id}/edit`}>
+                    <Pencil className="size-4" aria-hidden />
+                    Editar
+                  </Link>
+                </Button>
+              )}
               {/* Junto a Editar porque es su hermana: una corrige esta orden
                   y la otra arranca una igual. El mismo cliente vuelve a pedir
                   la misma prenda con la misma base de tallas, y recapturar
-                  quince renglones a mano es de donde salen los errores. */}
-              <Button asChild variant="outline" className="touch-target">
-                <Link href={`/orders/new?from=${order.id}`}>
-                  <Copy className="size-4" aria-hidden />
-                  Duplicar
-                </Link>
-              </Button>
+                  quince renglones a mano es de donde salen los errores.
+
+                  Es el único botón que sobrevive en una orden CANCELADA: la
+                  base de tallas sigue siendo buena y lo único que sobra es su
+                  historial. */}
+              {canWrite && (
+                <Button asChild variant="outline" className="touch-target">
+                  <Link href={`/orders/new?from=${order.id}`}>
+                    <Copy className="size-4" aria-hidden />
+                    Duplicar
+                  </Link>
+                </Button>
+              )}
               {/* Va antes de Mover y Cancelar: es la acción que sigue cuando
                   el taller termina, y estaba costando recapturar el desglose
                   entero en Salidas. */}
-              {canSendToIssue && (
+              {canEdit && canSendToIssue && (
                 <OrderSendToIssueDialog
                   orderId={order.id}
                   orderCode={order.code}
@@ -477,7 +512,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               )}
               {/* Sin talleres ni etapas dadas de alta no hay nada que
                   elegir, y el botón sólo llevaría a un diálogo vacío. */}
-              {workshops.length > 0 && stages.length > 0 && (
+              {canEdit && workshops.length > 0 && stages.length > 0 && (
                 <OrderShipmentDialog
                   orderId={order.id}
                   orderCode={order.code}
@@ -486,25 +521,19 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   stages={stages}
                 />
               )}
-              <OrderMoveDialog
-                orderId={order.id}
-                orderCode={order.code}
-                currentFolderId={order.folderId}
-                folders={folders}
-              />
-              <OrderCancelDialog orderId={order.id} orderCode={order.code} />
+              {canEdit && (
+                <OrderMoveDialog
+                  orderId={order.id}
+                  orderCode={order.code}
+                  currentFolderId={order.folderId}
+                  folders={folders}
+                />
+              )}
+              {canEdit && (
+                <OrderCancelDialog orderId={order.id} orderCode={order.code} />
+              )}
             </div>
-          ) : (
-            /* Cancelada no se toca… salvo para volver a empezar. Duplicar es
-               justo lo que se hace cuando una orden se cae: la base de tallas
-               sigue siendo buena y lo único que sobra es su historial. */
-            <Button asChild variant="outline" className="touch-target">
-              <Link href={`/orders/new?from=${order.id}`}>
-                <Copy className="size-4" aria-hidden />
-                Duplicar
-              </Link>
-            </Button>
-          )
+          ) : undefined
         }
       />
 
@@ -557,7 +586,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <OrderComments
           orderId={order.id}
           comments={commentViews}
-          canWrite={canComment}
+          canWrite={canWrite}
         />
       </section>
 
@@ -576,7 +605,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </span>
             )}
           </h2>
-          <OrderIssues issues={issueViews} />
+          <OrderIssues issues={issueViews} canOpen={canOpenDocuments} />
         </section>
       )}
 
@@ -585,7 +614,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
       {shipmentViews.length > 0 && (
         <section className="flat-surface p-4">
           <h2 className="mb-3 text-sm font-semibold">En talleres</h2>
-          <OrderShipments shipments={shipmentViews} />
+          <OrderShipments
+            shipments={shipmentViews}
+            canWrite={canWrite}
+            canOpenDocuments={canOpenDocuments}
+          />
         </section>
       )}
 
@@ -689,7 +722,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 {/* Sin ningún corte abierto no hay a qué cargar las piezas:
                     el botón llevaría a un diálogo que no puede guardar. La
                     primera captura se hace con "Capturar corte". */}
-                {!isCancelled && batchOptions.length > 0 && (
+                {canEdit && batchOptions.length > 0 && (
                   <OrderProgressDialog
                     lineId={line.id}
                     sizeCode={line.size.code}
@@ -805,7 +838,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
           batches={batchViews}
           orderId={order.id}
           orderCode={order.code}
-          canSend={!isCancelled}
+          canSend={canEdit}
+          canOpenDocuments={canOpenDocuments}
           shippableSizes={shippableSizes}
           workshops={workshops}
           stages={stages}

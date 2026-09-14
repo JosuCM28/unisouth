@@ -245,7 +245,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · Ayudantes. Edita tareas, ayudantes y cálculos; NO recorre el almacén ni ve auditoría |
-| `READ_ONLY` | Sólo lectura |
+| `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, foleos,
 talleres, corridas, reglas y bodegas son del lado de producción: el auxiliar
@@ -260,12 +260,25 @@ Las **Reglas** le siguen llegando donde importan: el catálogo desaparece de su
 menú, pero las que aplican al trabajo que está capturando le aparecen solas en
 la pantalla de captura vía `applicableRulesAction`, que pide `inventory:read`.
 
-Cinco capacidades separan lo anterior:
+**READ_ONLY y por qué tiene su propia llave.** Es quien entra a MIRAR cómo va
+un pedido —quien contesta el teléfono cuando el cliente pregunta— y nada más.
+Mientras Órdenes pidió `inventory:browse`, dejarlo entrar ahí abría de pilón
+los otros trece destinos que cuelgan de esa misma llave, así que las órdenes
+se separaron en `orders:browse`. Dentro de la pantalla no puede tocar nada
+porque no lleva `inventory:write`: capturar corte, editar, duplicar, mover,
+cancelar, mandar a taller y borrar **ni siquiera se le pintan**. Esconder el
+botón es comodidad, no seguridad: la barrera sigue siendo `executeAction`.
+
+Su barra inferior del celular queda vacía —ninguno de los cuatro destinos es
+suyo— y no se pinta; navega desde el menú del encabezado.
+
+Seis capacidades separan lo anterior:
 
 | Capacidad | Qué gobierna |
 |---|---|
 | `inventory:read` | Consultar un dato suelto: escanear un rollo, el pizarrón de tareas |
 | `inventory:browse` | **Recorrer el almacén**: rollos, documentos y los catálogos que se eligen al capturar (materiales, prendas, ubicaciones, clientes, proveedores) |
+| `orders:browse` | Las **órdenes de corte** y su avance: la lista, los pedidos, la ficha de la orden, su impresión y su Excel. Aparte de `inventory:browse` para que se pueda dar sin abrir el almacén entero |
 | `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, foleos, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
@@ -275,9 +288,13 @@ salió tiene su propia llave de escritura, para que "no verlo" y "no poder
 escribirlo" sean lo mismo.
 
 El destino de entrada tras el login NO es `/dashboard` fijo — lo resuelve
-`landingRoute()` con el primer destino que el rol puede ver. La barra inferior
-del celular se filtra igual: WAREHOUSE ve tres botones, no cuatro, porque
-Cálculo dejó de ser suyo.
+`landingRoute()` con el primer destino que el rol puede ver: Dirección entra
+en `/lots/scan` y Sólo lectura en `/orders`. La barra inferior del celular se
+filtra igual: WAREHOUSE ve tres botones, no cuatro, porque Cálculo dejó de ser
+suyo, y READ_ONLY no la ve.
+
+`npm run verify:roles` imprime el menú que le toca a cada rol y falla si no
+coincide con lo acordado. Córrelo cada vez que muevas la matriz.
 
 Los permisos son capacidades (`inventory:write`, `inventory:adjust`,
 `catalog:write`…), no pantallas. `executeAction` exige el permiso antes de

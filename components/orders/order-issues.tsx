@@ -36,70 +36,102 @@ export interface IssueView {
  * cancelado es parte de lo que pasó con la orden, y esconderlo deja sin
  * respuesta al que pregunta "¿no que ya lo habías mandado?".
  */
-export function OrderIssues({ issues }: { issues: IssueView[] }) {
+export function OrderIssues({
+  issues,
+  canOpen = false,
+}: {
+  issues: IssueView[];
+  /**
+   * Si el folio lleva al vale.
+   *
+   * Por omisión NO: el vale vive en Documentos y pide `inventory:browse`,
+   * que quien sólo mira órdenes no tiene. Sin esto el enlace prometía una
+   * pantalla que le contesta con un error de permiso.
+   */
+  canOpen?: boolean;
+}) {
   return (
     <ul className="flex flex-col gap-2">
-      {issues.map((issue) => {
-        const isCancelled = issue.status === "CANCELLED";
-
-        return (
-          <li key={issue.id}>
-            <Link
-              href={`/documents/${issue.id}`}
-              className="flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 text-sm">
-                  <Truck
-                    className="size-3.5 shrink-0 text-muted-foreground"
-                    aria-hidden
-                  />
-                  <span
-                    className={cn(
-                      "tabular font-medium",
-                      isCancelled && "line-through",
-                    )}
-                  >
-                    {issue.code}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-xs",
-                      DOCUMENT_STATUS_STYLES[issue.status],
-                    )}
-                  >
-                    {DOCUMENT_STATUS_LABELS[issue.status]}
-                  </span>
-                </p>
-
-                <p className="tabular mt-1 text-xs text-muted-foreground">
-                  {formatDate(issue.date)}
-                  {/* De qué corte salió: es lo que distingue dos vales de la
-                      misma orden mandados con una semana de diferencia. */}
-                  {issue.batchLabel
-                    ? ` · ${issue.batchLabel}`
-                    : " · orden completa"}
-                  {issue.receivedBy && ` · recibe ${issue.receivedBy}`}
-                </p>
-              </div>
-
-              <div className="shrink-0 text-right">
-                <p
-                  className={cn(
-                    "tabular text-xl font-semibold leading-none",
-                    isCancelled && "text-muted-foreground line-through",
-                  )}
-                >
-                  {issue.pieces}
-                </p>
-                <p className="tabular mt-0.5 text-xs text-muted-foreground">
-                  {issue.sizes} {issue.sizes === 1 ? "talla" : "tallas"}
-                </p>
-              </div>
-            </Link>
-          </li>
-        );
-      })}
+      {issues.map((issue) => (
+        <li key={issue.id}>
+          <IssueCard issue={issue} canOpen={canOpen} />
+        </li>
+      ))}
     </ul>
+  );
+}
+
+/** Una salida: la misma tarjeta, con o sin enlace al vale. */
+function IssueCard({ issue, canOpen }: { issue: IssueView; canOpen: boolean }) {
+  const isCancelled = issue.status === "CANCELLED";
+
+  const content = (
+    <>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <Truck
+            className="size-3.5 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "tabular font-medium",
+              isCancelled && "line-through",
+            )}
+          >
+            {issue.code}
+          </span>
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-xs",
+              DOCUMENT_STATUS_STYLES[issue.status],
+            )}
+          >
+            {DOCUMENT_STATUS_LABELS[issue.status]}
+          </span>
+        </p>
+
+        <p className="tabular mt-1 text-xs text-muted-foreground">
+          {formatDate(issue.date)}
+          {/* De qué corte salió: es lo que distingue dos vales de la
+              misma orden mandados con una semana de diferencia. */}
+          {issue.batchLabel
+            ? ` · ${issue.batchLabel}`
+            : " · orden completa"}
+          {issue.receivedBy && ` · recibe ${issue.receivedBy}`}
+        </p>
+      </div>
+
+      <div className="shrink-0 text-right">
+        <p
+          className={cn(
+            "tabular text-xl font-semibold leading-none",
+            isCancelled && "text-muted-foreground line-through",
+          )}
+        >
+          {issue.pieces}
+        </p>
+        <p className="tabular mt-0.5 text-xs text-muted-foreground">
+          {issue.sizes} {issue.sizes === 1 ? "talla" : "tallas"}
+        </p>
+      </div>
+    </>
+  );
+
+  if (!canOpen) {
+    return (
+      <div className="flat-surface flex items-start justify-between gap-3 p-3">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/documents/${issue.id}`}
+      className="flat-surface flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent"
+    >
+      {content}
+    </Link>
   );
 }

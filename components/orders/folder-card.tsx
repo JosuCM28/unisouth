@@ -6,6 +6,13 @@ import { FolderDeleteButton } from "./folder-delete-button";
 
 interface Props {
   folder: OrderFolderWithTotals;
+  /**
+   * Si se ofrece borrar el pedido.
+   *
+   * Por omisión NO: una tarjeta que se pinta en varias pantallas es
+   * justamente donde un olvido deja el botón suelto para quien sólo consulta.
+   */
+  canWrite?: boolean;
 }
 
 /**
@@ -14,7 +21,7 @@ interface Props {
  * Muestra lo mismo que una orden —cuánto falta— pero sumando todas las suyas,
  * para que "cómo va el pedido de Ternium" se responda sin abrir nada.
  */
-export function FolderCard({ folder }: Props) {
+export function FolderCard({ folder, canWrite = false }: Props) {
   const { pending, surplus } = cutProgress(
     folder.orderedQuantity,
     folder.cutQuantity,
@@ -113,14 +120,17 @@ export function FolderCard({ folder }: Props) {
         </div>
 
         {/* Por encima de la capa del enlace, o el toque abriría el pedido.
-            El botón se ofrece siempre: con órdenes dentro, el diálogo explica
-            que hay que vaciarlo primero en vez de esconder la acción. */}
-        <FolderDeleteButton
-          folderId={folder.id}
-          folderCode={folder.code}
-          orderCount={folder.orderCount}
-          className="relative z-20"
-        />
+            A quien captura se le ofrece siempre: con órdenes dentro, el
+            diálogo explica que hay que vaciarlo primero en vez de esconder la
+            acción. */}
+        {canWrite && (
+          <FolderDeleteButton
+            folderId={folder.id}
+            folderCode={folder.code}
+            orderCount={folder.orderCount}
+            className="relative z-20"
+          />
+        )}
       </div>
     </div>
   );

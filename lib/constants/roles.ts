@@ -44,6 +44,16 @@ export const PERMISSIONS = [
      aparte los dos casos eran indistinguibles: 18 destinos del menú pedían
      exactamente el mismo permiso. */
   "inventory:browse",
+  /* Ver las órdenes de corte y cómo van: qué pidió el cliente, cuánto se ha
+     cortado en cada tanda y qué falta.
+
+     Se separó de `inventory:browse` porque hay quien entra SÓLO a mirar el
+     avance —quien contesta el teléfono cuando el cliente pregunta por su
+     pedido— y no tiene nada que hacer en los rollos, los catálogos ni los
+     documentos. Mientras las órdenes pidieron `inventory:browse`, abrir esa
+     pantalla obligaba a abrir de pilón los otros trece destinos que cuelgan
+     de la misma llave. */
+  "orders:browse",
   "inventory:write",
   "inventory:adjust",
   "catalog:write",
@@ -81,9 +91,6 @@ export const PERMISSION_VALUES: Permission[] = [...PERMISSIONS];
 
 /**
  * Matriz de la sección 8 del contrato.
- *
- * Todos los roles pueden leer inventario: hasta el de sólo lectura entra a
- * consultar existencias, que es el 80% del uso del sistema.
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Todo, incluido usuarios y configuración.
@@ -116,6 +123,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   WAREHOUSE: [
     "inventory:read",
     "inventory:browse",
+    "orders:browse",
     "inventory:write",
     "inventory:adjust",
     "catalog:write",
@@ -127,6 +135,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   PRODUCTION: [
     "inventory:read",
     "inventory:browse",
+    "orders:browse",
     "production:browse",
     "reporting:read",
     "staff:browse",
@@ -137,6 +146,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   PURCHASING: [
     "inventory:read",
     "inventory:browse",
+    "orders:browse",
     "production:browse",
     "reporting:read",
     "staff:browse",
@@ -161,13 +171,20 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "staff:write",
   ],
 
-  READ_ONLY: [
-    "inventory:read",
-    "inventory:browse",
-    "production:browse",
-    "reporting:read",
-    "staff:browse",
-  ],
+  /* Una sola pantalla: las órdenes de corte, y de ahí no se mueve.
+
+     Es el rol del que entra a MIRAR cómo va un pedido —cuánto se cortó, qué
+     falta, qué ya salió a taller— sin tener nada que ver con la operación del
+     almacén. Por eso no lleva `inventory:browse`: esa llave abre de golpe
+     rollos, catálogos, recepciones, salidas y documentos, y aquí la idea es
+     justo la contraria.
+
+     Tampoco lleva `inventory:write`, que es lo que hace que la pantalla se
+     pinte sin un solo botón de captura: ve la orden completa —tallas, cortes,
+     envíos, comentarios— y no puede tocar nada. La barrera real sigue siendo
+     `executeAction`; esconder los botones sólo evita ofrecerle lo que le va a
+     rebotar. */
+  READ_ONLY: ["orders:browse"],
 };
 
 /** Convierte el String de la base a un Role válido. */

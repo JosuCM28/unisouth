@@ -51,6 +51,13 @@ interface Props {
   showFolder?: boolean;
   /** Cambia el texto del vacío: "no hay" no es lo mismo que "no coincide". */
   isFiltered?: boolean;
+  /**
+   * Si la tabla ofrece borrar.
+   *
+   * Por omisión NO: es la columna que sobra en cuanto la lista la abre
+   * alguien que sólo viene a mirar el avance.
+   */
+  canWrite?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
 }
@@ -76,6 +83,7 @@ export function OrderTable({
   server,
   showFolder = false,
   isFiltered = false,
+  canWrite = false,
   emptyTitle,
   emptyDescription,
 }: Props) {
@@ -219,18 +227,25 @@ export function OrderTable({
       accessorFn: (order) => order._count?.comments ?? 0,
       cell: ({ row }) => <Comments count={row.original._count?.comments ?? 0} />,
     },
-    {
-      id: "actions",
-      header: "",
-      enableSorting: false,
-      cell: ({ row }) => (
-        <OrderDeleteButton
-          orderId={row.original.id}
-          orderCode={row.original.code}
-          cutQuantity={totalsOf(row.original).cut}
-        />
-      ),
-    },
+    /* La columna de borrar sólo existe para quien captura. Se quita entera y
+       no se deja vacía: una columna en blanco corre el resto hacia dentro sin
+       explicar por qué. */
+    ...(canWrite
+      ? [
+          {
+            id: "actions",
+            header: "",
+            enableSorting: false,
+            cell: ({ row }: { row: { original: OrderTableRow } }) => (
+              <OrderDeleteButton
+                orderId={row.original.id}
+                orderCode={row.original.code}
+                cutQuantity={totalsOf(row.original).cut}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -262,6 +277,7 @@ export function OrderTable({
         <OrderListItem
           order={order}
           folderName={showFolder ? order.folderName : null}
+          canWrite={canWrite}
         />
       )}
     />
