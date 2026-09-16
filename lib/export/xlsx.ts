@@ -134,6 +134,19 @@ const STYLE_DECIMAL3 = 16;
    si el tendido salió dentro de lo esperado, amarillo si se pasó. */
 const STYLE_PERCENT_OK = 17;
 const STYLE_PERCENT_WARN = 18;
+/* La rejilla CUADRICULADA: caja completa de 1px en las cuatro orillas.
+
+   Los demás estilos de tabla llevan sólo raya de abajo y se apoyan en las
+   líneas de pantalla de Excel para que se vean las columnas. Esas líneas NO
+   se imprimen, así que una hoja que en pantalla se ve tabulada sale al papel
+   como números sueltos —y esa hoja se imprime y se lleva a la mesa de corte,
+   que es donde se usa—. Estos cinco dibujan el cuadro de verdad. */
+const STYLE_CELL = 20;
+const STYLE_CELL_NUMBER = 21;
+const STYLE_CELL_STRONG = 22;
+const STYLE_GRID_HEADER = 23;
+const STYLE_GRID_TOTAL = 24;
+const STYLE_GRID_TOTAL_NUMBER = 25;
 
 /** Los tipos numéricos que traen su propio formato. */
 const PERCENT_STYLES: Record<"percent" | "percent0" | "decimal3", number> = {
@@ -290,14 +303,15 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fill><patternFill patternType="solid"><fgColor rgb="FF00B050"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
-<borders count="4">
+<borders count="5">
 <border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left/><right/><top/><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border>
 <border><left/><right/><top/><bottom style="medium"><color rgb="FF0F172A"/></bottom><diagonal/></border>
 <border><left/><right/><top style="thin"><color rgb="FF0F172A"/></top><bottom/><diagonal/></border>
+<border><left style="thin"><color rgb="FF64748B"/></left><right style="thin"><color rgb="FF64748B"/></right><top style="thin"><color rgb="FF64748B"/></top><bottom style="thin"><color rgb="FF64748B"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="20">
+<cellXfs count="26">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
 <xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
@@ -318,6 +332,12 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="166" fontId="0" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>
 <xf numFmtId="166" fontId="0" fillId="4" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>
 <xf numFmtId="168" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="4" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="165" fontId="1" fillId="2" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
 </cellXfs>
 </styleSheet>`;
 
@@ -335,7 +355,19 @@ export function toXlsx<T>(
 }
 
 /** Mete la hoja en el .xlsx. Lo de alrededor es igual para toda hoja. */
-function packageWorkbook(sheetXml: string, tabName: string): Buffer {
+function packageWorkbook(
+  sheetXml: string,
+  tabName: string,
+  repeatRows?: string,
+): Buffer {
+  /* Los títulos que se repiten en cada página son un NOMBRE DEFINIDO del
+     libro, no una propiedad de la hoja: así lo guarda Excel. Sin esto, una
+     rejilla que se parte en dos hojas deja la segunda sin encabezado y quien
+     la recibe no sabe qué columna es cuál. */
+  const printTitles = repeatRows
+    ? `<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'${sheetName(tabName)}'!${repeatRows}</definedName></definedNames>`
+    : "";
+
   return createZip([
     {
       name: "[Content_Types].xml",
@@ -360,7 +392,7 @@ function packageWorkbook(sheetXml: string, tabName: string): Buffer {
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <sheets><sheet name="${sheetName(tabName)}" sheetId="1" r:id="rId1"/></sheets>
-<calcPr calcId="0" fullCalcOnLoad="1"/>
+${printTitles}<calcPr calcId="0" fullCalcOnLoad="1"/>
 </workbook>`,
     },
     {
@@ -386,7 +418,16 @@ export type SheetStyle =
   | "tableHeader"
   | "tableHeaderRight"
   | "total"
-  | "totalNumber";
+  | "totalNumber"
+  /* Los cinco de la rejilla cuadriculada, para las hojas que se IMPRIMEN.
+     Dibujan la caja de cada celda en vez de fiarse de las líneas de pantalla,
+     que no salen en papel. */
+  | "cell"
+  | "cellNumber"
+  | "cellStrong"
+  | "gridHeader"
+  | "gridTotal"
+  | "gridTotalNumber";
 
 const SHEET_STYLES: Record<SheetStyle, number> = {
   title: STYLE_TITLE,
@@ -398,6 +439,12 @@ const SHEET_STYLES: Record<SheetStyle, number> = {
   tableHeaderRight: STYLE_TABLE_HEADER_RIGHT,
   total: STYLE_TOTAL,
   totalNumber: STYLE_TOTAL_NUMBER,
+  cell: STYLE_CELL,
+  cellNumber: STYLE_CELL_NUMBER,
+  cellStrong: STYLE_CELL_STRONG,
+  gridHeader: STYLE_GRID_HEADER,
+  gridTotal: STYLE_GRID_TOTAL,
+  gridTotalNumber: STYLE_GRID_TOTAL_NUMBER,
 };
 
 export interface SheetCell {
@@ -451,15 +498,41 @@ export type SheetRow = SheetCell[];
  * No lleva autofiltro ni panel congelado a propósito: filtrar un documento por
  * una de sus columnas lo desarma.
  */
+/**
+ * Cómo sale la hoja EN PAPEL.
+ *
+ * Opcional y apagado por omisión: las hojas que ya existían se imprimen con
+ * lo que Excel decida, y cambiárselos de sopetón les movería el corte de
+ * página a quien ya las archiva impresas. Se piden cuando la hoja nace para
+ * imprimirse.
+ */
+export interface PrintSetup {
+  /** Horizontal. Para rejillas anchas —una columna por orden— es obligado. */
+  landscape?: boolean;
+  /** Encoge hasta que el ancho quepa en una hoja. Alto libre. */
+  fitToWidth?: boolean;
+  /** Repite estas filas en cada página: "1:16" deja el membrete arriba. */
+  repeatRows?: string;
+}
+
 export function toXlsxDocument(
   rows: SheetRow[],
   widths: number[],
   tabName = "Datos",
+  print?: PrintSetup,
 ): Buffer {
-  return packageWorkbook(buildDocumentSheet(rows, widths), tabName);
+  return packageWorkbook(
+    buildDocumentSheet(rows, widths, print),
+    tabName,
+    print?.repeatRows,
+  );
 }
 
-function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
+function buildDocumentSheet(
+  rows: SheetRow[],
+  widths: number[],
+  print?: PrintSetup,
+): string {
   const cols = widths
     .map(
       (width, index) =>
@@ -520,15 +593,32 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
           .map((range) => `<mergeCell ref="${range}"/>`)
           .join("")}</mergeCells>`;
 
-  // `mergeCells` va DESPUÉS de `sheetData`: el orden de los elementos está
-  // fijado por el esquema y Excel se niega a abrir el archivo si se invierte.
+  /* El ajuste al ancho se declara en DOS lugares y hacen falta los dos:
+     `pageSetUpPr` prende el modo y `pageSetup` dice a cuántas páginas. Con
+     `fitToHeight="0"` el alto queda libre, que es lo que se quiere en una
+     rejilla larga: se encoge de lado hasta caber y se parte en páginas hacia
+     abajo, en vez de encogerse hasta ser ilegible. */
+  const sheetPr = print?.fitToWidth
+    ? `<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`
+    : "";
+
+  const pageXml = print
+    ? `<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>` +
+      `<pageSetup orientation="${print.landscape ? "landscape" : "portrait"}"` +
+      (print.fitToWidth ? ` fitToWidth="1" fitToHeight="0"` : "") +
+      `/>`
+    : "";
+
+  /* El orden de los elementos lo fija el esquema y Excel se niega a abrir el
+     archivo si se invierte: `sheetPr` antes que todo, `mergeCells` después de
+     `sheetData`, y los de impresión al final. */
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<dimension ref="A1:${lastColumn}${lastRow}"/>
+${sheetPr}<dimension ref="A1:${lastColumn}${lastRow}"/>
 <sheetViews><sheetView workbookViewId="0"/></sheetViews>
 <sheetFormatPr defaultRowHeight="15"/>
 <cols>${cols}</cols>
-<sheetData>${body}</sheetData>${mergeXml}
+<sheetData>${body}</sheetData>${mergeXml}${pageXml}
 </worksheet>`;
 }
 

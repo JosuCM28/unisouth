@@ -29,10 +29,10 @@ export async function GET(
   const folder = await new OrderFolderRepository().findForConcentrate(id);
   if (!folder) return new Response("Pedido no encontrado", { status: 404 });
 
-  const { rows, widths } = buildConcentrateSheet(folder);
+  const { rows, widths, print } = buildConcentrateSheet(folder);
 
   return xlsxResponse(
-    toXlsxDocument(rows, widths, "Total a cortar"),
+    toXlsxDocument(rows, widths, "Total a cortar", print),
     `total-a-cortar-${folder.code}`,
   );
 }

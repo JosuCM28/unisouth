@@ -1,6 +1,6 @@
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { formatDate } from "@/lib/utils";
-import type { SheetRow } from "./xlsx";
+import type { PrintSetup, SheetRow } from "./xlsx";
 
 /**
  * EL CONCENTRADO del pedido: una columna por orden, un renglón por talla.
@@ -44,10 +44,11 @@ const TOTAL_WIDTH = 16;
  */
 const MAX_ORDERS = 30;
 
-/** La hoja lista para empaquetar: sus renglones y el ancho de sus columnas. */
+/** La hoja lista para empaquetar: renglones, anchos y cómo sale en papel. */
 export interface ConcentrateSheet {
   rows: SheetRow[];
   widths: number[];
+  print: PrintSetup;
 }
 
 export function buildConcentrateSheet(folder: Folder): ConcentrateSheet {
@@ -74,6 +75,17 @@ export function buildConcentrateSheet(folder: Folder): ConcentrateSheet {
       ...hiddenNotice(hidden),
     ],
     widths: [SIZE_WIDTH, ...shown.map(() => ORDER_WIDTH), TOTAL_WIDTH],
+    print: {
+      /* Horizontal y ajustada al ancho: con una columna por orden, en vertical
+         un pedido de ocho se parte a la mitad y las últimas órdenes salen en
+         una segunda hoja, separadas de sus tallas. */
+      landscape: true,
+      fitToWidth: true,
+      /* El membrete y los encabezados se repiten en cada página. Una rejilla
+         de muchas tallas se parte hacia abajo, y sin esto la segunda hoja
+         llega con puros números y sin decir de qué orden es cada columna. */
+      repeatRows: `$1:$${header.length}`,
+    },
   };
 }
 
@@ -202,16 +214,21 @@ function headerRows(folder: Folder, orderCount: number): SheetRow[] {
 function orderHeaderRows(orders: Order[]): SheetRow[] {
   const totalColumn = FIRST_ORDER_COLUMN + orders.length;
 
+  /* Cuadriculadas igual que la tabla: el bloque de encabezados y la rejilla
+     son UNA sola caja en el papel, y dejar estos renglones sin borde parte la
+     hoja en dos a la vista justo donde no hay corte. */
   function labelled(
     label: string,
     pick: (order: Order) => string,
   ): SheetRow {
     return [
-      { at: 1, value: label, style: "label" },
+      { at: 1, value: label, style: "gridTotal" },
       ...orders.map((order, index) => ({
         at: FIRST_ORDER_COLUMN + index,
         value: pick(order),
+        style: "cell" as const,
       })),
+      { at: totalColumn, value: "", style: "cell" as const },
     ];
   }
 
@@ -225,15 +242,14 @@ function orderHeaderRows(orders: Order[]): SheetRow[] {
       (order) => order.material?.name ?? order.cutFabricText ?? "—",
     ),
     labelled("Molde", (order) => order.cutPattern ?? "—"),
-    [],
     [
-      { at: 1, value: "TALLA", style: "tableHeader" },
+      { at: 1, value: "TALLA", style: "gridHeader" },
       ...orders.map((_, index) => ({
         at: FIRST_ORDER_COLUMN + index,
         value: `CANTIDAD ${index + 1}`,
-        style: "tableHeaderRight" as const,
+        style: "gridHeader" as const,
       })),
-      { at: totalColumn, value: "A CORTAR", style: "tableHeaderRight" },
+      { at: totalColumn, value: "A CORTAR", style: "gridHeader" },
     ],
   ];
 }
@@ -283,20 +299,22 @@ function sizeRows(
     const row = firstRow + index;
 
     return [
-      { at: 1, value: size.code, style: "label" },
+      { at: 1, value: size.code, style: "cellStrong" },
       ...size.quantities.map((quantity, column) => ({
         at: FIRST_ORDER_COLUMN + column,
         // Vacío y no cero: una columna de ceros esconde las tallas que esa
-        // orden sí pidió, que es lo único que se busca al leer de lado.
+        // orden sí pidió, que es lo único que se busca al leer de lado. La
+        // celda igual lleva su cuadro, para que el renglón no salga partido.
         value: quantity ?? "",
         kind: "number" as const,
+        style: "cellNumber" as const,
       })),
       {
         at: totalColumn,
         formula: `SUM(${firstLetter}${row}:${lastLetter}${row})`,
         value: rowTotal(size),
         kind: "number",
-        style: "totalNumber",
+        style: "gridTotalNumber",
       },
     ];
   });
@@ -304,7 +322,7 @@ function sizeRows(
   const grandTotal = grid.reduce((sum, size) => sum + rowTotal(size), 0);
 
   const totals: SheetRow = [
-    { at: 1, value: "TOTAL", style: "total" },
+    { at: 1, value: "TOTAL", style: "gridTotal" },
     ...Array.from({ length: orderCount }, (_, column) => {
       const letter = columnName(FIRST_ORDER_COLUMN + column);
       return {
@@ -312,7 +330,7 @@ function sizeRows(
         formula: `SUM(${letter}${firstRow}:${letter}${lastRow})`,
         value: columnTotal(grid, column),
         kind: "number" as const,
-        style: "totalNumber" as const,
+        style: "gridTotalNumber" as const,
       };
     }),
     {
@@ -320,7 +338,7 @@ function sizeRows(
       formula: `SUM(${totalLetter}${firstRow}:${totalLetter}${lastRow})`,
       value: grandTotal,
       kind: "number",
-      style: "totalNumber",
+      style: "gridTotalNumber",
     },
   ];
 
@@ -328,14 +346,16 @@ function sizeRows(
     ...body,
     totals,
     [],
+    /* La caja del papel: rótulo y cifra, los dos cuadriculados. Es lo que se
+       busca primero al recoger la hoja de la impresora. */
     [
-      { at: 1, value: "TOTAL A CORTAR", style: "section" },
+      { at: 1, value: "TOTAL A CORTAR", style: "gridHeader" },
       {
         at: FIRST_ORDER_COLUMN,
         formula: `${totalLetter}${lastRow + 1}`,
         value: grandTotal,
         kind: "number",
-        style: "total",
+        style: "gridTotalNumber",
       },
     ],
   ];
@@ -372,16 +392,16 @@ function noteRows(grid: SizeRow[]): SheetRow[] {
     [],
     [{ at: 1, value: "Anotaciones por talla", style: "section" }],
     [
-      { at: 1, value: "Talla", style: "tableHeader" },
-      { at: FIRST_ORDER_COLUMN, value: "Orden", style: "tableHeader" },
-      { at: FIRST_ORDER_COLUMN + 1, value: "Anotación", style: "tableHeader" },
+      { at: 1, value: "Talla", style: "gridHeader" },
+      { at: FIRST_ORDER_COLUMN, value: "Orden", style: "gridHeader" },
+      { at: FIRST_ORDER_COLUMN + 1, value: "Anotación", style: "gridHeader" },
     ],
     ...withNotes.flatMap((size) =>
       size.notes.map(
         (note): SheetRow => [
-          { at: 1, value: size.code, style: "label" },
-          { at: FIRST_ORDER_COLUMN, value: note.orderCode },
-          { at: FIRST_ORDER_COLUMN + 1, value: note.text },
+          { at: 1, value: size.code, style: "cellStrong" },
+          { at: FIRST_ORDER_COLUMN, value: note.orderCode, style: "cell" },
+          { at: FIRST_ORDER_COLUMN + 1, value: note.text, style: "cell" },
         ],
       ),
     ),
