@@ -7,6 +7,7 @@ import { getOrderFormOptions } from "@/lib/order-form-options";
 import { todayInputValue } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrderForm, type EditableOrder } from "@/components/orders/order-form";
+import { EMPTY_ORDER_CUT_CLOSING } from "@/components/orders/order-cut-closing";
 
 export const metadata: Metadata = { title: "Nueva orden" };
 
@@ -148,6 +149,10 @@ async function loadTemplate(id: string) {
       cutVersionNotes: order.cutVersionNotes ?? "",
       cutNotes: order.cutNotes,
     },
+    /* El cierre NO se copia: son los metros de AQUELLA mesa. Arrastrarlos a
+       una orden nueva metería en el reporte un tendido que nunca ocurrió,
+       por la misma razón que no se copia la referencia del cliente. */
+    cutClosing: EMPTY_ORDER_CUT_CLOSING,
     lines: order.lines.map((line) => ({
       /* Llave nueva y SIN `id`: con el id del renglón original, guardar
          intentaría actualizar renglones que pertenecen a la otra orden.

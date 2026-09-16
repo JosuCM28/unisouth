@@ -55,6 +55,14 @@ export default async function EditOrderPage({ params }: PageProps) {
       cutVersionNotes: order.cutVersionNotes ?? "",
       cutNotes: order.cutNotes,
     },
+    cutClosing: {
+      clientPo: order.clientPo ?? "",
+      /* Los Decimal se pasan a texto aquí: el formulario es un Client
+         Component y un Decimal de Prisma no cruza esa frontera. */
+      metersDelivered: order.metersDelivered?.toString() ?? "",
+      metersSpread: order.metersSpread?.toString() ?? "",
+      smallRemnant: order.smallRemnant?.toString() ?? "",
+    },
     lines: order.lines.map((line) => ({
       key: line.id,
       id: line.id,

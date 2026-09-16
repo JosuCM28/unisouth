@@ -21,7 +21,27 @@ import { todayInputValue } from "@/lib/utils";
  */
 
 /** Cómo se escribe una celda en la hoja. */
-export type CellKind = "text" | "number" | "date" | "datetime";
+export type CellKind =
+  | "text"
+  | "number"
+  | "date"
+  | "datetime"
+  /* Porcentaje. El valor viaja en TANTO POR UNO —0.02, no 2— porque así lo
+     entiende Excel: si se manda ya multiplicado sale "200%". Quien lo recibe
+     puede cambiar los decimales sin rehacer la cuenta. */
+  | "percent"
+  /* Porcentaje SIN decimales, para el excedente. La hoja lo trae redondeado a
+     entero porque es un vistazo —"se pasó un 2%"— y no una medición: los dos
+     decimales se reservan para la retacería, que sí se compara contra un
+     umbral. */
+  | "percent0"
+  /* Tres decimales fijos, para el promedio real. Con el formato general, un
+     1.163 y un 1.16 se alinean distinto y la columna deja de leerse de
+     corrido, que es justo para lo que sirve. */
+  | "decimal3";
+
+/** Fondo sólido de una celda, para una columna que se lee como semáforo. */
+export type CellFlag = "ok" | "warn";
 
 export interface XlsxColumn<T> {
   header: string;
@@ -29,6 +49,15 @@ export interface XlsxColumn<T> {
   kind?: CellKind;
   /** Ancho en caracteres. Sin él se calcula del encabezado. */
   width?: number;
+  /**
+   * Pinta la celda de verde o amarillo según la fila.
+   *
+   * Existe porque la hoja de papel que este archivo reemplaza viene así, y el
+   * color es lo primero que se busca al revisarla: sin él, quien recibe el
+   * Excel tendría que leer columna por columna para encontrar los cortes que
+   * se pasaron. Devolver `undefined` deja la celda sin fondo.
+   */
+  flag?: (row: T) => CellFlag | undefined;
 }
 
 /** Escapa lo que no puede ir crudo dentro de un XML. */
@@ -98,14 +127,44 @@ const STYLE_TABLE_HEADER_RIGHT = 11;
 const STYLE_TOTAL = 12;
 const STYLE_TOTAL_NUMBER = 13;
 const STYLE_RIGHT = 14;
+const STYLE_PERCENT = 15;
+const STYLE_PERCENT0 = 19;
+const STYLE_DECIMAL3 = 16;
+/* El semáforo de la retacería: fondo sólido, como en la hoja de papel. Verde
+   si el tendido salió dentro de lo esperado, amarillo si se pasó. */
+const STYLE_PERCENT_OK = 17;
+const STYLE_PERCENT_WARN = 18;
+
+/** Los tipos numéricos que traen su propio formato. */
+const PERCENT_STYLES: Record<"percent" | "percent0" | "decimal3", number> = {
+  percent: STYLE_PERCENT,
+  percent0: STYLE_PERCENT0,
+  decimal3: STYLE_DECIMAL3,
+};
+
+/** Estilos de porcentaje con fondo, por bandera. */
+const FLAG_STYLES: Record<CellFlag, number> = {
+  ok: STYLE_PERCENT_OK,
+  warn: STYLE_PERCENT_WARN,
+};
 
 function renderCell(
   reference: string,
   value: string | number | Date | null | undefined,
   kind: CellKind,
+  flag?: CellFlag,
 ): string {
   if (value === null || value === undefined || value === "") {
     return `<c r="${reference}"/>`;
+  }
+
+  /* El semáforo manda sobre el formato por tipo: su estilo ya trae el formato
+     de porcentaje, y sólo se pide en columnas que lo son. */
+  if (flag) {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      return `<c r="${reference}" s="${FLAG_STYLES[flag]}"><v>${numeric}</v></c>`;
+    }
   }
 
   if (kind === "date" && value instanceof Date) {
@@ -117,6 +176,14 @@ function renderCell(
      lo que se va a revisar. El número de serie es el mismo; cambia el formato. */
   if (kind === "datetime" && value instanceof Date) {
     return `<c r="${reference}" s="${STYLE_DATETIME}"><v>${excelSerialDate(value)}</v></c>`;
+  }
+
+  if (kind === "percent" || kind === "percent0" || kind === "decimal3") {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      const style = PERCENT_STYLES[kind];
+      return `<c r="${reference}" s="${style}"><v>${numeric}</v></c>`;
+    }
   }
 
   if (kind === "number") {
@@ -169,6 +236,7 @@ function buildSheet<T>(rows: T[], columns: XlsxColumn<T>[]): string {
             `${columnName(index + 1)}${rowIndex + 2}`,
             column.value(row),
             column.kind ?? "text",
+            column.flag?.(row),
           ),
         )
         .join("");
@@ -209,16 +277,18 @@ function buildSheet<T>(rows: T[], columns: XlsxColumn<T>[]): string {
  */
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.##"/><numFmt numFmtId="165" formatCode="#,##0"/></numFmts>
+<numFmts count="5"><numFmt numFmtId="164" formatCode="#,##0.##"/><numFmt numFmtId="165" formatCode="#,##0"/><numFmt numFmtId="166" formatCode="0.00%"/><numFmt numFmtId="167" formatCode="0.000"/><numFmt numFmtId="168" formatCode="0%"/></numFmts>
 <fonts count="3">
 <font><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="14"/><name val="Calibri"/></font>
 </fonts>
-<fills count="3">
+<fills count="5">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF00B050"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
 <borders count="4">
 <border><left/><right/><top/><bottom/><diagonal/></border>
@@ -227,7 +297,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <border><left/><right/><top style="thin"><color rgb="FF0F172A"/></top><bottom/><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="15">
+<cellXfs count="20">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
 <xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
@@ -243,6 +313,11 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1"/>
 <xf numFmtId="165" fontId="1" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right"/></xf>
+<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="166" fontId="0" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="166" fontId="0" fillId="4" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="168" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 </cellXfs>
 </styleSheet>`;
 

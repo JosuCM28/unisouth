@@ -1603,6 +1603,25 @@ model CuttingOrder {
   /// the workshop ticks them off one by one on the printed sheet.
   cutNotes        String[]    @default([])
 
+  // ── CIERRE DEL CORTE — lo que se mide cuando la mesa termina ──────────────
+  // Alimentan el reporte general de corte. Son OPCIONALES porque se conocen
+  // hasta que se levanta la mesa, y la orden se captura mucho antes: exigirlos
+  // al dar de alta obligaría a inventar números.
+  //
+  // Sólo se guarda lo que se MIDE. El excedente, el promedio real, el
+  // porcentaje de retacería y el sobrante se calculan al exportar a partir de
+  // estos cuatro: guardarlos sería duplicar un dato que, al corregir los
+  // metros, quedaría contradiciendo a su propia fórmula.
+
+  /// La orden de compra del cliente, cuando la maneja aparte de `reference`.
+  clientPo        String?
+  /// Metros que el cliente mandó para este corte.
+  metersDelivered Decimal? @db.Decimal(12, 2)
+  /// Metros que de verdad se tendieron en la mesa.
+  metersSpread    Decimal? @db.Decimal(12, 2)
+  /// Retacería chica: los pedazos que ya no dan para otra prenda.
+  smallRemnant    Decimal? @db.Decimal(12, 2)
+
   orderedAt DateTime  @default(now())
   dueDate   DateTime?
   closedAt  DateTime?

@@ -4,9 +4,22 @@ import {
   cuidSchema,
   localDate,
   optionalCuid,
+  optionalNumber,
   optionalText,
   requiredText,
 } from "./common";
+
+/**
+ * Una medida en metros del cierre del corte.
+ *
+ * Opcional —se conoce hasta que se levanta la mesa— pero nunca negativa: unos
+ * metros en negativo no son una corrección de nada, son un dedazo, y colados
+ * al reporte descuadran el promedio real y el sobrante de toda la hoja.
+ */
+const closingMeters = optionalNumber.refine(
+  (value) => value === undefined || value >= 0,
+  "No pueden ser metros negativos",
+);
 
 /** Un renglón: una talla y cuántas piezas pidieron de ella. */
 export const cuttingOrderLineSchema = z.object({
@@ -56,6 +69,17 @@ export const cuttingOrderSchema = z.object({
     .transform((values) =>
       (values ?? []).map((note) => note.trim()).filter((note) => note.length > 0),
     ),
+
+  /* El cierre del corte: lo que se mide cuando la mesa termina y alimenta el
+     reporte general. Sólo van los cuatro datos CRUDOS —el excedente, el
+     promedio real, el porcentaje de retacería y el sobrante se calculan al
+     exportar—, porque guardar un promedio junto a los metros de los que sale
+     es garantizar que un día se contradigan. */
+  clientPo: optionalText,
+  metersDelivered: closingMeters,
+  metersSpread: closingMeters,
+  smallRemnant: closingMeters,
+
   lines: z
     .array(cuttingOrderLineSchema)
     .min(1, "Agrega al menos una talla"),

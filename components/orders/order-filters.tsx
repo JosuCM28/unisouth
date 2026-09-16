@@ -69,6 +69,15 @@ export function OrderFilters({ clients, showArchived }: Props) {
     ? `/api/export/orders?${exportParams}`
     : "/api/export/orders";
 
+  /* El concentrado de corte comparte los filtros, pero su rango de fechas se
+     entiende distinto: allá corre sobre la ÚLTIMA EDICIÓN, no sobre el día
+     del pedido. Por eso el botón lo dice en su etiqueta, para que quien pone
+     "hoy · hoy" sepa que va a bajar lo que se trabajó hoy y no lo que se
+     pidió hoy. */
+  const cutReportHref = exportParams.toString()
+    ? `/api/export/cut-report?${exportParams}`
+    : "/api/export/cut-report";
+
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 md:grid-cols-4">
@@ -129,6 +138,11 @@ export function OrderFilters({ clients, showArchived }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <ExportButton href={exportHref} exact />
+        <ExportButton
+          href={cutReportHref}
+          label="Reporte de corte"
+          exact
+        />
         <PrintLinkButton href="/print/orders" />
 
         {/* Los pedidos archivados se piden a propósito: son los entregados, y

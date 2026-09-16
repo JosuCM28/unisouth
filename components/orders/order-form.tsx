@@ -19,6 +19,11 @@ import {
   EMPTY_ORDER_CUT_HEADER,
   type OrderCutHeaderDraft,
 } from "./order-cut-header";
+import {
+  OrderCutClosing,
+  EMPTY_ORDER_CUT_CLOSING,
+  type OrderCutClosingDraft,
+} from "./order-cut-closing";
 import { UnsavedChangesGuard } from "@/components/shared/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +76,7 @@ export interface EditableOrder {
   dueDate: string | null;
   notes: string | null;
   cutHeader: OrderCutHeaderDraft;
+  cutClosing: OrderCutClosingDraft;
   lines: LineDraft[];
 }
 
@@ -144,6 +150,9 @@ export function OrderForm({
   const [cutHeader, setCutHeader] = useState<OrderCutHeaderDraft>(
     order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
   );
+  const [cutClosing, setCutClosing] = useState<OrderCutClosingDraft>(
+    order?.cutClosing ?? EMPTY_ORDER_CUT_CLOSING,
+  );
   const [lines, setLines] = useState<LineDraft[]>(order?.lines ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -161,6 +170,7 @@ export function OrderForm({
       dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
       notes: order?.notes ?? "",
       cutHeader: order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
+      cutClosing: order?.cutClosing ?? EMPTY_ORDER_CUT_CLOSING,
       lines: order?.lines ?? [],
     }),
   );
@@ -230,6 +240,7 @@ export function OrderForm({
       dueDate,
       notes,
       cutHeader,
+      cutClosing,
       lines,
     }) !== originalSnapshot;
 
@@ -260,6 +271,13 @@ export function OrderForm({
       cutVersion: cutHeader.cutVersion || undefined,
       cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
+      clientPo: cutClosing.clientPo || undefined,
+      /* Van como texto: Zod los convierte. Mandar `Number("")` desde aquí
+         daría 0, y un cero capturado no es lo mismo que un campo vacío —el
+         reporte sacaría un promedio real de una mesa que nadie ha medido. */
+      metersDelivered: cutClosing.metersDelivered || undefined,
+      metersSpread: cutClosing.metersSpread || undefined,
+      smallRemnant: cutClosing.smallRemnant || undefined,
       lines: valid.map((line) => ({
         id: line.id,
         sizeId: line.sizeId,
@@ -506,6 +524,17 @@ export function OrderForm({
         </FormSection>
       </div>
 
+      {/* El cierre va al final y aparte: son los metros que se miden cuando la
+          mesa termina, no algo que se sepa al dar de alta la orden. */}
+      <div className="flat-surface p-4">
+        <FormSection
+          title="Cierre del corte"
+          description="Los metros de la mesa. Alimentan el reporte general de corte."
+        >
+          <OrderCutClosing value={cutClosing} onChange={setCutClosing} />
+        </FormSection>
+      </div>
+
       <div className="flat-surface p-4">
         <FormSection title="Detalles del pedido">
           <div className="flex flex-col gap-4">
@@ -602,6 +631,7 @@ function snapshot(state: {
   dueDate: string;
   notes: string;
   cutHeader: OrderCutHeaderDraft;
+  cutClosing: OrderCutClosingDraft;
   lines: LineDraft[];
 }): string {
   return JSON.stringify({

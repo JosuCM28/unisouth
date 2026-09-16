@@ -52,6 +52,10 @@ export class CuttingOrderService extends BaseService {
           cutVersion: input.cutVersion,
           cutVersionNotes: input.cutVersionNotes,
           cutNotes: input.cutNotes,
+          clientPo: input.clientPo,
+          metersDelivered: input.metersDelivered,
+          metersSpread: input.metersSpread,
+          smallRemnant: input.smallRemnant,
           createdById: this.context.userId,
           lines: {
             create: input.lines.map((line, index) => ({
@@ -178,6 +182,14 @@ export class CuttingOrderService extends BaseService {
           cutVersion: input.cutVersion ?? null,
           cutVersionNotes: input.cutVersionNotes ?? null,
           cutNotes: input.cutNotes,
+          /* El cierre del corte, con el mismo `?? null`: estos cuatro se
+             capturan en pasadas distintas —la orden se da de alta hoy y los
+             metros se miden cuando la mesa termina— y borrar un metraje mal
+             tecleado tiene que poder deshacerse dejando el campo vacío. */
+          clientPo: input.clientPo ?? null,
+          metersDelivered: input.metersDelivered ?? null,
+          metersSpread: input.metersSpread ?? null,
+          smallRemnant: input.smallRemnant ?? null,
         },
       });
 
