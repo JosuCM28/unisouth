@@ -199,6 +199,11 @@ export class LotService extends BaseService {
     return this.transaction(async (tx) => {
       const lot = await this.requireLot(tx, input.lotId);
 
+      /* El tono va PRIMERO y dentro de esta misma transacción: si el ajuste
+         de saldo revienta, tampoco queda escrito un tono nuevo sobre un
+         metraje viejo. Es una corrección sola, no dos. */
+      await this.applyShadeCorrection(tx, lot, input);
+
       const current = round4(Number(lot.currentQuantity));
       const counted = round4(input.countedQuantity);
 
@@ -472,6 +477,42 @@ export class LotService extends BaseService {
     });
 
     return { lot: verified, difference: round4(counted - current), movement };
+  }
+
+  /**
+   * Corrige el tono junto con el metraje, cuando el reconteo lo trae.
+   *
+   * Deja su PROPIA entrada en la bitácora en vez de colgarse del ajuste de
+   * saldo: el kárdex responde "qué pasó con este rollo" y el AuditLog "quién
+   * editó qué campo". Cambiar el tono no movió un solo metro, así que no
+   * tiene nada que hacer dentro del movimiento.
+   *
+   * MEDIUM y no HIGH: es el mismo peso que corregir el tono desde la ficha
+   * del rollo, y se hereda el motivo que ya exige el reconteo.
+   */
+  private async applyShadeCorrection(
+    tx: PrismaExecutor,
+    lot: Lot,
+    input: RecountLotInput,
+  ): Promise<void> {
+    // `undefined` es "no lo toques"; `null` es "bórralo". Son distintos.
+    if (input.shade === undefined || input.shade === lot.shade) return;
+
+    await tx.lot.update({
+      where: { id: lot.id },
+      data: { shade: input.shade },
+    });
+
+    await this.auditWith(tx).record({
+      entity: "Lot",
+      entityId: lot.id,
+      action: "UPDATE",
+      reference: lot.code,
+      oldValue: { shade: lot.shade },
+      newValue: { shade: input.shade },
+      sensitivity: "MEDIUM",
+      reason: input.reason,
+    });
   }
 
   private async requireLot(tx: PrismaExecutor, lotId: string): Promise<Lot> {

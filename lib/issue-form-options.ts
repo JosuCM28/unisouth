@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ClientRepository } from "@/lib/repositories/client.repository";
+import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
 import type { IssueProductOption } from "@/components/issues/issue-from-calculation";
@@ -15,8 +16,16 @@ export const FACTORY_OWNER = "__factory__";
  * opciones distintas.
  */
 export async function getIssueFormOptions() {
-  const [issuable, cutTags, materials, products, sizes, clients, productionRuns] =
-    await Promise.all([
+  const [
+    issuable,
+    cutTags,
+    materials,
+    products,
+    sizes,
+    clients,
+    productionRuns,
+    locations,
+  ] = await Promise.all([
       // Qué hay REALMENTE surtible hoy, por dueño y material.
       new LotRepository().findIssuableOptions(),
       // Los foleos vigentes; se administran en /cut-tags.
@@ -56,6 +65,9 @@ export async function getIssueFormOptions() {
         select: { id: true, code: true, name: true },
         orderBy: { createdAt: "desc" },
       }),
+      // Para el alta de rollo desde el propio vale: dónde se acomodó lo que
+      // acaba de llegar. Opcional, como en el alta de siempre.
+      new LocationRepository().findOptions(),
     ]);
 
   const productOptions: IssueProductOption[] = products.map((product) => ({
@@ -120,6 +132,11 @@ export async function getIssueFormOptions() {
     id: material.id,
     code: material.code,
     name: material.name,
+    /* La unidad base y el tono obligatorio son para el ALTA de rollo desde el
+       vale: al elegir el material se propone su unidad, que es lo que evita
+       dar de alta metros de tela como si fueran piezas. */
+    baseUnit: material.baseUnit,
+    requiresShade: material.requiresShade,
     lotCount: stockByMaterial.get(material.id) ?? 0,
     // Se serializa el Set: un Map/Set no cruza al Client Component.
     clientIds: [...materialsByClient.entries()]
@@ -134,5 +151,6 @@ export async function getIssueFormOptions() {
     sizes,
     cutTags,
     productionRuns,
+    locations,
   };
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { PackagePlus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Unit } from "@prisma/client";
 import {
@@ -30,6 +30,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchSelect } from "@/components/shared/search-select";
 import { ApplicableRules } from "@/components/rules/applicable-rules";
 import { IssueLotPicker, type PickerState } from "./issue-lot-picker";
+import {
+  IssueLotCreate,
+  type NewLotLocationOption,
+  type NewLotOwner,
+} from "./issue-lot-create";
 import { IssueLotCorrectDialog } from "./issue-lot-correct-dialog";
 import { IssueRunningTotal } from "./issue-running-total";
 import {
@@ -52,6 +57,10 @@ interface MaterialOption {
   id: string;
   code: string;
   name: string;
+  /** Unidad con la que se propone dar de alta un rollo de este material. */
+  baseUnit: Unit;
+  /** Si la tela no se puede tender sin saber su tono. */
+  requiresShade: boolean;
   /** Rollos surtibles hoy. Se muestra para no elegir a ciegas. */
   lotCount: number;
   /** Dueños que tienen rollos de este material. */
@@ -106,6 +115,8 @@ interface Props {
   cutTags: CutTagOption[];
   clients: ClientOption[];
   productionRuns: { id: string; code: string; name: string | null }[];
+  /** Para dar de alta un rollo sin salirse del vale: dónde se acomodó. */
+  locations: NewLotLocationOption[];
   /** Presente = se está corrigiendo un borrador, no creando uno nuevo. */
   document?: EditableIssue;
   /**
@@ -117,6 +128,19 @@ interface Props {
    * esconde en vez de dejarlo tocar algo que el servidor va a rechazar.
    */
   canAdjust?: boolean;
+}
+
+/**
+ * Lo que devuelve el diálogo de corrección.
+ *
+ * El tono viene aquí y no sólo en el rollo porque el renglón lo pinta: sin
+ * esto habría que recargar la pantalla para ver el tono nuevo en el vale que
+ * se está capturando.
+ */
+interface CorrectedLot {
+  available: number;
+  unit: Unit;
+  shade: string | null;
 }
 
 /** Un renglón ya armado: el rollo concreto y cuánto se le quita. */
@@ -148,6 +172,7 @@ export function IssueForm({
   cutTags,
   clients,
   productionRuns,
+  locations,
   document,
   canAdjust = false,
 }: Props) {
@@ -180,6 +205,10 @@ export function IssueForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMaterialId, setPickerMaterialId] = useState("");
   const [pickerState, setPickerState] = useState<PickerState>({ kind: "idle" });
+  /* Las dos caras del mismo diálogo: elegir de lo que hay, o dar de alta lo
+     que acaba de llegar. Una sola a la vez y no un diálogo encima de otro:
+     en el celular son dos hojas apiladas y la de abajo queda inalcanzable. */
+  const [pickerMode, setPickerMode] = useState<"pick" | "create">("pick");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* Foto del vale tal como se cargó, para saber después si se tocó algo.
@@ -285,6 +314,23 @@ export function IssueForm({
     setPickerOpen(false);
     setPickerMaterialId("");
     setPickerState({ kind: "idle" });
+    setPickerMode("pick");
+  }
+
+  /**
+   * El rollo acaba de nacer: entra al vale y la lista se pone al día.
+   *
+   * Se agrega solo, sin pedir que lo marquen: quien lo dio de alta desde
+   * aquí lo dio de alta PARA esta salida. Y se vuelve a la lista con su
+   * material ya cargado, porque lo normal es que vengan varios rollos de la
+   * misma tela en el mismo viaje.
+   */
+  function handleLotCreated(lot: IssueLotOption, materialId: string) {
+    handlePick(lot);
+    setPickerMode("pick");
+    void handleMaterialChange(materialId);
+
+    toast.success(`${lot.code} dado de alta y agregado al vale`);
   }
 
   function updateQuantity(index: number, value: string) {
@@ -300,17 +346,14 @@ export function IssueForm({
   }
 
   /**
-   * El rollo se acaba de recontar: el renglón se pone al día con lo que de
-   * verdad quedó.
+   * El rollo se acaba de corregir: el renglón se pone al día con lo que de
+   * verdad quedó y con el tono que de verdad es.
    *
    * La cantidad a surtir se reajusta sólo si se había quedado por encima de
    * lo que hay. Si el auxiliar ya había tecleado menos —está sacando un
    * pedazo, no el rollo entero— pisarle el número le borraría la captura.
    */
-  function handleCorrected(
-    index: number,
-    corrected: { available: number; unit: Unit },
-  ) {
+  function handleCorrected(index: number, corrected: CorrectedLot) {
     setLines((current) =>
       current.map((line, position) => {
         if (position !== index) return line;
@@ -321,6 +364,7 @@ export function IssueForm({
           ...line,
           available: corrected.available,
           unit: corrected.unit,
+          shade: corrected.shade,
           quantity: excedia ? String(corrected.available) : line.quantity,
         };
       }),
@@ -461,6 +505,21 @@ export function IssueForm({
 
   const usedLotIds = lines.map((line) => line.lotId);
 
+  /* De quién nace el rollo que se dé de alta desde aquí.
+
+     Si el vale ya tiene empresa dueña, el rollo es de ELLA y no se pregunta:
+     un rollo de otro dueño no se podría surtir en este mismo vale, así que
+     ofrecer el selector sería ofrecer un error. Sin dueño elegido —"Todos"—
+     sí hay que preguntarlo, y ahí el componente muestra su propio selector. */
+  const newLotOwner: NewLotOwner | null = clientId
+    ? {
+        clientId: realClientId,
+        label:
+          clients.find((client) => client.id === clientId)?.name ??
+          "De la fábrica",
+      }
+    : null;
+
   /* Se recalcula en cada tecla: el punto de mostrarlo es que el total siga a
      la mano que escribe. Son decenas de renglones, no miles, así que sumar
      de nuevo cuesta menos que cualquier esquema para evitarlo. */
@@ -552,8 +611,14 @@ export function IssueForm({
           <ResponsiveFormDialog
             open={pickerOpen}
             onOpenChange={(next) => (next ? openPicker() : closePicker())}
-            title="Agregar rollos"
-            description="Marca todos los que se lleven. Retazos primero, luego los más viejos."
+            title={
+              pickerMode === "create" ? "Dar de alta un rollo" : "Agregar rollos"
+            }
+            description={
+              pickerMode === "create"
+                ? "Material, cantidad y unidad. Entra al vale en cuanto se dé de alta."
+                : "Marca todos los que se lleven. Retazos primero, luego los más viejos."
+            }
             trigger={
               <Button type="button" variant="outline" className="touch-target">
                 <Plus className="size-4" aria-hidden />
@@ -561,6 +626,26 @@ export function IssueForm({
               </Button>
             }
           >
+            {pickerMode === "create" ? (
+              <IssueLotCreate
+                /* El catálogo COMPLETO y no `visibleMaterials`: aquí se está
+                   dando de alta el primer rollo de una tela, que por
+                   definición todavía no tiene existencia y por eso no sale
+                   en la lista de lo surtible. */
+                materials={materials}
+                locations={locations}
+                /* Sin el centinela de la fábrica: el selector de dueño del
+                   alta ya trae su propia opción "De la fábrica", y aquí
+                   saldría duplicada. */
+                clients={clients.filter(
+                  (client) => client.id !== FACTORY_OWNER,
+                )}
+                owner={newLotOwner}
+                defaultMaterialId={pickerMaterialId}
+                onCreated={handleLotCreated}
+                onCancel={() => setPickerMode("pick")}
+              />
+            ) : (
             <div className="flex flex-col gap-4">
               <FormSelectField id="picker-material" label="Material">
                 <SearchSelect
@@ -591,6 +676,23 @@ export function IssueForm({
                 onPick={handlePick}
               />
 
+              {/* El rollo que no está en la lista porque todavía no existe.
+
+                  Va aquí abajo y no arriba a propósito: primero se busca
+                  entre lo que ya hay —dar de alta dos veces el mismo rollo
+                  descuadra la bodega— y sólo si no aparece se registra. Es
+                  también el lugar donde se acaba de leer "no hay rollos de
+                  este material en bodega", que es cuando se necesita. */}
+              <Button
+                type="button"
+                variant="outline"
+                className="touch-target"
+                onClick={() => setPickerMode("create")}
+              >
+                <PackagePlus className="size-4" aria-hidden />
+                Dar de alta un rollo
+              </Button>
+
               {/* El acumulado, dentro del propio selector: es aquí donde se
                   va marcando rollo por rollo, así que es aquí donde se decide
                   si ya se juntaron los metros. Verlo obligaba a cerrar el
@@ -612,6 +714,7 @@ export function IssueForm({
                 {lines.length > 0 && ` · ${lines.length} rollo(s)`}
               </Button>
             </div>
+            )}
           </ResponsiveFormDialog>
         </div>
       </div>
@@ -752,10 +855,7 @@ interface LinesProps {
   totals: IssueTotals;
   onChangeQuantity: (index: number, value: string) => void;
   onRemove: (index: number) => void;
-  onCorrected: (
-    index: number,
-    corrected: { available: number; unit: Unit },
-  ) => void;
+  onCorrected: (index: number, corrected: CorrectedLot) => void;
   canAdjust: boolean;
 }
 
@@ -817,10 +917,7 @@ interface LineRowProps {
   index: number;
   onChangeQuantity: (index: number, value: string) => void;
   onRemove: (index: number) => void;
-  onCorrected: (
-    index: number,
-    corrected: { available: number; unit: Unit },
-  ) => void;
+  onCorrected: (index: number, corrected: CorrectedLot) => void;
   canAdjust: boolean;
 }
 
@@ -856,6 +953,7 @@ function IssueLineRow({
               lotCode={line.lotCode}
               available={line.available}
               unit={line.unit}
+              shade={line.shade}
               onCorrected={(corrected) => onCorrected(index, corrected)}
             />
           )}

@@ -275,10 +275,44 @@ export class LotRepository extends BaseRepository<
         unit: true,
         currentQuantity: true,
         reservedQuantity: true,
-        material: { select: { name: true } },
+        // El tono se corrige en el mismo acto que el metraje: la pantalla
+        // necesita el actual para no pedir que se vuelva a teclear.
+        shade: true,
+        // `requiresShade` para poder avisar antes de dejar sin tono una tela
+        // que no se puede tender sin él.
+        material: { select: { name: true, requiresShade: true } },
         _count: {
           select: { movements: { where: { type: { not: "RECEIPT_INITIAL" } } } },
         },
+      },
+    });
+
+    if (!lot) throw new NotFoundError("el rollo", id);
+
+    return lot;
+  }
+
+  /**
+   * Un rollo recién dado de alta, con lo justo para pintarlo en el vale.
+   *
+   * `create()` devuelve el `Lot` pelón, sin el nombre del material ni el
+   * código de su ubicación, y el renglón del vale los enseña. Se relee aquí
+   * en vez de en la action para que el `Decimal` de Prisma no cruce al
+   * cliente por accidente: lo que sale de aquí ya es número.
+   */
+  async findForIssueOption(id: string) {
+    const lot = await this.db.lot.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        shade: true,
+        isRemnant: true,
+        unit: true,
+        currentQuantity: true,
+        reservedQuantity: true,
+        location: { select: { code: true } },
+        material: { select: { name: true } },
       },
     });
 

@@ -82,6 +82,10 @@ export interface LotCorrectionInfo {
   unit: Unit;
   currentQuantity: number;
   reservedQuantity: number;
+  /** El tono con el que está capturado hoy, para poder corregirlo. */
+  shade: string | null;
+  /** Si el material exige tono: se avisa cuando se va a dejar en blanco. */
+  requiresShade: boolean;
   /** Falso en cuanto el rollo tiene una salida o un ajuste encima. */
   canChangeUnit: boolean;
 }
@@ -99,6 +103,8 @@ export async function lotCorrectionInfoAction(input: unknown) {
         unit: lot.unit,
         currentQuantity: Number(lot.currentQuantity),
         reservedQuantity: Number(lot.reservedQuantity),
+        shade: lot.shade,
+        requiresShade: lot.material.requiresShade,
         canChangeUnit: lot._count.movements === 0,
       };
     },

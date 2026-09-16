@@ -25,8 +25,14 @@ interface Props {
   /** Lo que el vale cree que hay. Sólo para el encabezado del diálogo. */
   available: number;
   unit: Unit;
-  /** Cuánto quedó de verdad y en qué unidad, ya aplicado el ajuste. */
-  onCorrected: (result: { available: number; unit: Unit }) => void;
+  /** El tono con el que el vale lo tiene pintado hoy. */
+  shade: string | null;
+  /** Cuánto quedó de verdad, en qué unidad y con qué tono. */
+  onCorrected: (result: {
+    available: number;
+    unit: Unit;
+    shade: string | null;
+  }) => void;
 }
 
 /* El mismo orden por uso que en la recepción: kg y m arriba, el resto
@@ -48,18 +54,26 @@ const UNIT_OPTIONS = [...common, ...rest];
  * reconteo de siempre —el mismo `recountLotAction`, con su movimiento de
  * ajuste y su motivo obligatorio— sólo que disparado desde aquí. El saldo del
  * rollo queda corregido para la próxima salida, y no sólo para este papel.
+ *
+ * El TONO se corrige aquí mismo por lo mismo: el rollo está en la mano y los
+ * dos errores se descubren en el mismo instante —mide 110 y no 100, y es
+ * negro y no blanco—. Corregirlo cambia el rollo, así que el vale impreso
+ * sale con el tono bueno sin tocar el documento: la salida lee el tono vivo
+ * del rollo, no una copia.
  */
 export function IssueLotCorrectDialog({
   lotId,
   lotCode,
   available,
   unit,
+  shade,
   onCorrected,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<LotCorrectionInfo | null>(null);
   const [quantity, setQuantity] = useState("");
   const [nextUnit, setNextUnit] = useState<string>(unit);
+  const [nextShade, setNextShade] = useState(shade ?? "");
   const [reason, setReason] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -87,7 +101,16 @@ export function IssueLotCorrectDialog({
     setInfo(result.data);
     setQuantity(String(result.data.currentQuantity));
     setNextUnit(result.data.unit);
+    // El tono se relee del rollo y no del renglón: el vale pudo quedar
+    // abierto mientras alguien más lo corrigió desde la ficha.
+    setNextShade(result.data.shade ?? "");
   }
+
+  const trimmedShade = nextShade.trim();
+  /* "No lo toques" y "déjalo en blanco" son distintos, y esta comparación es
+     la que los separa: sin ella, un rollo sin tono mandaría `shade: ""` en
+     cada reconteo y la bitácora se llenaría de cambios que nadie hizo. */
+  const shadeChanged = Boolean(info) && trimmedShade !== (info?.shade ?? "");
 
   async function handleSave() {
     const counted = Number(quantity.replace(",", "."));
@@ -111,6 +134,9 @@ export function IssueLotCorrectDialog({
         // Sólo viaja si de verdad cambió: mandarla igual haría que el
         // servicio entrara por el camino de la corrección de unidad.
         unit: nextUnit !== info?.unit ? nextUnit : undefined,
+        // Mismo criterio: ausente es "no lo toques". Cuando sí cambió viaja
+        // tal cual, y en blanco significa borrarlo.
+        shade: shadeChanged ? trimmedShade : undefined,
       }),
     );
     setIsSaving(false);
@@ -125,6 +151,7 @@ export function IssueLotCorrectDialog({
     onCorrected({
       available: counted - (info?.reservedQuantity ?? 0),
       unit: nextUnit as Unit,
+      shade: trimmedShade || null,
     });
 
     toast.success(`${lotCode} corregido`);
@@ -138,14 +165,14 @@ export function IssueLotCorrectDialog({
       open={open}
       onOpenChange={handleOpenChange}
       title={`Corregir ${lotCode}`}
-      description="Lo que de verdad mide el rollo. Se ajusta su saldo con un movimiento, no sólo este vale."
+      description="Lo que de verdad mide y de qué tono es. Se corrige el rollo, no sólo este vale."
       trigger={
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="touch-target shrink-0 text-muted-foreground"
-          aria-label={`Corregir el metraje de ${lotCode}`}
+          aria-label={`Corregir el metraje y el tono de ${lotCode}`}
         >
           <Ruler className="size-4" aria-hidden />
         </Button>
@@ -204,6 +231,37 @@ export function IssueLotCorrectDialog({
               regístralo de nuevo.
             </p>
           )}
+
+          {/* El tono va JUNTO al metraje y no en otra pantalla: se descubren
+              en el mismo instante, con el rollo en la mano y la etiqueta a la
+              vista. Corregirlo cambia el rollo, así que el vale impreso sale
+              con el tono bueno sin tocar el documento. */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="correct-shade">Tono / partida de tintura</Label>
+            <Input
+              id="correct-shade"
+              value={nextShade}
+              onChange={(event) => setNextShade(event.target.value)}
+              placeholder="A-42"
+              className="touch-target tabular"
+            />
+            {shadeChanged && (
+              <p className="text-xs text-muted-foreground">
+                {trimmedShade
+                  ? `Quedará como tono ${trimmedShade} en el rollo y en este vale.`
+                  : "Se quedará sin tono en el rollo y en este vale."}
+              </p>
+            )}
+            {/* Aviso, no bloqueo: si el rollo de verdad no trae tono, el
+                sistema no puede inventárselo. Pero esta tela no se tiende sin
+                él, y dejarlo en blanco sin decir nada es peor. */}
+            {info.requiresShade && !trimmedShade && (
+              <p className="text-xs text-state-reserved">
+                Esta tela se maneja por tono: sin él no se sabe qué rollos se
+                pueden tender juntos.
+              </p>
+            )}
+          </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="correct-reason">Por qué no coincide</Label>

@@ -4,7 +4,9 @@ import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, optionalCuid } from "@/lib/validations/common";
 import { LotRepository } from "@/lib/repositories/lot.repository";
+import { createLotSchema } from "@/lib/validations/lot.schema";
 import { CalculationService } from "@/lib/services/calculation.service";
+import { LotService } from "@/lib/services/lot.service";
 
 /**
  * Consultas que alimentan el formulario de salida.
@@ -61,6 +63,53 @@ export async function availableLotsAction(input: unknown) {
         // Un rollo íntegramente reservado ocupa lugar pero no se puede tomar:
         // ofrecerlo sólo llevaría a un error al aplicar el vale.
         .filter((lot) => lot.available > 0);
+    },
+  });
+}
+
+/**
+ * Alta de rollo SIN salirse del vale.
+ *
+ * Es EL MISMO alta de Inventario —`createLotSchema` y `LotService.create`,
+ * con su folio, su RECEIPT_INITIAL y su auditoría—; lo único distinto es la
+ * respuesta, que vuelve ya con la forma del renglón para poder ponerla en el
+ * vale sin una segunda vuelta al servidor.
+ *
+ * Existe porque el caso es diario: llega tela y se va derecho a producción
+ * sin pasar por el rack. Hasta ahora eso obligaba a abandonar el vale a
+ * medias, ir a darla de alta y volver a armarlo todo.
+ *
+ * Se reaprovecha el esquema completo en vez de recortarlo: así las reglas de
+ * cada campo son las MISMAS en las dos pantallas, y el formulario decide
+ * cuáles pide —material, cantidad, unidad, tono y ubicación— sin que aquí
+ * haya que mantener una segunda lista.
+ *
+ * Pide `inventory:write`, lo mismo que `createLotAction`: dar de alta un
+ * rollo es registrar lo que llegó, no ajustar un saldo.
+ */
+export async function createLotForIssueAction(input: unknown) {
+  return executeAction(input, {
+    schema: createLotSchema,
+    permission: "inventory:write",
+    // También /issues: el rollo nuevo tiene que aparecer en las listas de
+    // rollos surtibles sin que nadie recargue a mano.
+    revalidate: ["/lots", "/dashboard", "/issues"],
+    successMessage: "Rollo dado de alta",
+    handler: async ({ input, auditContext }): Promise<IssueLotOption> => {
+      const created = await new LotService(auditContext).create(input);
+      const lot = await new LotRepository().findForIssueOption(created.id);
+
+      return {
+        id: lot.id,
+        code: lot.code,
+        shade: lot.shade,
+        isRemnant: lot.isRemnant,
+        available:
+          Number(lot.currentQuantity) - Number(lot.reservedQuantity),
+        unit: lot.unit,
+        locationCode: lot.location?.code ?? null,
+        materialName: lot.material.name,
+      };
     },
   });
 }

@@ -94,6 +94,28 @@ export const recountLotSchema = z.object({
    * servicio, que es quien puede ver el historial.
    */
   unit: z.nativeEnum(Unit).optional(),
+
+  /**
+   * El tono REAL del rollo, cuando lo que se capturó mal fue eso.
+   *
+   * Viaja con el reconteo y no con la edición de la ficha porque es el MISMO
+   * momento: el rollo está en la mano y se descubre a la vez que mide otra
+   * cosa y que no es del tono que dice la etiqueta. Pedir dos pantallas para
+   * dos hallazgos simultáneos termina en que sólo se corrige uno, y el tono
+   * es el que más caro sale: dos tonos en un mismo tendido salen con franjas
+   * y la prenda se rechaza.
+   *
+   * Ausente = no se toca, que es el reconteo de siempre. Cadena vacía = se
+   * borra el tono, y eso es una corrección legítima: la etiqueta traía una
+   * partida que el rollo no tiene.
+   */
+  shade: z
+    .string()
+    .trim()
+    .max(255, "El tono no puede pasar de 255 caracteres")
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value || null)),
+
   measurementSource: z
     .nativeEnum(MeasurementSource)
     .default(MeasurementSource.MEASURED),

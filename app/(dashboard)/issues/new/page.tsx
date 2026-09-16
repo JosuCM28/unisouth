@@ -45,6 +45,7 @@ export default async function NewIssuePage() {
         cutTags={options.cutTags}
         clients={options.clients}
         productionRuns={options.productionRuns}
+        locations={options.locations}
         canAdjust={canAdjust}
       />
     </div>

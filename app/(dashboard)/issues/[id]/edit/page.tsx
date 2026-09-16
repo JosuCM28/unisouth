@@ -123,6 +123,7 @@ export default async function EditIssuePage({ params }: PageProps) {
         cutTags={options.cutTags}
         clients={options.clients}
         productionRuns={options.productionRuns}
+        locations={options.locations}
         document={editable}
         canAdjust={canAdjust}
       />
