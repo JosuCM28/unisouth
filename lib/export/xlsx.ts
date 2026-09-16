@@ -415,9 +415,12 @@ export interface SheetCell {
    * número ya calculado esa corrección deja la hoja mintiendo, y el error no
    * se ve porque la suma sigue ahí, bien formateada y equivocada.
    *
-   * Manda sobre `value`: una celda con fórmula no lleva valor de respaldo, y
-   * el libro se abre con `fullCalcOnLoad` para que Excel la resuelva de
-   * entrada en vez de mostrar una celda en blanco.
+   * Cuando la celda TAMBIÉN trae un `value` numérico, ese número se guarda
+   * como resultado de la fórmula. Conviene siempre que se pueda calcular del
+   * lado del servidor: sin él la celda se ve vacía en todo lo que no
+   * recalcula al abrir —el visor de Windows, la vista previa de Drive, Excel
+   * del celular—, y quien recibe el archivo no ve "falta recalcular", ve un
+   * reporte sin totales. La fórmula sigue viva de todos modos.
    */
   formula?: string;
   /**
@@ -534,14 +537,37 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
  * Con estilo manda el estilo: el renglón de totales va en negritas aunque la
  * celda sea un número, y ese estilo ya trae su propio formato numérico.
  */
+/**
+ * El resultado guardado de una fórmula, listo para el XML.
+ *
+ * Sólo numérico: los totales de estas hojas son cifras, y una cadena guardada
+ * como resultado obligaría a declarar el tipo de la celda —`t="str"`— y a
+ * mantenerlo de acuerdo con la fórmula. Sin valor se devuelve vacío, que es el
+ * comportamiento de antes: la celda queda a que Excel la calcule.
+ */
+function formulaValue(value: SheetCell["value"]): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  return `<v>${value}</v>`;
+}
+
 function renderSheetCell(reference: string, cell: SheetCell): string {
   const kind = cell.kind ?? "text";
 
-  /* La fórmula manda sobre el valor: quien la pide quiere que la hoja se
-     recalcule, no un número congelado con una fórmula decorativa al lado. */
+  /* Fórmula CON su resultado ya escrito, no sólo la fórmula.
+
+     Una celda con `<f>` y sin `<v>` se ve VACÍA hasta que algo la recalcula, y
+     no todo lo que abre un .xlsx recalcula: el visor de Windows, la vista
+     previa de Drive, Excel del celular y cualquier lector que sólo mire los
+     valores guardados enseñan una columna de totales en blanco. Para quien
+     recibe el archivo por correo eso no es "falta recalcular", es que el
+     reporte no trae los totales.
+
+     Con el valor guardado se lee de inmediato en todos lados, y la fórmula
+     sigue viva: en cuanto alguien corrige una cantidad, el total se mueve. */
   if (cell.formula) {
     const style = cell.style ? ` s="${SHEET_STYLES[cell.style]}"` : "";
-    return `<c r="${reference}"${style}><f>${escapeXml(cell.formula)}</f></c>`;
+    const cached = formulaValue(cell.value);
+    return `<c r="${reference}"${style}><f>${escapeXml(cell.formula)}</f>${cached}</c>`;
   }
 
   if (!cell.style) return renderCell(reference, cell.value, kind);
