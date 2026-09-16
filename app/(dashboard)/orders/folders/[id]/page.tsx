@@ -6,12 +6,17 @@ import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { prisma } from "@/lib/prisma";
+import { cutBatchLabel } from "@/lib/constants/labels";
+import { buildFolderSendPreview } from "@/lib/folder-send-preview";
 import { cutProgress, formatDate, toDateInputValue } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ExportButton } from "@/components/shared/export-button";
 import { Button } from "@/components/ui/button";
 import { FolderArchiveButton } from "@/components/orders/folder-archive-button";
 import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
+import { FolderSendToIssueDialog } from "@/components/orders/folder-send-to-issue-dialog";
+import { FolderWorkshopDialog } from "@/components/orders/folder-workshop-dialog";
 import { OrderTable } from "@/components/orders/order-table";
 
 interface PageProps {
@@ -44,8 +49,18 @@ export default async function OrderFolderPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  const folder = await new OrderFolderRepository().findWithOrders(id);
+  const repository = new OrderFolderRepository();
+
+  const folder = await repository.findWithOrders(id);
   if (!folder) notFound();
+
+  /* El resumen de lo que saldría del pedido. Sólo se calcula para quien puede
+     capturar: a quien nada más consulta no se le pintan esos botones, y
+     recorrer los cortes de todas las órdenes para no enseñar nada sería un
+     viaje de más en la pantalla que más se abre. */
+  const send = canWrite
+    ? await buildSendContext(repository, id)
+    : null;
 
   const totals = folder.orders
     .filter((order) => order.status !== "CANCELLED")
@@ -109,8 +124,51 @@ export default async function OrderFolderPage({ params }: PageProps) {
           />
         </div>
 
-        {canWrite && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* El concentrado lo baja cualquiera que pueda abrir el pedido: es
+              la hoja que se manda por correo cuando el cliente pregunta, y
+              quien contesta el teléfono no captura nada. `exact` porque los
+              filtros de la lista no significan nada dentro de un pedido. */}
+          <ExportButton
+            href={`/api/export/folders/${folder.id}`}
+            label="Total a cortar"
+            exact
+          />
+
+          {send && !isArchived && (
+            <>
+              <FolderSendToIssueDialog
+                folderId={folder.id}
+                folderCode={folder.code}
+                sizes={send.preview.issue.sizes}
+                pieces={send.preview.issue.pieces}
+                bundles={send.preview.issue.bundles}
+                orders={send.preview.issue.orders}
+                skipped={send.preview.issue.skipped}
+                clients={send.preview.clients}
+              />
+
+              {/* Sin talleres o sin etapas capturadas el diálogo no tendría
+                  qué ofrecer, y un botón que abre un formulario imposible de
+                  llenar sólo se aprieta una vez. */}
+              {send.workshops.length > 0 && send.stages.length > 0 && (
+                <FolderWorkshopDialog
+                  folderId={folder.id}
+                  folderCode={folder.code}
+                  sizes={send.preview.workshop.sizes}
+                  pieces={send.preview.workshop.pieces}
+                  bundles={send.preview.workshop.bundles}
+                  orders={send.preview.workshop.orders}
+                  skippedOrders={send.preview.workshop.skippedOrders}
+                  workshops={send.workshops}
+                  stages={send.stages}
+                />
+              )}
+            </>
+          )}
+
+          {canWrite && (
+            <>
             <Button asChild variant="outline" className="touch-target">
               <Link href={`/orders/folders/${folder.id}/edit`}>
                 <Pencil className="size-4" aria-hidden />
@@ -126,8 +184,9 @@ export default async function OrderFolderPage({ params }: PageProps) {
               folderCode={folder.code}
               orderCount={folder.orders.length}
             />
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {(folder.reference || folder.dueDate || folder.notes) && (
@@ -195,6 +254,42 @@ export default async function OrderFolderPage({ params }: PageProps) {
       )}
     </div>
   );
+}
+
+/**
+ * Lo que necesitan los dos botones de "mandar el pedido entero".
+ *
+ * Los cortes, los talleres y las etapas van en una sola ida a la base: son
+ * tres consultas independientes y encadenarlas sumaría tres viajes a la
+ * pantalla que más se abre del módulo.
+ *
+ * El resumen se calcula con la MISMA función que después arma los renglones,
+ * así que lo que el diálogo enseña y lo que el vale acaba llevando no pueden
+ * diferir.
+ */
+async function buildSendContext(
+  repository: OrderFolderRepository,
+  folderId: string,
+) {
+  const [orders, workshops, stages] = await Promise.all([
+    repository.findSendableCuts(folderId),
+    prisma.workshop.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.processStage.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true },
+      orderBy: [{ position: "asc" }, { name: "asc" }],
+    }),
+  ]);
+
+  return {
+    preview: buildFolderSendPreview(orders, cutBatchLabel),
+    workshops,
+    stages,
+  };
 }
 
 /** Un número grande con su etiqueta. Los totales del pedido de un vistazo. */

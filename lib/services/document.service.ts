@@ -83,6 +83,13 @@ export class DocumentService extends BaseService {
              perdería de vista una entrega que sí salió por la puerta. */
           cuttingOrderId: input.cuttingOrderId,
           cuttingBatchId: input.cuttingBatchId,
+          orderFolderId: input.orderFolderId,
+          /* Los cortes que se lleva un vale global. Se conectan al crear y
+             nunca se sueltan: son el seguro que impide que esos mismos cortes
+             vuelvan a salir después, orden por orden. */
+          sentBatches: input.sentBatchIds?.length
+            ? { connect: input.sentBatchIds.map((id) => ({ id })) }
+            : undefined,
           concept: input.concept,
           reference: input.reference,
           handedOverBy: input.handedOverBy,

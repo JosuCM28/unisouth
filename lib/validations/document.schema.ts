@@ -92,6 +92,18 @@ export const documentSchema = z.object({
    */
   cuttingOrderId: optionalCuid,
   cuttingBatchId: optionalCuid,
+  /**
+   * De qué PEDIDO nace el vale, y qué cortes se llevó, cuando sale por el
+   * pedido entero y no por una orden.
+   *
+   * Tampoco los teclea nadie: los pone `OrderFolderService.sendToIssue`. Un
+   * vale global cubre cortes de varias órdenes, así que los dos campos de
+   * arriba se quedan vacíos —tendrían que elegir una de cinco— y estos dos
+   * dicen de dónde salió y exactamente qué se llevó. Sin `sentBatchIds` el
+   * seguro del doble envío no vería esos cortes y podrían volver a salir.
+   */
+  orderFolderId: optionalCuid,
+  sentBatchIds: z.array(cuidSchema).optional(),
   concept: optionalText,
   reference: optionalText,
   /** Quién entrega y quién recibe: el vale se firma en físico. */

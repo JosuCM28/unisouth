@@ -239,6 +239,8 @@ export class GarmentShipmentService extends BaseService {
          bloque, como si hubieran salido dos. */
       cuttingOrderId: undefined,
       cuttingBatchId: undefined,
+      // Tampoco cuelga de un pedido: el envío es de una orden y ya la trae.
+      orderFolderId: undefined,
       concept: order.description ?? undefined,
       // El folio de la orden, que es contra lo que el taller cotiza y cobra.
       reference: order.code,

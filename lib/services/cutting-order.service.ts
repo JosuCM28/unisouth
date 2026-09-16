@@ -5,6 +5,11 @@ import type {
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
+import {
+  toCutLines,
+  type CutLineDraft,
+  type CutSourceLine,
+} from "@/lib/cut-lines";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import type {
   BatchProgressInput,
@@ -504,11 +509,7 @@ export class CuttingOrderService extends BaseService {
   private async requireEditableBatch(tx: Tx, batchId: string, orderId: string) {
     const batch = await this.requireBatch(tx, batchId, orderId);
 
-    const live = await tx.inventoryDocument.findFirst({
-      where: { cuttingBatchId: batchId, status: { not: "CANCELLED" } },
-      select: { code: true, status: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const live = await this.liveIssueOfBatch(tx, batchId);
 
     if (live) {
       const state = live.status === "DRAFT" ? "en borrador" : "aplicada";
@@ -518,6 +519,34 @@ export class CuttingOrderService extends BaseService {
     }
 
     return batch;
+  }
+
+  /**
+   * El vale VIVO que ya se llevó este corte, si existe.
+   *
+   * Una sola consulta para las dos reglas que dependen de ella —no se puede
+   * reenviar un corte que ya salió, ni corregirle las cantidades— porque son
+   * la misma pregunta y tenerla escrita dos veces es cómo se acaban
+   * respondiendo distinto.
+   *
+   * Mira los DOS caminos por los que un corte pudo salir: su propio vale y el
+   * vale global de un pedido, que se lleva los cortes de varias órdenes de un
+   * jalón. Preguntar sólo por el primero dejaría volver a mandar, orden por
+   * orden, prendas que ya salieron en el global, y la cuenta de lo que anda
+   * afuera dejaría de cuadrar sin que nadie se entere hasta el conteo.
+   */
+  private async liveIssueOfBatch(tx: Tx, batchId: string) {
+    return tx.inventoryDocument.findFirst({
+      where: {
+        status: { not: "CANCELLED" },
+        OR: [
+          { cuttingBatchId: batchId },
+          { sentBatches: { some: { id: batchId } } },
+        ],
+      },
+      select: { code: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
   /** La talla de un renglón, para el mensaje de error de un recálculo. */
@@ -725,7 +754,7 @@ export class CuttingOrderService extends BaseService {
         ? await this.loadSendableBatch(tx, orderId, batchId)
         : null;
 
-      const cutLines = batch
+      const cutLines: CutLineDraft[] = batch
         ? await this.batchCutLines(tx, order.lines, batch.id)
         : order.lines
             .filter((line) => line.cutQuantity > 0)
@@ -763,6 +792,9 @@ export class CuttingOrderService extends BaseService {
            vale sigue en pie", y lo que impide mandar dos veces el mismo corte. */
         cuttingOrderId: order.id,
         cuttingBatchId: batch?.id,
+        // Este vale nace de UNA orden: el pedido y sus cortes son del vale
+        // global, que es el otro camino.
+        orderFolderId: undefined,
         // De dónde salió, en el papel que firma el taller.
         concept: order.description ?? undefined,
         reference: order.reference ?? order.code,
@@ -830,11 +862,7 @@ export class CuttingOrderService extends BaseService {
       throw new BusinessRuleError("Ese corte no pertenece a esta orden.");
     }
 
-    const live = await tx.inventoryDocument.findFirst({
-      where: { cuttingBatchId: batchId, status: { not: "CANCELLED" } },
-      select: { code: true, status: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const live = await this.liveIssueOfBatch(tx, batchId);
 
     if (live) {
       const state = live.status === "DRAFT" ? "en borrador" : "aplicada";
@@ -859,7 +887,7 @@ export class CuttingOrderService extends BaseService {
    */
   private async batchCutLines(
     tx: Tx,
-    lines: { id: string; sizeId: string; tagId: string | null; notes: string | null }[],
+    lines: CutSourceLine[],
     batchId: string,
   ) {
     /* En orden de captura: los bultos se amarran y se anotan en el orden en
@@ -870,42 +898,9 @@ export class CuttingOrderService extends BaseService {
       select: { lineId: true, quantity: true, bundles: true },
     });
 
-    const byLine = new Map<string, { quantity: number; bundles: number }[]>();
-
-    for (const entry of entries) {
-      const rows = byLine.get(entry.lineId) ?? [];
-      rows.push({ quantity: entry.quantity, bundles: entry.bundles });
-      byLine.set(entry.lineId, rows);
-    }
-
-    // Se recorren las TALLAS y no las capturas para respetar el orden del
-    // pedido: el vale se lee contra la orden, talla por talla y en su orden.
-    return lines.flatMap((line) => {
-      const rows = byLine.get(line.id) ?? [];
-      const net = sumBundlePieces(rows);
-
-      if (net <= 0) return [];
-
-      const captured = rows.filter((row) => row.quantity > 0);
-
-      /* Con una corrección de por medio el desglose deja de describir lo que
-         se va a entregar —el bulto de 30 ya no lleva 30— y el vale se firma
-         contra bultos de verdad. Entonces va el neto en un solo renglón y el
-         auxiliar anota los bultos al empacar. Sin correcciones, que es el caso
-         normal, cada bulto viaja como su propio renglón. */
-      const cutRows =
-        sumBundlePieces(captured) === net
-          ? captured
-          : [{ quantity: net, bundles: 1 }];
-
-      return cutRows.map((row) => ({
-        sizeId: line.sizeId,
-        quantity: row.quantity,
-        bundles: row.bundles,
-        tagId: line.tagId ?? undefined,
-        notes: line.notes ?? undefined,
-      }));
-    });
+    /* La regla vive en `lib/cut-lines` y no aquí porque la salida global de un
+       pedido hace exactamente lo mismo con los cortes de varias órdenes. */
+    return toCutLines(lines, entries);
   }
 
   /**

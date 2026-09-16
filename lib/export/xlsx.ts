@@ -360,6 +360,7 @@ function packageWorkbook(sheetXml: string, tabName: string): Buffer {
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <sheets><sheet name="${sheetName(tabName)}" sheetId="1" r:id="rId1"/></sheets>
+<calcPr calcId="0" fullCalcOnLoad="1"/>
 </workbook>`,
     },
     {
@@ -405,6 +406,28 @@ export interface SheetCell {
   value?: string | number | Date | null;
   kind?: CellKind;
   style?: SheetStyle;
+  /**
+   * Fórmula de Excel, SIN el `=` de adelante (`SUM(B10:E10)`).
+   *
+   * Existe porque hay hojas que no se mandan para leerse sino para EDITARSE:
+   * el concentrado de un pedido llega con las cantidades puestas, pero quien
+   * lo recibe corrige una talla y espera que el total se mueva solo. Con el
+   * número ya calculado esa corrección deja la hoja mintiendo, y el error no
+   * se ve porque la suma sigue ahí, bien formateada y equivocada.
+   *
+   * Manda sobre `value`: una celda con fórmula no lleva valor de respaldo, y
+   * el libro se abre con `fullCalcOnLoad` para que Excel la resuelva de
+   * entrada en vez de mostrar una celda en blanco.
+   */
+  formula?: string;
+  /**
+   * Última columna de la fusión, 1-based. `at: 1, mergeTo: 6` fusiona A:F.
+   *
+   * Sólo el ancla lleva contenido; las demás celdas del rango se escriben
+   * vacías con el mismo estilo, que es lo que hace que el relleno y el borde
+   * del bloque no se corten a media fusión.
+   */
+  mergeTo?: number;
 }
 
 /** Un renglón del documento. Vacío = renglón en blanco, que separa bloques. */
@@ -441,6 +464,8 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
     )
     .join("");
 
+  const merges: string[] = [];
+
   const body = rows
     .map((cells, rowIndex) => {
       const reference = rowIndex + 1;
@@ -450,7 +475,31 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
       const rendered = cells
         .map((cell) => {
           column = cell.at ?? column + 1;
-          return renderSheetCell(`${columnName(column)}${reference}`, cell);
+          const anchor = `${columnName(column)}${reference}`;
+
+          if (!cell.mergeTo || cell.mergeTo <= column) {
+            return renderSheetCell(anchor, cell);
+          }
+
+          merges.push(`${anchor}:${columnName(cell.mergeTo)}${reference}`);
+
+          /* Las celdas tapadas se escriben vacías y CON el estilo del ancla.
+             Excel no hereda el formato dentro de una fusión: sin ellas, un
+             título sobre fondo sólido se pinta sólo hasta donde llega su
+             primera columna y el bloque sale cortado a la mitad. */
+          const covered: string[] = [];
+          for (let next = column + 1; next <= cell.mergeTo; next += 1) {
+            covered.push(
+              renderSheetCell(`${columnName(next)}${reference}`, {
+                style: cell.style,
+              }),
+            );
+          }
+
+          // La última tapada deja el cursor donde termina la fusión.
+          column = cell.mergeTo;
+
+          return renderSheetCell(anchor, cell) + covered.join("");
         })
         .join("");
 
@@ -461,13 +510,22 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
   const lastColumn = columnName(Math.max(widths.length, 1));
   const lastRow = Math.max(rows.length, 1);
 
+  const mergeXml =
+    merges.length === 0
+      ? ""
+      : `<mergeCells count="${merges.length}">${merges
+          .map((range) => `<mergeCell ref="${range}"/>`)
+          .join("")}</mergeCells>`;
+
+  // `mergeCells` va DESPUÉS de `sheetData`: el orden de los elementos está
+  // fijado por el esquema y Excel se niega a abrir el archivo si se invierte.
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <dimension ref="A1:${lastColumn}${lastRow}"/>
 <sheetViews><sheetView workbookViewId="0"/></sheetViews>
 <sheetFormatPr defaultRowHeight="15"/>
 <cols>${cols}</cols>
-<sheetData>${body}</sheetData>
+<sheetData>${body}</sheetData>${mergeXml}
 </worksheet>`;
 }
 
@@ -478,6 +536,14 @@ function buildDocumentSheet(rows: SheetRow[], widths: number[]): string {
  */
 function renderSheetCell(reference: string, cell: SheetCell): string {
   const kind = cell.kind ?? "text";
+
+  /* La fórmula manda sobre el valor: quien la pide quiere que la hoja se
+     recalcule, no un número congelado con una fórmula decorativa al lado. */
+  if (cell.formula) {
+    const style = cell.style ? ` s="${SHEET_STYLES[cell.style]}"` : "";
+    return `<c r="${reference}"${style}><f>${escapeXml(cell.formula)}</f></c>`;
+  }
+
   if (!cell.style) return renderCell(reference, cell.value, kind);
 
   const style = SHEET_STYLES[cell.style];

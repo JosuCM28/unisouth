@@ -134,6 +134,107 @@ export class OrderFolderRepository extends BaseRepository<
     });
   }
 
+  /**
+   * El pedido con el desglose por talla de cada una de sus órdenes.
+   *
+   * Es la lectura del CONCENTRADO: una columna por orden y un renglón por
+   * talla. Las canceladas no viajan —lo que se canceló no se corta— y las
+   * tallas salen en el orden del catálogo y no en el de captura, porque en la
+   * hoja las columnas se comparan renglón contra renglón y dos órdenes que
+   * capturaron sus tallas en distinto orden no cuadrarían.
+   */
+  async findForConcentrate(id: string) {
+    return this.db.orderFolder.findUnique({
+      where: { id },
+      include: {
+        client: { select: { name: true } },
+        orders: {
+          where: { status: { not: "CANCELLED" } },
+          orderBy: [{ orderedAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+          include: {
+            client: { select: { name: true } },
+            material: { select: { code: true, name: true } },
+            lines: {
+              orderBy: [{ size: { order: "asc" } }, { position: "asc" }],
+              select: {
+                orderedQuantity: true,
+                notes: true,
+                size: { select: { id: true, code: true, order: true } },
+                cutTag: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Los cortes del pedido que todavía pueden salir, con lo que dio cada uno.
+   *
+   * Trae TODOS los cortes —incluidos los que ya salieron— y sus vales vivos,
+   * porque la pantalla tiene que poder decir "se saltan tres, ya salieron en
+   * OUT-2026-0912" en vez de callárselos. Quién se salta y quién no lo decide
+   * el servicio, que es donde vive la regla.
+   */
+  async findSendableCuts(folderId: string) {
+    return this.db.cuttingOrder.findMany({
+      where: { folderId, status: { not: "CANCELLED" } },
+      orderBy: [{ orderedAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        clientId: true,
+        materialId: true,
+        productionRunId: true,
+        description: true,
+        reference: true,
+        notes: true,
+        /* El encabezado del corte viaja entero al vale: molde, versión y sus
+           notas se supieron al capturar la orden y volver a teclearlos en el
+           vale es cómo terminan diciendo cosas distintas. */
+        cutFabricText: true,
+        cutPattern: true,
+        cutVersion: true,
+        cutVersionNotes: true,
+        cutNotes: true,
+        lines: {
+          orderBy: { position: "asc" },
+          select: {
+            id: true,
+            sizeId: true,
+            tagId: true,
+            notes: true,
+            size: { select: { code: true, order: true } },
+          },
+        },
+        batches: {
+          orderBy: { number: "asc" },
+          select: {
+            id: true,
+            number: true,
+            label: true,
+            entries: {
+              orderBy: { createdAt: "asc" },
+              select: { lineId: true, quantity: true, bundles: true },
+            },
+            /* Los dos caminos por los que un corte ya pudo salir: su propio
+               vale y el vale global de un pedido. Se preguntan juntos porque
+               omitir cualquiera de los dos deja pasar una entrega repetida. */
+            issues: {
+              where: { status: { not: "CANCELLED" } },
+              select: { code: true, status: true },
+            },
+            folderIssues: {
+              where: { status: { not: "CANCELLED" } },
+              select: { code: true, status: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
   /** Para el selector del formulario de orden: sólo carpetas vivas. */
   async findSelectable(): Promise<
     Array<{ id: string; code: string; name: string; clientName: string | null }>

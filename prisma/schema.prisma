@@ -741,6 +741,26 @@ model InventoryDocument {
   cuttingBatchId String?
   cuttingBatch   CuttingBatch? @relation("DocumentCuttingBatch", fields: [cuttingBatchId], references: [id], onDelete: SetNull)
 
+  /// The CLIENT'S ORDER this voucher emptied, when it was issued for a whole
+  /// folder at once.
+  ///
+  /// A folder-wide issue carries the cuts of several orders, so the two fields
+  /// above cannot name them: `cuttingOrderId` would have to pick one of five
+  /// and lie about the rest. This one says which folder it came from, and
+  /// `sentBatches` below says exactly which cuts travelled.
+  orderFolderId String?
+  orderFolder   OrderFolder? @relation("DocumentOrderFolder", fields: [orderFolderId], references: [id], onDelete: SetNull)
+
+  /// Every cutting run this voucher took, for a folder-wide issue.
+  ///
+  /// Many-to-many and not a second `cuttingBatchId` because one voucher takes
+  /// many runs. It exists for ONE reason: `cuttingBatchId` is the lock that
+  /// stops a run from being delivered twice, and a folder-wide voucher leaves
+  /// it null. Without this table those runs would look untouched and could be
+  /// sent again, order by order, a week later — and nobody would find out
+  /// until the count.
+  sentBatches CuttingBatch[] @relation("DocumentSentBatches")
+
   concept      String?
   reference    String?
   handedOverBy String?
@@ -797,6 +817,7 @@ model InventoryDocument {
   @@index([productionRunId])
   @@index([cuttingOrderId])
   @@index([cuttingBatchId])
+  @@index([orderFolderId])
   @@map("inventory_documents")
 }
 
@@ -1543,6 +1564,8 @@ model OrderFolder {
   updatedAt   DateTime @updatedAt
 
   orders CuttingOrder[]
+  /// The folder-wide issue vouchers born from it.
+  issues InventoryDocument[] @relation("DocumentOrderFolder")
 
   @@index([archivedAt, createdAt])
   @@index([clientId])
@@ -1684,6 +1707,10 @@ model CuttingBatch {
   /// The issue vouchers for THIS cutting run. More than one only after
   /// cancelling: a live voucher blocks sending the run again.
   issues  InventoryDocument[] @relation("DocumentCuttingBatch")
+  /// The folder-wide vouchers that took this run along with other orders'.
+  /// Read by the same lock as `issues`: a live one here blocks it just the
+  /// same, because the garments already left on that paper.
+  folderIssues InventoryDocument[] @relation("DocumentSentBatches")
 
   @@unique([orderId, number])
   @@index([orderId])
