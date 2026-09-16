@@ -35,15 +35,6 @@ export interface CutReportTotals {
   leftover: number | null;
 }
 
-/**
- * Arriba de este porcentaje, la retacería se marca en amarillo en el Excel.
- *
- * En tanto por uno, como el resto de las tasas del archivo. Es el corte que
- * usa la fábrica para decidir si el tendido salió caro: no es una ley, es el
- * número con el que hoy se revisa la hoja.
- */
-export const REMNANT_WARNING_RATE = 0.016;
-
 export function cutReportTotals(input: CutReportInput): CutReportTotals {
   const { orderedQuantity, cutQuantity, metersSpread, smallRemnant } = input;
 

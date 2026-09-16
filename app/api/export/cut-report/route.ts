@@ -1,24 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
-import {
-  toXlsxWithNotice,
-  xlsxResponse,
-  type XlsxColumn,
-} from "@/lib/export/xlsx";
+import { xlsxResponse } from "@/lib/export/xlsx";
 import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
-import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
 import {
-  cutReportTotals,
-  weekdayName,
-  REMNANT_WARNING_RATE,
-  type CutReportTotals,
-} from "@/lib/export/cut-report";
+  buildCutReportWorkbook,
+  type ReportRow,
+} from "@/lib/export/cut-report-sheet";
+import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
+import { cutReportTotals, weekdayName } from "@/lib/export/cut-report";
 import {
   cuttingOrderWhere,
   parseCuttingOrderFilters,
 } from "@/lib/repositories/cutting-order-filters";
-import type { CuttingOrderStatus } from "@prisma/client";
 
 /**
  * El concentrado de corte: una fila POR ORDEN.
@@ -29,94 +23,10 @@ import type { CuttingOrderStatus } from "@prisma/client";
  * juntas, así que repartirlos entre renglones exigiría inventar un criterio
  * que en la mesa no existe.
  *
- * Reemplaza la hoja de cálculo que se llevaba a mano, por eso conserva sus
- * columnas y hasta el color de la retacería.
+ * Reemplaza la hoja que se llevaba a mano y sale con su mismo formato —el
+ * orden de las columnas, los colores y el semáforo—, porque se compara contra
+ * las hojas viejas y se manda por correo a quien no tiene la app enfrente.
  */
-interface Row {
-  orderedAt: Date;
-  reference: string;
-  clientPo: string;
-  client: string;
-  status: CuttingOrderStatus;
-  fabric: string;
-  description: string;
-  ordered: number;
-  cut: number;
-  metersDelivered: number | null;
-  metersSpread: number | null;
-  smallRemnant: number | null;
-  totals: CutReportTotals;
-}
-
-const COLUMNS: XlsxColumn<Row>[] = [
-  { header: "FECHA DE CORTE", value: (r) => r.orderedAt, kind: "date", width: 14 },
-  { header: "DIAS", value: (r) => weekdayName(r.orderedAt), width: 12 },
-  { header: "NO. ORDEN", value: (r) => r.reference, width: 14 },
-  { header: "PO DEL CLIENTE", value: (r) => r.clientPo, width: 16 },
-  { header: "CLIENTE", value: (r) => r.client, width: 22 },
-  { header: "STATUS", value: (r) => CUTTING_ORDER_STATUS_LABELS[r.status], width: 14 },
-  { header: "TIPO DE TELA -COLOR", value: (r) => r.fabric, width: 26 },
-  { header: "DESCRIPCION", value: (r) => r.description, width: 26 },
-  { header: "CANTIDAD REQUERIDA", value: (r) => r.ordered, kind: "number", width: 13 },
-  { header: "CANTIDAD CORTADA", value: (r) => r.cut, kind: "number", width: 13 },
-  {
-    header: "DIFRENCIA ( CANT REQ.- CANT",
-    value: (r) => r.totals.difference,
-    kind: "number",
-    width: 13,
-  },
-  {
-    header: "% excedente",
-    value: (r) => r.totals.surplusRate,
-    kind: "percent0",
-    width: 12,
-  },
-  {
-    header: "METROS ENTREGADOS",
-    value: (r) => r.metersDelivered,
-    kind: "number",
-    width: 13,
-  },
-  {
-    header: "METROS TENDIDOS",
-    value: (r) => r.metersSpread,
-    kind: "number",
-    width: 13,
-  },
-  {
-    header: "RETACERIA CHICA",
-    value: (r) => r.smallRemnant,
-    kind: "number",
-    width: 13,
-  },
-  {
-    header: "PROMEDIO REAL",
-    value: (r) => r.totals.realAverage,
-    kind: "decimal3",
-    width: 13,
-  },
-  {
-    header: "% RETACERIA",
-    value: (r) => r.totals.remnantRate,
-    kind: "percent",
-    width: 13,
-    /* El semáforo de la hoja de papel. Sin retacería medida no hay color: una
-       celda verde diría que el corte salió bien cuando lo que pasa es que
-       nadie lo ha medido. */
-    flag: (r) => {
-      const rate = r.totals.remnantRate;
-      if (rate === null) return undefined;
-      return rate > REMNANT_WARNING_RATE ? "warn" : "ok";
-    },
-  },
-  {
-    header: "SOBRANTE TELA",
-    value: (r) => r.totals.leftover,
-    kind: "number",
-    width: 13,
-  },
-];
-
 export async function GET(request: Request) {
   // Recorre la tabla completa: sin tope es un vector de denegación.
   await enforceRateLimit("export:cut-report", EXPORT_LIMIT);
@@ -153,42 +63,50 @@ export async function GET(request: Request) {
     },
   });
 
-  const rows: Row[] = orders.map((order) => {
+  const rows: ReportRow[] = orders.map((order) => {
     const ordered = sum(order.lines.map((line) => line.orderedQuantity));
     const cut = sum(order.lines.map((line) => line.cutQuantity));
     const metersDelivered = toNumber(order.metersDelivered);
     const metersSpread = toNumber(order.metersSpread);
     const smallRemnant = toNumber(order.smallRemnant);
 
-    return {
-      orderedAt: order.orderedAt,
-      /* El folio interno cuando no hay número del cliente: la columna nunca va
-         vacía, porque es por la que se busca la fila en la hoja. */
-      reference: order.reference ?? order.code,
-      clientPo: order.clientPo ?? "",
-      client: order.client?.name ?? "Fábrica",
-      status: order.status,
-      fabric: fabricName(order),
-      description: order.description ?? "",
-      ordered,
-      cut,
+    const totals = cutReportTotals({
+      orderedQuantity: ordered,
+      cutQuantity: cut,
       metersDelivered,
       metersSpread,
       smallRemnant,
-      totals: cutReportTotals({
-        orderedQuantity: ordered,
-        cutQuantity: cut,
-        metersDelivered,
-        metersSpread,
-        smallRemnant,
-      }),
-    };
+    });
+
+    /* El orden ES el de las columnas de la hoja. Va como arreglo y no como
+       objeto porque la hoja es un formato fijo: son las mismas dieciocho
+       casillas, siempre en el mismo lugar, y nombrarlas aquí invitaría a
+       reordenarlas de un lado sin acordarse del otro. */
+    return [
+      order.orderedAt,
+      weekdayName(order.orderedAt),
+      /* El folio interno cuando no hay número del cliente: la columna nunca
+         va vacía, porque es por la que se busca la fila en la hoja. */
+      order.reference ?? order.code,
+      order.clientPo,
+      order.client?.name ?? "Fábrica",
+      CUTTING_ORDER_STATUS_LABELS[order.status],
+      fabricName(order),
+      order.description,
+      ordered,
+      cut,
+      totals.difference,
+      totals.surplusRate,
+      metersDelivered,
+      metersSpread,
+      smallRemnant,
+      totals.realAverage,
+      totals.remnantRate,
+      totals.leftover,
+    ];
   });
 
-  return xlsxResponse(
-    toXlsxWithNotice(rows, COLUMNS, "Reporte de corte"),
-    "reporte-corte",
-  );
+  return xlsxResponse(buildCutReportWorkbook(rows), "reporte-corte");
 }
 
 /**
@@ -201,9 +119,9 @@ export async function GET(request: Request) {
 function fabricName(order: {
   material: { code: string; name: string } | null;
   cutFabricText: string | null;
-}): string {
+}): string | null {
   if (order.material) return `${order.material.code} · ${order.material.name}`;
-  return order.cutFabricText ?? "";
+  return order.cutFabricText;
 }
 
 /** Un Decimal de Prisma a número plano, o `null` si no se capturó. */
