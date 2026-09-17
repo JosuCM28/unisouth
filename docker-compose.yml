@@ -30,6 +30,19 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
 
+      # Dónde se guardan las fotos de las órdenes. Es la ruta DENTRO del
+      # contenedor, la misma que monta el volumen de abajo.
+      UPLOADS_DIR: /app/uploads
+
+    # Las fotos de las órdenes son el respaldo de los papeles que llegan a la
+    # fábrica: viven fuera del contenedor o se van con el siguiente despliegue.
+    #
+    # Volumen CON NOMBRE y no una carpeta del host: al montarse sobre una ruta
+    # que ya existe en la imagen hereda su dueño —`nextjs`, que es quien corre
+    # la app— y nace escribible sin tener que entrar por SSH a dar permisos.
+    volumes:
+      - uploads:/app/uploads
+
     # Dokploy publica el puerto por su propio proxy (Traefik), así que no se
     # expone al host: dejarlo abierto sería saltarse el TLS del proxy.
     expose:
@@ -41,3 +54,6 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+
+volumes:
+  uploads:

@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Fotos subidas en desarrollo. En producción viven en el volumen del VPS.
+/.uploads

@@ -79,6 +79,31 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
+# ── Fotos de las órdenes ───────────────────────────────────────────────────
+# La carpeta se crea AQUÍ, en la imagen, y no en el servidor a mano.
+#
+# No es un detalle de comodidad: cuando Docker monta un volumen con nombre
+# sobre una ruta que YA EXISTE en la imagen, le copia el contenido y —lo que
+# importa— el DUEÑO de esa ruta. Con la carpeta creada de antemano a nombre de
+# `nextjs`, el volumen nace escribible y no hace falta entrar por SSH a
+# corregir permisos.
+#
+# Si la ruta no existiera en la imagen, el volumen se crearía a nombre de root
+# y la app —que corre sin privilegios— no podría escribir una sola foto.
+#
+# OJO: esto vale para un volumen CON NOMBRE. Un bind mount de una carpeta del
+# servidor NO hereda nada: ahí manda el dueño de la carpeta del host.
+RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
+
+# Por omisión, para que la app no dependa de que alguien recuerde ponerla.
+# Montar el volumen encima no la cambia: la ruta es la misma.
+ENV UPLOADS_DIR=/app/uploads
+
+# A propósito SIN `VOLUME`: esa instrucción haría que cada despliegue creara
+# un volumen anónimo distinto —las fotos se perderían igual— y además iría
+# dejando volúmenes huérfanos comiéndose el disco del VPS. El montaje se
+# declara en Dokploy, que es donde se puede apuntar siempre al mismo.
+
 USER nextjs
 
 EXPOSE 3000
