@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { removeAttachmentAction } from "@/app/actions/attachment.actions";
 import { runAction } from "@/lib/offline/run-action";
 import { formatDateTime } from "@/lib/utils";
+import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -70,6 +71,12 @@ export function OrderPhotos({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState<OrderPhoto | null>(null);
+  /* La foto que se está por borrar. Aparte de `open` porque el visor se
+     CIERRA para dejar su lugar a la confirmación: en celular el visor es un
+     diálogo y la confirmación una hoja inferior, y montar una encima de otro
+     deja dos trampas de foco peleándose. */
+  const [confirming, setConfirming] = useState<OrderPhoto | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -96,10 +103,27 @@ export function OrderPhotos({
     }
   }
 
-  async function handleDelete(photo: OrderPhoto) {
+  /** El visor cede su lugar a la confirmación. */
+  function askDelete(photo: OrderPhoto) {
+    setOpen(null);
+    setConfirming(photo);
+  }
+
+  /** Arrepentirse devuelve al visor, no a la lista: ahí estaba mirando. */
+  function cancelDelete() {
+    const photo = confirming;
+    setConfirming(null);
+    if (photo) setOpen(photo);
+  }
+
+  async function handleDelete() {
+    if (!confirming) return;
+
+    setIsDeleting(true);
     const result = await runAction(() =>
-      removeAttachmentAction({ id: photo.id }),
+      removeAttachmentAction({ id: confirming.id }),
     );
+    setIsDeleting(false);
 
     if (!result.success) {
       toast.error(result.error);
@@ -107,7 +131,7 @@ export function OrderPhotos({
     }
 
     toast.success("Foto eliminada");
-    setOpen(null);
+    setConfirming(null);
     router.refresh();
   }
 
@@ -203,9 +227,93 @@ export function OrderPhotos({
         photo={open}
         canWrite={canWrite}
         onClose={() => setOpen(null)}
-        onDelete={handleDelete}
+        onAskDelete={askDelete}
+      />
+
+      <DeleteConfirm
+        orderId={orderId}
+        photo={confirming}
+        isDeleting={isDeleting}
+        onCancel={cancelDelete}
+        onConfirm={handleDelete}
       />
     </section>
+  );
+}
+
+/**
+ * "¿Segura que la borras?", con la foto enfrente.
+ *
+ * Lleva la miniatura porque el visor se cerró para dejarle el lugar, y una
+ * confirmación que sólo dice un nombre de archivo obliga a acordarse de cuál
+ * de seis fotos se estaba mirando. Aquí se ve.
+ *
+ * Es la única pregunta de este tipo en la pantalla y se justifica: borrar
+ * tumba el respaldo de un papel que puede ser la única copia que queda, y no
+ * hay deshacer.
+ */
+function DeleteConfirm({
+  orderId,
+  photo,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  orderId: string;
+  photo: OrderPhoto | null;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ResponsiveFormDialog
+      open={photo !== null}
+      onOpenChange={(next) => !next && onCancel()}
+      title="Borrar la foto"
+      description="Se borra el archivo y no se puede deshacer. Si es el único respaldo del papel, no hay de dónde recuperarlo."
+    >
+      {photo && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 border border-border p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/orders/${orderId}/photos/${photo.id}`}
+              alt={photo.name}
+              className="size-16 shrink-0 border border-border bg-muted object-cover"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{photo.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDateTime(photo.createdAt)}
+                {photo.uploadedByName ? ` · ${photo.uploadedByName}` : ""}
+              </p>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="h-12 w-full bg-destructive text-white hover:bg-destructive/90"
+          >
+            <Trash2 className="size-4" aria-hidden />
+            {isDeleting ? "Borrando…" : "Sí, borrar la foto"}
+          </Button>
+
+          {/* Salida explícita: en celular la hoja se cierra arrastrando, que
+              no todo el mundo descubre con guantes puestos. */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="h-12 w-full"
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
+    </ResponsiveFormDialog>
   );
 }
 
@@ -220,13 +328,14 @@ function PhotoViewer({
   photo,
   canWrite,
   onClose,
-  onDelete,
+  onAskDelete,
 }: {
   orderId: string;
   photo: OrderPhoto | null;
   canWrite: boolean;
   onClose: () => void;
-  onDelete: (photo: OrderPhoto) => void;
+  /** No borra: pregunta. El botón está junto a Descargar y se aprieta solo. */
+  onAskDelete: (photo: OrderPhoto) => void;
 }) {
   return (
     <Dialog open={photo !== null} onOpenChange={(next) => !next && onClose()}>
@@ -255,11 +364,11 @@ function PhotoViewer({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="touch-target"
-                    onClick={() => onDelete(photo)}
+                    className="touch-target text-destructive"
+                    onClick={() => onAskDelete(photo)}
                   >
                     <Trash2 className="size-4" aria-hidden />
-                    <span className="sr-only">Borrar foto</span>
+                    Borrar
                   </Button>
                 )}
                 <Button
