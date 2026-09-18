@@ -14,6 +14,7 @@ import { removeAttachmentAction } from "@/app/actions/attachment.actions";
 import { runAction } from "@/lib/offline/run-action";
 import { formatDateTime } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
+import { ZoomableImage } from "@/components/shared/zoomable-image";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -384,11 +385,14 @@ function PhotoViewer({
               </div>
             </div>
 
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            {/* Con zoom: lo que se guarda aquí es un papel escrito a mano, y
+                un número de talla borroso hay que poder acercarlo. La app
+                apaga el pellizco del navegador, así que lo trae el propio
+                visor. */}
+            <ZoomableImage
               src={`/api/orders/${orderId}/photos/${photo.id}`}
               alt={photo.name}
-              className="max-h-[75vh] w-full bg-muted object-contain"
+              className="h-[75vh] w-full"
             />
 
             <p className="border-t border-border p-3 text-xs text-muted-foreground">
