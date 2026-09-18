@@ -169,30 +169,27 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "purchase:approve",
   ],
 
-  /* Dirección tiene un menú corto y a propósito: escanear un rollo, el
-     pizarrón de tareas, el padrón de ayudantes y el motor de cálculo. Ahí sí
-     captura —mueve tarjetas, da de alta un ayudante, corre un cálculo—, pero
-     NO recorre el almacén: sin `inventory:browse` se le caen del menú los
-     destinos de rollos, catálogos y documentos, y sin `production:browse`
-     tampoco ve el lado de producción.
+  /* DOS destinos: Órdenes y Órdenes de planta. Nada más.
+
+     Es el rol de la OTRA PLANTA. Mira cómo van los pedidos de la casa igual
+     que Sólo lectura —las pantallas de ver piden `orders:browse` y las de
+     escribir `inventory:write`, que no lleva, así que ahí dentro no se le
+     pinta un solo botón de captura— y captura lo suyo en su propio módulo.
+
+     Lo que PERDIÓ y por qué. Escanear, Tareas, Cálculo y Ayudantes eran de
+     cuando este rol era "Dirección" y vivía de este lado. Ahora es quien
+     trabaja allá abajo: no toca rollos de esta bodega, no mueve el pizarrón
+     de este almacén, no corre cálculos contra este inventario y el padrón de
+     ayudantes de descarga no es suyo. Dejarle esas llaves era darle escritura
+     sobre la operación de una planta en la que no está.
+
+     NO lleva `plant-orders:adopt`: jalar una orden al concentrado de la
+     casa es decidir qué se tiende en la mesa de acá, y eso es de quien
+     administra el almacén. Si colgara de la misma llave con la que captura,
+     se agregaría solo.
 
      Tampoco lleva `audit:read`: la bitácora queda sólo en ADMIN. */
-  MANAGEMENT: [
-    "inventory:read",
-    "inventory:write",
-    "catalog:write",
-    "calculation:run",
-    "staff:browse",
-    "staff:write",
-    /* El módulo de la otra planta: ahí captura sus órdenes de corte.
-
-       NO lleva `plant-orders:adopt`: jalar una orden al concentrado de la
-       casa es decidir qué se tiende en la mesa de acá, y eso es de quien
-       administra el almacén. Tampoco lleva `orders:browse`, así que sigue
-       sin ver las órdenes de esta planta. */
-    "plant-orders:browse",
-    "plant-orders:write",
-  ],
+  MANAGEMENT: ["orders:browse", "plant-orders:browse", "plant-orders:write"],
 
   /* Una sola pantalla: las órdenes de corte, y de ahí no se mueve.
 

@@ -244,7 +244,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos. Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
-| `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · **Órdenes de planta** · Ayudantes. Edita tareas, ayudantes y cálculos, y captura las órdenes de la OTRA PLANTA; NO recorre el almacén ni ve auditoría |
+| `MANAGEMENT` | **La OTRA PLANTA. Dos pantallas: Órdenes · Órdenes de planta.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, foleos,
@@ -273,7 +273,8 @@ Su barra inferior del celular queda vacía —ninguno de los cuatro destinos es
 suyo— y no se pinta; navega desde el menú del encabezado.
 
 **La otra planta y su módulo.** Hay una segunda planta que captura sus
-propias órdenes de corte. Son `CuttingOrder` normales —la misma tabla, las
+propias órdenes de corte. Quien trabaja allá entra con el rol `MANAGEMENT`,
+que existía de antes y se recortó para esto: ya no es un rol de esta planta. Son `CuttingOrder` normales —la misma tabla, las
 mismas tallas, el mismo catálogo— marcadas con `origin = PLANT`, y viven en
 `/plant-orders`. Nacen FUERA del concentrado de la casa: existen, se ven en su
 módulo, y no aparecen en `/orders` hasta que alguien de acá las jala con el
@@ -306,7 +307,7 @@ Nueve capacidades separan lo anterior:
 | `inventory:browse` | **Recorrer el almacén**: rollos, documentos y los catálogos que se eligen al capturar (materiales, prendas, ubicaciones, clientes, proveedores) |
 | `orders:browse` | Las **órdenes de corte** y su avance: la lista, los pedidos, la ficha de la orden, su impresión y su Excel. Aparte de `inventory:browse` para que se pueda dar sin abrir el almacén entero |
 | `plant-orders:browse` / `plant-orders:write` | El módulo de la **otra planta**: ver y capturar sus órdenes. Aparte de `orders:browse` porque son dos pantallas de públicos opuestos — allá abajo no tienen por qué ver el pedido que se corta acá, ni al revés |
-| `plant-orders:adopt` | **Agregar** una orden de la otra planta al concentrado de la casa, y quitarla. Llave propia que Dirección NO tiene: si colgara de `plant-orders:write` —la llave con la que capturan— se agregarían solos |
+| `plant-orders:adopt` | **Agregar** una orden de la otra planta al concentrado de la casa, y quitarla. Llave propia que la otra planta NO tiene: si colgara de `plant-orders:write` —la llave con la que capturan— se agregarían solos |
 | `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, foleos, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
@@ -316,10 +317,11 @@ salió tiene su propia llave de escritura, para que "no verlo" y "no poder
 escribirlo" sean lo mismo.
 
 El destino de entrada tras el login NO es `/dashboard` fijo — lo resuelve
-`landingRoute()` con el primer destino que el rol puede ver: Dirección entra
-en `/lots/scan` y Sólo lectura en `/orders`. La barra inferior del celular se
-filtra igual: WAREHOUSE ve tres botones, no cuatro, porque Cálculo dejó de ser
-suyo, y READ_ONLY no la ve.
+`landingRoute()` con el primer destino que el rol puede ver: la otra planta y
+Sólo lectura entran en `/orders`. La barra inferior del celular se filtra
+igual: WAREHOUSE ve tres botones, no cuatro, porque Cálculo dejó de ser suyo,
+y ni READ_ONLY ni la otra planta la ven —ninguno de los cuatro destinos de la
+barra es suyo, así que no se pinta y navegan desde el menú del encabezado.
 
 `npm run verify:roles` imprime el menú que le toca a cada rol y falla si no
 coincide con lo acordado. Córrelo cada vez que muevas la matriz.
@@ -359,8 +361,8 @@ Tokens en `app/globals.css` con `@theme inline` de Tailwind v4 y colores en
 
 - **Barra inferior fija** de máximo 4 destinos: Tablero · Inventario ·
   Escanear · Cálculo. Es la navegación principal en el piso. Se filtra por
-  rol, así que el auxiliar de almacén ve tres —Cálculo no es suyo— y Dirección
-  ve dos.
+  rol, así que el auxiliar de almacén ve tres —Cálculo no es suyo—, y ni Sólo
+  lectura ni la otra planta la ven: ninguno de los cuatro destinos es suyo.
 - **Sidebar sólo en `md:` hacia arriba.** En celular no existe.
 - **Área táctil mínima 44px.** Usa la utilidad `.touch-target`.
 - Respeta el notch: `.safe-top` y `.safe-bottom` con `env(safe-area-inset-*)`.
