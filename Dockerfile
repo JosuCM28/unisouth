@@ -1,12 +1,14 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  UNISOUTH — imagen de producción
 #
-#  Tres etapas para que la imagen final no cargue con el compilador ni con
-#  las dependencias de desarrollo. Resultado: ~300 MB en vez de ~1.2 GB.
+#  Cuatro etapas para que la imagen final no cargue con el compilador ni con
+#  las dependencias de desarrollo. Resultado: ~250 MB en vez de ~1.2 GB.
 #
-#  De esos ~300, algo más de 100 son el CLI de Prisma: viaja a la imagen para
-#  aplicar las migraciones pendientes al arrancar. El porqué está abajo, junto
-#  al COPY que lo trae.
+#  De esos, unos 72 MB son el CLI de Prisma: viaja a la imagen para aplicar
+#  las migraciones pendientes al arrancar. Se instala en su PROPIA etapa y no
+#  se copia del builder, porque arrastra 28 paquetes y copiar a mano los que
+#  uno cree que hacen falta deja el contenedor muerto en el arranque. El
+#  porqué completo está abajo, en la etapa 3.
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Se fija la versión menor, no `22-alpine` a secas: un cambio silencioso de
@@ -59,7 +61,38 @@ ENV NODE_ENV=production
 RUN npm run build
 
 
-# ── 3. Ejecución ───────────────────────────────────────────────────────────
+# ── 3. El CLI de migraciones ───────────────────────────────────────────────
+# Se instala en un árbol LIMPIO, aparte del de la app.
+#
+# El primer intento fue copiar node_modules/prisma y node_modules/@prisma/engines
+# del builder. No basta: el CLI arrastra 32 paquetes —@prisma/config, c12, jiti,
+# dotenv, effect y compañía— y con dos de los 32 el contenedor arranca, corre el
+# entrypoint y muere con MODULE_NOT_FOUND antes de servir una sola petición.
+#
+# Copiarlos a mano era la otra opción y es peor: la lista cambia con cada
+# actualización de Prisma y nadie se acuerda de revisarla. Aquí npm resuelve el
+# cierre completo solo, y se queda en esta etapa todo lo que no haga falta.
+FROM base AS migrator
+WORKDIR /cli
+
+# Se copia con OTRO nombre y se borra en cuanto se le lee la versión.
+#
+# Dejarlo como package.json era el error obvio: npm lo habría tomado como el
+# manifiesto de esta etapa e instalado las dependencias enteras de la app
+# —Next, React, radix— para poder migrar. Minutos de build y cientos de megas
+# por un dato de una línea.
+COPY package.json ./project-package.json
+
+# La versión sale del package.json del proyecto y no está escrita a mano: con
+# un número aquí, actualizar Prisma dejaría la app y las migraciones corriendo
+# versiones distintas sin que nada avise.
+RUN VERSION=$(node -p "require('./project-package.json').devDependencies.prisma") \
+ && rm project-package.json \
+ && npm init -y > /dev/null \
+ && npm install --no-audit --no-fund "prisma@${VERSION}"
+
+
+# ── 4. Ejecución ───────────────────────────────────────────────────────────
 FROM base AS runner
 WORKDIR /app
 
@@ -92,15 +125,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./nod
 # costó una base sombra y un migration de alcance. Cien megas en el disco del
 # VPS valen menos que volver a eso.
 #
-# @prisma/engines va aparte porque el CLI no lo empaqueta: ahí vive el
-# schema-engine, que es el binario que aplica los .sql.
+# Va en su PROPIA carpeta y no mezclado con el node_modules de la app: son dos
+# árboles con distinto propósito, y juntarlos haría que una actualización de
+# uno pudiera pisar una dependencia del otro.
 #
 # NO se copia prisma.config.ts a propósito. Ese archivo hace
-# `import "dotenv/config"` para leer el .env en desarrollo, y aquí no hay .env
-# ni dotenv: las variables las inyecta Dokploy. Sin él, el CLI usa su ruta por
-# omisión —prisma/schema.prisma, que es justo donde está— y lee el entorno.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+# `import "dotenv/config"` para leer el .env en desarrollo, y aquí no hay .env:
+# las variables las inyecta Dokploy. Sin él, el CLI usa su ruta por omisión
+# —prisma/schema.prisma, que es justo donde está— y lee el entorno.
+COPY --from=migrator --chown=nextjs:nodejs /cli/node_modules ./prisma-cli/node_modules
 
 # ── Fotos de las órdenes ───────────────────────────────────────────────────
 # La carpeta se crea AQUÍ, en la imagen, y no en el servidor a mano.

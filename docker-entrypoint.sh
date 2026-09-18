@@ -30,7 +30,7 @@ echo "→ Aplicando migraciones pendientes…"
 # Con varias réplicas arrancando a la vez no hay problema: Prisma toma un
 # advisory lock de Postgres mientras migra, así que una aplica y las demás
 # esperan y encuentran el trabajo hecho.
-node node_modules/prisma/build/index.js migrate deploy
+node prisma-cli/node_modules/prisma/build/index.js migrate deploy
 
 echo "→ Arrancando la aplicación"
 
