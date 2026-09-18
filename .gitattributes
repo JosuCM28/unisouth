@@ -1,0 +1,15 @@
+# Los scripts de shell SIEMPRE con saltos de línea de Unix.
+#
+# No es cosmético. Se escriben en Windows, donde git los guarda con CRLF, y se
+# ejecutan dentro de un contenedor Alpine. El `sh` de Alpine lee el retorno de
+# carro como parte del intérprete y falla con un mensaje que no dice nada:
+#
+#   /bin/sh^M: bad interpreter: No such file or directory
+#
+# El contenedor no arranca y el error no menciona los saltos de línea por
+# ningún lado. Esta línea es lo único que lo evita.
+*.sh text eol=lf
+
+# Por lo mismo: los ejecuta el contenedor, no Windows.
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf

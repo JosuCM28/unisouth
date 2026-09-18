@@ -57,7 +57,9 @@ encuentres un error de sintaxis.
 
 1. Corre `npx prisma format` y `npx prisma validate`. Si hay errores, arréglalos
    y dime cuáles fueron.
-2. Corre `npx prisma generate` y luego `npx prisma db push` contra Neon.
+2. Corre `npx prisma generate` y luego `npx prisma migrate dev`. NO uses
+   `db push`: deja el cambio en la base sin un .sql que lo cuente y separa la
+   historia de migraciones del esquema real.
 3. Crea lib/prisma.ts: singleton de PrismaClient con el patrón globalThis para
    dev, más los tipos PrismaTransaction y PrismaExecutor exportados.
 4. Crea lib/utils.ts con: cn(), toPlainObject() (convierte Decimal a number

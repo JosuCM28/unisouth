@@ -50,8 +50,8 @@ Copia `.env.example` a `.env` y llénalo:
 
 | Variable | Para qué |
 |---|---|
-| `DATABASE_URL` | Cadena de Neon **con** `-pooler`. La usa la app en runtime. |
-| `DIRECT_URL` | La misma cadena **sin** `-pooler`. Prisma la necesita para migraciones; el pooler de Neon no las soporta. |
+| `DATABASE_URL` | Cadena del Postgres del VPS. La usa la app en runtime. |
+| `DIRECT_URL` | Hoy, la **misma** cadena. Es la que usan las migraciones; existe aparte porque un pooler no las soporta y algún día podría haber uno. |
 | `BETTER_AUTH_SECRET` | Genera con `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | `http://localhost:3000` en desarrollo. |
 | `NEXT_PUBLIC_APP_URL` | Base del QR de cada rollo: `{APP_URL}/r/{code}`. |
@@ -109,7 +109,7 @@ El flujo va siempre en una sola dirección:
 │                     Prisma                                  │
 │                        │                                    │
 │                        ▼                                    │
-│              PostgreSQL 18 (Neon)                           │
+│         PostgreSQL 18 (en el mismo VPS)                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -245,7 +245,7 @@ proxy.ts                Redirección optimista (antes middleware.ts)
 
 ## Stack
 
-Next.js 16 · React 19 · TypeScript estricto · PostgreSQL 18 (Neon) ·
+Next.js 16 · React 19 · TypeScript estricto · PostgreSQL 18 (VPS) ·
 Prisma 6 · BetterAuth · shadcn/ui · Tailwind CSS v4 · React Hook Form + Zod
 
 ## Despliegue en Dokploy
@@ -275,23 +275,25 @@ El host es el **nombre del servicio** en la red interna de Docker
 servicio de base de datos.
 
 `DATABASE_URL` y `DIRECT_URL` llevan **exactamente la misma cadena**. La
-diferencia entre ambas sólo existe en Neon, que tiene un endpoint con pooler
-para runtime y otro directo para migraciones. Un Postgres normal no tiene esa
+diferencia entre ambas sólo aparece cuando hay un pooler de conexiones en
+medio: ése no soporta migraciones, así que la app iría por el pooler y las
+migraciones por el puerto directo. Un Postgres normal no tiene esa
 separación, pero Prisma exige las dos variables porque el `schema.prisma` las
-declara.
+declara — y tenerla puesta desde hoy evita reintroducirla con prisa el día que
+se meta un pooler.
 
 Tampoco lleva `sslmode=require`: el tráfico no sale del host, va por la red
 interna de Docker.
 
-#### Si la base está en Neon
+#### Si algún día se mete un pooler
 
 ```
-DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/db?sslmode=require&channel_binding=require
-DIRECT_URL=postgresql://user:pass@ep-xxx.region.aws.neon.tech/db?sslmode=require
+DATABASE_URL=postgresql://user:pass@host:6432/unisouthdb   # por el pooler
+DIRECT_URL=postgresql://user:pass@host:5438/unisouthdb     # directo
 ```
 
-Misma contraseña, mismo host, pero `DIRECT_URL` va **sin** `-pooler` y sin
-`channel_binding`.
+Misma contraseña y mismo host: lo que cambia es el puerto. `DIRECT_URL` tiene
+que saltarse el pooler o las migraciones del arranque fallan.
 
 ### 3. Build arg (el paso que se olvida)
 
@@ -338,7 +340,7 @@ primero se crea con un script, y después se le cambia el rol:
 npx tsx -e "import('./lib/auth').then(async ({auth}) => { await auth.api.signUpEmail({body:{email:'tu@correo.com',password:'CAMBIA_ESTO',name:'Tu Nombre'}}); console.log('listo'); })"
 ```
 
-Luego, en Neon o con `npm run db:studio`, cambia su `role` a `ADMIN`.
+Luego, con `npm run db:studio` o `npm run user:role`, cambia su `role` a `ADMIN`.
 
 ### Verificación post-deploy
 

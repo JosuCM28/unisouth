@@ -10,21 +10,20 @@ D:\proyects\unisouth\
     └── schema.prisma      ← ya listo, no hay que reescribirlo
 ```
 
-## 2. Rota la contraseña de Neon
+## 2. Arma tu `.env`
 
-La que compartiste ya no es secreta. Ve a Neon → Roles → Reset password del
-rol `neondb_owner`. Después arma tu `.env`:
+La base es el PostgreSQL del VPS. Las dos cadenas son idénticas:
 
 ```bash
-DATABASE_URL="postgresql://neondb_owner:NUEVO_PASSWORD@ep-rapid-field-ay1xfgrx-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-DIRECT_URL="postgresql://neondb_owner:NUEVO_PASSWORD@ep-rapid-field-ay1xfgrx.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgresql://usuario:password@IP_DEL_VPS:5438/unisouthdb"
+DIRECT_URL="postgresql://usuario:password@IP_DEL_VPS:5438/unisouthdb"
 BETTER_AUTH_SECRET="genera_con_openssl_rand_base64_32"
 BETTER_AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-`DIRECT_URL` es la misma cadena **sin** `-pooler`. Prisma la necesita para
-migraciones; el pooler de Neon no las soporta.
+`DIRECT_URL` es la que usan las migraciones. Hoy da lo mismo porque se conecta
+directo; existe aparte porque un pooler no soporta migraciones.
 
 ## 3. Arranca Claude Code
 
@@ -63,7 +62,7 @@ pierdes las reglas.
 | Fase | Qué entrega | Depende de |
 |---|---|---|
 | 0 | Andamiaje + tema flat | — |
-| 1 | Prisma + Neon + seed | 0 |
+| 1 | Prisma + Postgres + seed | 0 |
 | 2 | Núcleo (errores, repo base, auditoría) | 1 |
 | 3 | Roles, labels, BetterAuth, login | 2 |
 | 4 | Layout, sidebar, barra móvil, tablero | 3 |

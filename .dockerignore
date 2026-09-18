@@ -1,5 +1,5 @@
 # ── Secretos ────────────────────────────────────────────────────────────
-# Lo más importante de este archivo: las credenciales de Neon y el secreto
+# Lo más importante de este archivo: las credenciales de la base y el secreto
 # de BetterAuth JAMÁS deben quedar horneados en una capa de la imagen.
 # En Dokploy se inyectan como variables de entorno del servicio.
 .env

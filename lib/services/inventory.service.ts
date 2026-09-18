@@ -32,7 +32,7 @@ export function round4(value: number): number {
  * Los 5 s de Prisma se quedan cortos: cuando varios cortes caen sobre el
  * mismo rollo, el FOR UPDATE los forma en fila y los últimos esperan su
  * turno. Con el default, en vez de esperar, reventaban por timeout.
- * `maxWait` es lo que aguarda para obtener conexión del pool de Neon.
+ * `maxWait` es lo que aguarda para obtener conexión del pool de Postgres.
  */
 const TRANSACTION_OPTIONS = { timeout: 20_000, maxWait: 10_000 } as const;
 

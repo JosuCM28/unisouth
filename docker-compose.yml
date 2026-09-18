@@ -1,8 +1,10 @@
 # Alternativa a la configuración por UI de Dokploy.
 #
 # Si prefieres apuntar Dokploy a un Compose en vez de a un Dockerfile suelto,
-# usa este archivo. La base de datos NO va aquí: vive en Neon, gestionada,
-# con respaldos automáticos y sin ocupar disco del VPS.
+# usa este archivo. La base de datos NO va aquí: es el PostgreSQL que ya corre
+# en el VPS, con su propio ciclo de vida. Meterla en este compose la ataría al
+# despliegue de la app, y un `docker compose down` distraído se llevaría el
+# inventario entero.
 
 services:
   app:
@@ -21,9 +23,11 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
 
-      # Neon: la cadena CON -pooler para el runtime.
       DATABASE_URL: ${DATABASE_URL}
-      # La MISMA cadena SIN -pooler. El pooler no soporta migraciones.
+      # La que usan las MIGRACIONES, que corren al arrancar el contenedor.
+      # Hoy es la misma cadena: el Postgres del VPS se conecta directo. Existe
+      # aparte porque un pooler (PgBouncer y compañía) no soporta migraciones,
+      # así que el día que se meta uno, aquí va la cadena que lo esquiva.
       DIRECT_URL: ${DIRECT_URL}
 
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}

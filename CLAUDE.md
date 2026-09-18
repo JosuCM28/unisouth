@@ -31,7 +31,7 @@ Tres hechos que definen todo el diseño:
 |---|---|
 | Framework | Next.js 16 · App Router · React 19 |
 | Lenguaje | TypeScript estricto |
-| Base de datos | PostgreSQL 18 en Neon |
+| Base de datos | PostgreSQL 18 **en el VPS**, junto a la app |
 | ORM | Prisma 6 |
 | Auth | BetterAuth (con plugin `admin`) |
 | UI | shadcn/ui (estilo `new-york`) + Tailwind CSS v4 |
@@ -479,14 +479,40 @@ Ejemplo que debe funcionar: *"Overol para gasera: 1 pieza = 2 m de tela +
 ## 16. Variables de entorno
 
 ```bash
-DATABASE_URL="postgresql://...-pooler...neon.tech/neondb?sslmode=require&channel_binding=require"
-DIRECT_URL="postgresql://...neon.tech/neondb?sslmode=require"   # sin -pooler, para migraciones
+DATABASE_URL="postgresql://USUARIO:CLAVE@HOST:5438/unisouthdb"
+DIRECT_URL="postgresql://USUARIO:CLAVE@HOST:5438/unisouthdb"   # para migraciones
 BETTER_AUTH_SECRET="..."   # openssl rand -base64 32
 BETTER_AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
+**Las dos cadenas son la misma hoy** porque el Postgres del VPS se conecta
+directo, sin pooler. `DIRECT_URL` existe aparte de todos modos: un pooler
+(PgBouncer y compañía) no soporta migraciones, así que el día que se meta uno,
+`DATABASE_URL` lo usa y `DIRECT_URL` lo esquiva. Borrar la segunda hoy
+obligaría a reintroducirla con prisa ese día.
+
 `.env` va en `.gitignore`. Mantén un `.env.example` con los valores enmascarados.
+
+### El esquema se cambia SÓLO con migraciones
+
+`npx prisma migrate dev --name lo_que_sea` en desarrollo, y ya. **No uses
+`db push`.**
+
+No es preferencia de estilo. `db push` escribe el cambio en la base sin dejar
+un `.sql` que lo cuente, así que la historia de migraciones deja de producir
+el esquema real. Cuando eso pasa, `migrate dev` reconstruye una base sombra
+desde los migrations, ve diferencias que nadie le explica, y su única salida
+segura es **ofrecer borrar la base entera**. Ya ocurrió una vez —se recuperó
+con una base sombra y un migration de alcance— y la única razón de que se
+pudiera arreglar sin perder nada es que todos los cambios eran aditivos.
+
+Cada despliegue corre `prisma migrate deploy` al arrancar el contenedor, desde
+`docker-entrypoint.sh`. Aplica lo que falte y no hace nada si no falta nada. Si
+una migración falla, **el contenedor no arranca**: es deliberado, porque
+Dokploy sólo manda tráfico cuando el healthcheck pasa, y un deploy caído con la
+versión anterior todavía sirviendo es mejor que la app corriendo contra un
+esquema a medias.
 
 ---
 

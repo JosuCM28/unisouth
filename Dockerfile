@@ -2,7 +2,11 @@
 #  UNISOUTH — imagen de producción
 #
 #  Tres etapas para que la imagen final no cargue con el compilador ni con
-#  las dependencias de desarrollo. Resultado: ~180 MB en vez de ~1.2 GB.
+#  las dependencias de desarrollo. Resultado: ~300 MB en vez de ~1.2 GB.
+#
+#  De esos ~300, algo más de 100 son el CLI de Prisma: viaja a la imagen para
+#  aplicar las migraciones pendientes al arrancar. El porqué está abajo, junto
+#  al COPY que lo trae.
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Se fija la versión menor, no `22-alpine` a secas: un cambio silencioso de
@@ -43,7 +47,7 @@ RUN npx prisma generate
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
-# Marcador para que ninguna página intente conectarse a Neon durante el
+# Marcador para que ninguna página intente conectarse a la base durante el
 # build. Las páginas son dinámicas (leen cookies), así que no se
 # prerenderizan, pero un import descuidado podría intentar abrir conexión.
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
@@ -79,6 +83,25 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
+# ── El CLI de Prisma, para migrar al arrancar ──────────────────────────────
+# Sí, pesa: el CLI y su schema-engine suman más de 100 MB a una imagen que
+# presume de ser chica. Se paga a propósito.
+#
+# La alternativa era seguir aplicando los cambios de esquema a mano, y eso ya
+# se probó: la historia de migraciones se separó del esquema real y recuperarla
+# costó una base sombra y un migration de alcance. Cien megas en el disco del
+# VPS valen menos que volver a eso.
+#
+# @prisma/engines va aparte porque el CLI no lo empaqueta: ahí vive el
+# schema-engine, que es el binario que aplica los .sql.
+#
+# NO se copia prisma.config.ts a propósito. Ese archivo hace
+# `import "dotenv/config"` para leer el .env en desarrollo, y aquí no hay .env
+# ni dotenv: las variables las inyecta Dokploy. Sin él, el CLI usa su ruta por
+# omisión —prisma/schema.prisma, que es justo donde está— y lee el entorno.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+
 # ── Fotos de las órdenes ───────────────────────────────────────────────────
 # La carpeta se crea AQUÍ, en la imagen, y no en el servidor a mano.
 #
@@ -104,6 +127,15 @@ ENV UPLOADS_DIR=/app/uploads
 # dejando volúmenes huérfanos comiéndose el disco del VPS. El montaje se
 # declara en Dokploy, que es donde se puede apuntar siempre al mismo.
 
+# El arranque: migrar y luego servir. Va antes del `USER` para que el chown y
+# el chmod corran como root.
+#
+# El permiso se da con RUN y no con `COPY --chmod`: esa bandera sólo existe
+# con BuildKit, y si el builder de turno es el clásico la construcción falla
+# con un error de sintaxis que no explica por qué.
+COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -113,4 +145,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/login || exit 1
 
-CMD ["node", "server.js"]
+# Ya no arranca el servidor directo: antes pasa por las migraciones
+# pendientes. El entrypoint termina con `exec node server.js`, así que el
+# proceso final es el mismo de siempre.
+CMD ["./docker-entrypoint.sh"]

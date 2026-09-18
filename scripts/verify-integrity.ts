@@ -29,7 +29,7 @@ async function main() {
       orderBy: { code: "asc" },
     }),
     // Una sola consulta agrupada en vez de una por lote: con 20 mil rollos,
-    // 20 mil viajes a Neon tardarían más que toda la jornada.
+    // 20 mil viajes a la base tardarían más que toda la jornada.
     prisma.movement.groupBy({
       by: ["lotId"],
       _sum: { quantity: true },

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  UNISOUTH — WAREHOUSE INVENTORY SYSTEM
-//  PostgreSQL 18 (Neon) · Prisma 6 · BetterAuth
+//  PostgreSQL 18 (self-hosted on the VPS) · Prisma 6 · BetterAuth
 //
 //  Conventions:
 //   · Quantities & money: Decimal(14,4) — never Float

@@ -55,7 +55,7 @@ export class DashboardService {
   /**
    * Las 7 cifras del tablero, todas en paralelo.
    *
-   * En serie serían 7 viajes a Neon encadenados y el tablero tardaría
+   * En serie serían 7 viajes a la base encadenados y el tablero tardaría
    * segundos en pintar desde el celular.
    */
   async getKpis(): Promise<DashboardKpis> {

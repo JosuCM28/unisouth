@@ -5,7 +5,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
  *
  * En desarrollo, Next.js recarga los módulos en cada cambio (HMR). Sin este
  * patrón cada recarga crearía un PrismaClient nuevo y en pocos minutos se
- * agotaría el pool de conexiones de Neon. En producción el módulo se evalúa
+ * agotaría el pool de conexiones de Postgres. En producción el módulo se evalúa
  * una sola vez, así que la instancia global no hace falta.
  */
 const globalForPrisma = globalThis as unknown as {

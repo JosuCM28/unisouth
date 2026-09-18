@@ -18,7 +18,7 @@ export interface IssueSummary {
  * Resume varias salidas de una vez.
  *
  * Va en consultas agrupadas sobre la página completa y no una por vale:
- * con 50 filas serían 150 viajes a Neon y la lista tardaría segundos en
+ * con 50 filas serían 150 viajes a la base y la lista tardaría segundos en
  * pintar desde el celular.
  *
  * Existe aparte del repositorio de documentos porque responde una pregunta

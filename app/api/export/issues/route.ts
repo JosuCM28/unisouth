@@ -109,7 +109,7 @@ export async function GET(request: Request) {
   });
 
   /* El resumen va en consultas agrupadas sobre todo el lote, igual que en la
-     lista: son dos viajes a Neon sin importar cuántos vales se exporten. */
+     lista: son dos viajes a la base sin importar cuántos vales se exporten. */
   const summaries = await getIssueSummaries(issues.map((issue) => issue.id));
 
   const rows: Row[] = issues.map((issue) => {

@@ -287,7 +287,7 @@ export class ReceiptRepository extends BaseRepository<
    * Agrega metraje y tela a cada recepción de la página.
    *
    * Va en DOS consultas agrupadas sobre la página completa, no una por
-   * recepción: con 50 filas serían 100 viajes a Neon y la lista tardaría
+   * recepción: con 50 filas serían 100 viajes a la base y la lista tardaría
    * segundos en pintar desde el celular.
    *
    * Se suma `initialQuantity` y no `currentQuantity` porque la pregunta es
