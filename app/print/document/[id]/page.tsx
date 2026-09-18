@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { CutTag } from "@prisma/client";
+import type { CutTag, DocumentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
@@ -11,7 +11,7 @@ import {
   DOCUMENT_TYPE_LABELS,
   UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
-import { contrastText, formatDate, formatQuantity } from "@/lib/utils";
+import { contrastText, formatQuantity } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
 import { FitToPage } from "@/components/shared/fit-to-page";
 
@@ -111,6 +111,8 @@ export default async function PrintDocumentPage({ params }: PageProps) {
         fabricName,
     );
 
+  const sheetTitle = sheetTitleFor(document.type, document.cutLines.length > 0);
+
   return (
     <main
       id="vale"
@@ -122,12 +124,14 @@ export default async function PrintDocumentPage({ params }: PageProps) {
 
       <header className="flex items-start justify-between gap-4 border-b-2 border-black pb-2">
         <div>
-          <h1 className="text-lg font-bold">UNISOUTH</h1>
-          <p className="text-xs">{DOCUMENT_TYPE_LABELS[document.type]}</p>
+          <p className="text-xs">UNISOUTH</p>
+          {/* El tipo es lo que se lee primero al recibir el bulto: quien lo
+              toma necesita saber QUÉ le llegó antes que de dónde. Por eso
+              manda en el encabezado y la marca baja a renglón chico. */}
+          <h1 className="text-2xl font-bold">{sheetTitle}</h1>
         </div>
         <div className="text-right">
           <p className="tabular text-base font-bold">{document.code}</p>
-          <p className="tabular text-xs">{formatDate(document.date)}</p>
           <p className="text-[10px] uppercase">
             {DOCUMENT_STATUS_LABELS[document.status]}
           </p>
@@ -144,7 +148,6 @@ export default async function PrintDocumentPage({ params }: PageProps) {
           {document.cutDescription && (
             <Row label="Descripción" value={document.cutDescription} />
           )}
-          <Row label="Fecha" value={formatDate(document.date)} />
           {document.reference && (
             <Row label="Orden" value={document.reference} />
           )}
@@ -372,6 +375,19 @@ export default async function PrintDocumentPage({ params }: PageProps) {
       </div>
     </main>
   );
+}
+
+/**
+ * El título de la hoja.
+ *
+ * Sólo la salida CON desglose de tallas cambia de nombre: una salida de
+ * rollos de tela sigue siendo una salida, y titularla "de corte" mentiría
+ * sobre lo que va dentro del bulto.
+ */
+function sheetTitleFor(type: DocumentType, hasCuts: boolean): string {
+  if (type === "ISSUE" && hasCuts) return "Salida de Corte";
+
+  return DOCUMENT_TYPE_LABELS[type];
 }
 
 function Row({ label, value }: { label: string; value: string }) {
