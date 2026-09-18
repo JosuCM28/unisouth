@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requirePermission } from "@/lib/core/session";
 import { storageIsWritable } from "@/lib/core/storage";
 import { OrderPhotos } from "@/components/orders/order-photos";
+import { OrderTechSheets } from "@/components/orders/order-tech-sheets";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { sumBundlePieces } from "@/lib/bundles";
 import {
@@ -161,7 +162,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages, issues, photos, storageReady] =
+  const [balances, shipments, workshops, stages, issues, files, storageReady] =
     await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
@@ -215,15 +216,21 @@ export default async function OrderDetailPage({ params }: PageProps) {
         cutLines: { select: { quantity: true, bundles: true } },
       },
     }),
-    /* Las fotos del papel que entregó el cliente. Van en la misma ida a la
-       base que todo lo demás: son una consulta más y encadenarlas sumaría un
-       viaje a la pantalla más pesada del módulo. */
+    /* Los archivos de la orden: las fotos del papel que entregó el cliente y
+       las fichas técnicas en PDF. Van en la misma ida a la base que todo lo
+       demás —son una consulta más y encadenarlas sumaría un viaje a la
+       pantalla más pesada del módulo— y se reparten por tipo abajo.
+
+       Se traen JUNTOS y no en dos consultas por lo mismo: son la misma tabla
+       y el mismo índice, así que partirlo serían dos viajes para el mismo
+       puñado de renglones. */
     prisma.attachment.findMany({
       where: { cuttingOrderId: id },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
         name: true,
+        type: true,
         sizeBytes: true,
         createdAt: true,
         uploadedBy: { select: { name: true } },
@@ -234,6 +241,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
        tomada. */
     storageIsWritable(),
   ]);
+
+  /* Se reparten por tipo. Sin esto, un PDF caía en la galería de fotos y se
+     pintaba como una imagen rota: el bloque de fotos pide TODO lo que cuelga
+     de la orden y hasta hoy no había nada más que fotos. */
+  const orderPhotos = files.filter((file) => file.type !== "TECH_SHEET");
+  const techSheets = files.filter((file) => file.type === "TECH_SHEET");
 
   const shipmentViews: ShipmentView[] = shipments.map((shipment) => ({
     id: shipment.id,
@@ -617,12 +630,28 @@ export default async function OrderDetailPage({ params }: PageProps) {
           completo —con su visor y su descarga— pero sin subir ni borrar. */}
       <OrderPhotos
         orderId={order.id}
-        photos={photos.map((photo) => ({
+        photos={orderPhotos.map((photo) => ({
           id: photo.id,
           name: photo.name,
           sizeBytes: photo.sizeBytes,
           createdAt: photo.createdAt,
           uploadedByName: photo.uploadedBy?.name ?? null,
+        }))}
+        canWrite={canWrite}
+        storageReady={storageReady}
+      />
+
+      {/* La ficha técnica va pegada a las fotos y por la misma razón: las dos
+          contestan "¿con qué instrucciones se corta esto?". La foto es el
+          papel que llegó; la ficha, el documento con el que se trabaja. */}
+      <OrderTechSheets
+        orderId={order.id}
+        sheets={techSheets.map((sheet) => ({
+          id: sheet.id,
+          name: sheet.name,
+          sizeBytes: sheet.sizeBytes,
+          createdAt: sheet.createdAt,
+          uploadedByName: sheet.uploadedBy?.name ?? null,
         }))}
         canWrite={canWrite}
         storageReady={storageReady}

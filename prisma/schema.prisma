@@ -2030,6 +2030,12 @@ enum AttachmentType {
   GUIDE
   INVOICE
   CERTIFICATE
+  /// The PDF spec sheet of what is being cut.
+  ///
+  /// Its own value and not the generic DOCUMENT: the order screen lists spec
+  /// sheets in their own block, and telling them apart by mime type would
+  /// quietly pull in any other PDF someone attached as DOCUMENT.
+  TECH_SHEET
   DOCUMENT
   OTHER
 }

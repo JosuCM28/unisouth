@@ -6,10 +6,13 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { getOrderFormOptions } from "@/lib/order-form-options";
+import { storageIsWritable } from "@/lib/core/storage";
 import { toDateInputValue } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrderForm, type EditableOrder } from "@/components/orders/order-form";
 import { EMPTY_ORDER_CUT_CLOSING } from "@/components/orders/order-cut-closing";
+import { OrderPhotos } from "@/components/orders/order-photos";
+import { OrderTechSheets } from "@/components/orders/order-tech-sheets";
 import { PlantAdoptControl } from "@/components/plant-orders/plant-adopt-control";
 
 interface PageProps {
@@ -42,7 +45,7 @@ export default async function PlantOrderPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  const [order, options] = await Promise.all([
+  const [order, files, storageReady, options] = await Promise.all([
     prisma.cuttingOrder.findUnique({
       where: { id },
       include: {
@@ -53,6 +56,22 @@ export default async function PlantOrderPage({ params }: PageProps) {
         },
       },
     }),
+    /* Los archivos de la orden: la foto del papel que le entregó el cliente a
+       la otra planta y su ficha técnica. La misma tabla y el mismo bloque que
+       en Órdenes, porque es la MISMA orden vista por la otra puerta. */
+    prisma.attachment.findMany({
+      where: { cuttingOrderId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        sizeBytes: true,
+        createdAt: true,
+        uploadedBy: { select: { name: true } },
+      },
+    }),
+    storageIsWritable(),
     getOrderFormOptions(),
   ]);
 
@@ -62,6 +81,10 @@ export default async function PlantOrderPage({ params }: PageProps) {
      en Órdenes, con sus cortes y sus vales. Enseñarla aquí recortada haría
      creer que esa orden no tiene avance. */
   if (order.origin !== "PLANT") notFound();
+
+  /* Por tipo: un PDF en la galería de fotos se pintaría como imagen rota. */
+  const photos = files.filter((file) => file.type !== "TECH_SHEET");
+  const techSheets = files.filter((file) => file.type === "TECH_SHEET");
 
   const editable: EditableOrder = {
     id: order.id,
@@ -146,6 +169,39 @@ export default async function PlantOrderPage({ params }: PageProps) {
           decide si entra al concentrado.
         </p>
       )}
+
+      {/* El respaldo del papel y la ficha técnica, los mismos bloques que en
+          Órdenes: es la misma orden y los mismos archivos, vistos por la otra
+          puerta. Quien captura acá sube los suyos; quien administra los abre
+          desde Órdenes sin tener que pedirlos por correo, que es justo lo que
+          este módulo viene a quitar. */}
+      <div className="flat-surface flex flex-col gap-6 p-4">
+        <OrderPhotos
+          orderId={order.id}
+          photos={photos.map((photo) => ({
+            id: photo.id,
+            name: photo.name,
+            sizeBytes: photo.sizeBytes,
+            createdAt: photo.createdAt,
+            uploadedByName: photo.uploadedBy?.name ?? null,
+          }))}
+          canWrite={canWrite}
+          storageReady={storageReady}
+        />
+
+        <OrderTechSheets
+          orderId={order.id}
+          sheets={techSheets.map((sheet) => ({
+            id: sheet.id,
+            name: sheet.name,
+            sizeBytes: sheet.sizeBytes,
+            createdAt: sheet.createdAt,
+            uploadedByName: sheet.uploadedBy?.name ?? null,
+          }))}
+          canWrite={canWrite}
+          storageReady={storageReady}
+        />
+      </div>
     </div>
   );
 }

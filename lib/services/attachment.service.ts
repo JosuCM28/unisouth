@@ -2,11 +2,16 @@ import type { Attachment } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import {
   deleteFileByKey,
+  isSupportedDocument,
   isSupportedImage,
   saveFile,
   storageIsWritable,
 } from "@/lib/core/storage";
-import { MAX_ATTACHMENT_BYTES } from "@/lib/validations/attachment.schema";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_TECH_SHEET_BYTES,
+  type AttachmentKind,
+} from "@/lib/validations/attachment.schema";
 import { BaseService } from "./base.service";
 
 /** Lo que llega del formulario, ya leído del multipart. */
@@ -16,7 +21,44 @@ export interface UploadInput {
   filename: string;
   mimeType: string;
   bytes: Uint8Array;
+  /**
+   * Foto del papel o ficha técnica en PDF.
+   *
+   * Por omisión foto: es lo que existía antes de que hubiera fichas, y así
+   * una llamada vieja sigue significando lo mismo que significaba.
+   */
+  kind?: AttachmentKind;
 }
+
+/**
+ * Las reglas de cada tipo de archivo, en un solo lugar.
+ *
+ * Diccionario y no `if` encadenados: agregar un tipo mañana es una entrada
+ * más, sin tocar `upload()`.
+ */
+const KIND_RULES: Record<
+  AttachmentKind,
+  {
+    accepts: (mimeType: string) => boolean;
+    maxBytes: number;
+    /** Cómo se llama en los mensajes que lee quien sube el archivo. */
+    label: string;
+    rejected: string;
+  }
+> = {
+  PHOTO: {
+    accepts: isSupportedImage,
+    maxBytes: MAX_ATTACHMENT_BYTES,
+    label: "La imagen",
+    rejected: "Sólo se pueden subir imágenes: JPG, PNG o WEBP.",
+  },
+  TECH_SHEET: {
+    accepts: isSupportedDocument,
+    maxBytes: MAX_TECH_SHEET_BYTES,
+    label: "La ficha técnica",
+    rejected: "La ficha técnica tiene que ser un PDF.",
+  },
+};
 
 /**
  * Los archivos que respaldan un papel.
@@ -37,19 +79,20 @@ export interface UploadInput {
  */
 export class AttachmentService extends BaseService {
   async upload(input: UploadInput): Promise<Attachment> {
-    if (!isSupportedImage(input.mimeType)) {
-      throw new BusinessRuleError(
-        "Sólo se pueden subir imágenes: JPG, PNG o WEBP.",
-      );
+    const kind = input.kind ?? "PHOTO";
+    const rules = KIND_RULES[kind];
+
+    if (!rules.accepts(input.mimeType)) {
+      throw new BusinessRuleError(rules.rejected);
     }
 
     if (input.bytes.byteLength === 0) {
       throw new BusinessRuleError("El archivo llegó vacío. Vuelve a intentar.");
     }
 
-    if (input.bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    if (input.bytes.byteLength > rules.maxBytes) {
       throw new BusinessRuleError(
-        `La imagen pesa más de ${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB. Tómala de nuevo o redúcela antes de subirla.`,
+        `${rules.label} pesa más de ${Math.round(rules.maxBytes / 1024 / 1024)} MB. Redúcela antes de subirla.`,
       );
     }
 
@@ -60,7 +103,7 @@ export class AttachmentService extends BaseService {
        tenerlo. */
     if (!(await storageIsWritable())) {
       throw new BusinessRuleError(
-        "El almacén de fotos no está disponible. Avisa al administrador: falta montar el volumen.",
+        "El almacén de archivos no está disponible. Avisa al administrador: falta montar el volumen.",
       );
     }
 
@@ -83,7 +126,7 @@ export class AttachmentService extends BaseService {
           name: cleanName(input.filename),
           mimeType: input.mimeType,
           sizeBytes: input.bytes.byteLength,
-          type: "PHOTO",
+          type: kind,
           cuttingOrderId: order.id,
           uploadedById: this.context.userId,
         },
@@ -95,7 +138,8 @@ export class AttachmentService extends BaseService {
         action: "UPDATE",
         reference: order.code,
         newValue: {
-          foto: attachment.name,
+          archivo: attachment.name,
+          tipo: kind,
           bytes: attachment.sizeBytes,
         },
         sensitivity: "LOW",
@@ -118,7 +162,7 @@ export class AttachmentService extends BaseService {
         where: { id },
         include: { cuttingOrder: { select: { code: true } } },
       });
-      if (!current) throw new NotFoundError("la foto", id);
+      if (!current) throw new NotFoundError("el archivo", id);
 
       await tx.attachment.delete({ where: { id } });
 
@@ -127,7 +171,7 @@ export class AttachmentService extends BaseService {
         entityId: current.cuttingOrderId ?? id,
         action: "UPDATE",
         reference: current.cuttingOrder?.code ?? current.name,
-        oldValue: { foto: current.name },
+        oldValue: { archivo: current.name, tipo: current.type },
         /* MEDIUM y no LOW: esto destruye el respaldo de un papel que puede
            ser la única copia que queda. No exige motivo —se borra sobre todo
            la foto movida o repetida, y pedirlo lograría que nadie limpie—

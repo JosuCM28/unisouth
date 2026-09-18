@@ -22,19 +22,46 @@ function root(): string {
   return process.env.UPLOADS_DIR || ".uploads";
 }
 
-/** Extensión por tipo. La lista es también la de tipos permitidos. */
-const EXTENSIONS: Record<string, string> = {
+/**
+ * Extensión por tipo. Las dos listas juntas son los tipos permitidos.
+ *
+ * Están separadas porque se validan por separado: al bloque de fotos no se le
+ * cuela un PDF, y al de fichas técnicas no se le cuela un JPG. Si fueran una
+ * sola lista, cualquiera de los dos aceptaría lo del otro.
+ */
+const IMAGE_EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
 };
 
+const DOCUMENT_EXTENSIONS: Record<string, string> = {
+  "application/pdf": "pdf",
+};
+
+const EXTENSIONS: Record<string, string> = {
+  ...IMAGE_EXTENSIONS,
+  ...DOCUMENT_EXTENSIONS,
+};
+
 export function isSupportedImage(mimeType: string): boolean {
-  return mimeType in EXTENSIONS;
+  return mimeType in IMAGE_EXTENSIONS;
+}
+
+/**
+ * Sólo PDF.
+ *
+ * Ni Word ni Excel a propósito: la ficha técnica se imprime y se clava en la
+ * mesa de corte, y un .docx se ve distinto en cada máquina que lo abra. El
+ * PDF es el único formato que sale igual en todas.
+ */
+export function isSupportedDocument(mimeType: string): boolean {
+  return mimeType in DOCUMENT_EXTENSIONS;
 }
 
 /** Los tipos que acepta el `<input type="file">`, para no repetir la lista. */
-export const SUPPORTED_IMAGE_TYPES = Object.keys(EXTENSIONS);
+export const SUPPORTED_IMAGE_TYPES = Object.keys(IMAGE_EXTENSIONS);
+export const SUPPORTED_DOCUMENT_TYPES = Object.keys(DOCUMENT_EXTENSIONS);
 
 /**
  * Guarda el archivo y devuelve su llave: el nombre con el que vive en disco.
