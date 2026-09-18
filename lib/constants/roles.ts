@@ -54,6 +54,21 @@ export const PERMISSIONS = [
      pantalla obligaba a abrir de pilón los otros trece destinos que cuelgan
      de la misma llave. */
   "orders:browse",
+  /* El módulo de la OTRA PLANTA: sus órdenes de corte, capturadas allá.
+
+     Va aparte de `orders:browse` porque son dos pantallas de públicos
+     opuestos. Allá abajo capturan lo suyo y no tienen por qué ver el pedido
+     de Ternium que se está cortando acá; y quien contesta el teléfono aquí
+     mira las órdenes de la casa sin que le aparezca el trabajo de la otra
+     planta mezclado. */
+  "plant-orders:browse",
+  "plant-orders:write",
+  /* Jalar una orden de la otra planta al concentrado de la casa.
+
+     Llave propia y no `inventory:write`: la otra planta SÍ escribe —captura
+     sus órdenes— pero no decide qué se corta aquí. Si "agregar" colgara de
+     la misma llave con la que capturan, se meterían solos al concentrado. */
+  "plant-orders:adopt",
   "inventory:write",
   "inventory:adjust",
   "catalog:write",
@@ -169,6 +184,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "calculation:run",
     "staff:browse",
     "staff:write",
+    /* El módulo de la otra planta: ahí captura sus órdenes de corte.
+
+       NO lleva `plant-orders:adopt`: jalar una orden al concentrado de la
+       casa es decidir qué se tiende en la mesa de acá, y eso es de quien
+       administra el almacén. Tampoco lleva `orders:browse`, así que sigue
+       sin ver las órdenes de esta planta. */
+    "plant-orders:browse",
+    "plant-orders:write",
   ],
 
   /* Una sola pantalla: las órdenes de corte, y de ahí no se mueve.

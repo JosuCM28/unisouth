@@ -40,6 +40,23 @@ interface ServerPage {
 interface Props {
   orders: OrderTableRow[];
   /**
+   * A dónde llevan el folio y la tarjeta.
+   *
+   * El módulo de la otra planta lista LAS MISMAS órdenes, pero su ficha vive
+   * en otra ruta y quien captura allá no tiene permiso de abrir `/orders`.
+   */
+  basePath?: string;
+  /**
+   * El semáforo del concentrado de cada orden.
+   *
+   * Llega como función y no como datos porque lo que se pinta —chip, botón o
+   * sólo el chip— depende del permiso de quien mira, y esta tabla no tiene
+   * por qué saber nada de eso. Ausente = la columna no existe, que es lo que
+   * quiere Órdenes: allá todas están agregadas y la columna sería un chip
+   * verde idéntico en cada renglón.
+   */
+  renderAdopt?: (order: OrderTableRow) => React.ReactNode;
+  /**
    * Presente = la página la reparte Postgres; ausente = el navegador.
    *
    * La lista general trae 50 de varios cientos y tiene que paginar contra la
@@ -81,6 +98,8 @@ interface Props {
 export function OrderTable({
   orders,
   server,
+  basePath = "/orders",
+  renderAdopt,
   showFolder = false,
   isFiltered = false,
   canWrite = false,
@@ -95,7 +114,7 @@ export function OrderTable({
       header: "Folio",
       cell: ({ row }) => (
         <Link
-          href={`/orders/${row.original.id}`}
+          href={`${basePath}/${row.original.id}`}
           className="tabular font-medium hover:underline"
         >
           {row.original.code}
@@ -116,6 +135,17 @@ export function OrderTable({
         </span>
       ),
     },
+    ...(renderAdopt
+      ? [
+          {
+            id: "adopted",
+            header: "Concentrado",
+            enableSorting: false,
+            cell: ({ row }: { row: { original: OrderTableRow } }) =>
+              renderAdopt(row.original),
+          } satisfies DataTableColumn<OrderTableRow>,
+        ]
+      : []),
     {
       id: "description",
       header: "Prenda",
@@ -277,6 +307,8 @@ export function OrderTable({
         <OrderListItem
           order={order}
           folderName={showFolder ? order.folderName : null}
+          basePath={basePath}
+          adoptSlot={renderAdopt?.(order)}
           canWrite={canWrite}
         />
       )}

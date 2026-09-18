@@ -6,7 +6,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createCuttingOrderAction,
+  createPlantOrderAction,
   updateCuttingOrderAction,
+  updatePlantOrderAction,
 } from "@/app/actions/cutting-order.actions";
 import { todayInputValue } from "@/lib/utils";
 import { runAction } from "@/lib/offline/run-action";
@@ -104,6 +106,19 @@ interface Props {
    * exactamente lo contrario de lo que se pidió.
    */
   duplicating?: boolean;
+  /**
+   * De qué lado se captura.
+   *
+   * `"plant"` es el módulo de la otra planta: el mismo formulario sin los dos
+   * bloques que no son suyos. El PEDIDO lo decide quien la agrega acá —dejarlo
+   * capturar allá sería meterse solos al concentrado saltándose el botón— y
+   * el CIERRE son los metros que se miden cuando se levanta la mesa, y la
+   * mesa está aquí.
+   *
+   * Es una variante y no un formulario aparte a propósito: el día que el
+   * pedido gane un campo, las dos pantallas lo reciben juntas.
+   */
+  variant?: "house" | "plant";
 }
 
 /**
@@ -123,8 +138,12 @@ export function OrderForm({
   order,
   defaults,
   duplicating = false,
+  variant = "house",
 }: Props) {
   const router = useRouter();
+  const isPlant = variant === "plant";
+  /** Dónde vive la ficha de lo que se acaba de guardar. */
+  const basePath = isPlant ? "/plant-orders" : "/orders";
   // Duplicar precarga desde una orden existente pero CREA otra.
   const isEditing = Boolean(order) && !duplicating;
 
@@ -290,12 +309,9 @@ export function OrderForm({
     /* `isEditing` y no `order`: al duplicar también llega una orden cargada,
        pero lo que hay que hacer con ella es CREAR otra. Preguntar por `order`
        aquí sobrescribiría la orden que se estaba copiando. */
-    const result =
-      isEditing && order
-        ? await runAction(() =>
-            updateCuttingOrderAction({ id: order.id, data: payload }),
-          )
-        : await runAction(() => createCuttingOrderAction(payload));
+    const result = await runAction(() =>
+      submit({ isPlant, isEditing, orderId: order?.id, payload }),
+    );
 
     setIsSubmitting(false);
 
@@ -306,7 +322,9 @@ export function OrderForm({
 
     toast.success(isEditing ? "Orden actualizada" : "Orden creada");
     router.push(
-      isEditing ? `/orders/${order!.id}` : `/orders/${result.data.id}`,
+      isEditing
+        ? `${basePath}/${order!.id}`
+        : `${basePath}/${result.data.id}`,
     );
   }
 
@@ -325,7 +343,11 @@ export function OrderForm({
 
       <div className="flat-surface flex flex-col gap-4 p-4">
         {/* El pedido va primero: cuando la orden es parte de uno, es el dato
-            que el auxiliar ya trae en la cabeza al abrir el formulario. */}
+            que el auxiliar ya trae en la cabeza al abrir el formulario.
+
+            En modo planta no se pinta: a qué pedido de la casa entra la orden
+            lo decide quien la agrega acá, con el botón de Agregar. */}
+        {!isPlant && (
         <FormSelectField
           id="order-folder"
           label="Pedido"
@@ -346,6 +368,7 @@ export function OrderForm({
             clearLabel="Sin pedido"
           />
         </FormSelectField>
+        )}
 
         <FormSelectField
           id="order-client"
@@ -525,15 +548,20 @@ export function OrderForm({
       </div>
 
       {/* El cierre va al final y aparte: son los metros que se miden cuando la
-          mesa termina, no algo que se sepa al dar de alta la orden. */}
-      <div className="flat-surface p-4">
-        <FormSection
-          title="Cierre del corte"
-          description="Los metros de la mesa. Alimentan el reporte general de corte."
-        >
-          <OrderCutClosing value={cutClosing} onChange={setCutClosing} />
-        </FormSection>
-      </div>
+          mesa termina, no algo que se sepa al dar de alta la orden.
+
+          En modo planta no se pinta: la mesa está aquí y allá abajo no tienen
+          cómo saber esos metros. */}
+      {!isPlant && (
+        <div className="flat-surface p-4">
+          <FormSection
+            title="Cierre del corte"
+            description="Los metros de la mesa. Alimentan el reporte general de corte."
+          >
+            <OrderCutClosing value={cutClosing} onChange={setCutClosing} />
+          </FormSection>
+        </div>
+      )}
 
       <div className="flat-surface p-4">
         <FormSection title="Detalles del pedido">
@@ -611,6 +639,37 @@ export function OrderForm({
       </SubmitButton>
     </div>
   );
+}
+
+/**
+ * A qué acción va la captura.
+ *
+ * Cuatro combinaciones —crear o corregir, de la casa o de la otra planta— en
+ * una función con salidas tempranas y no en ternarias encajadas dentro del
+ * `handleSubmit`: ahí dentro la condición que importa deja de leerse.
+ *
+ * Las de planta van a acciones propias porque piden OTRO permiso:
+ * `plant-orders:write` en vez de `inventory:write`. Quien captura allá abajo
+ * no tiene nada que hacer en el inventario de acá.
+ */
+function submit({
+  isPlant,
+  isEditing,
+  orderId,
+  payload,
+}: {
+  isPlant: boolean;
+  isEditing: boolean;
+  orderId?: string;
+  payload: Record<string, unknown>;
+}) {
+  if (isEditing && orderId) {
+    if (isPlant) return updatePlantOrderAction({ id: orderId, data: payload });
+    return updateCuttingOrderAction({ id: orderId, data: payload });
+  }
+
+  if (isPlant) return createPlantOrderAction(payload);
+  return createCuttingOrderAction(payload);
 }
 
 /**

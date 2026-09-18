@@ -73,6 +73,8 @@ model User {
   purchaseRequestsRequested PurchaseRequest[]   @relation("PurchaseRequestRequestedBy")
   purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
   cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
+  /// Las órdenes de la otra planta que este usuario jaló al concentrado.
+  plantOrdersAdded          CuttingOrder[]      @relation("CuttingOrderAddedBy")
   cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
   cuttingBatches            CuttingBatch[]      @relation("CuttingBatchOpenedBy")
   orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
@@ -1646,6 +1648,26 @@ model CuttingOrder {
   /// Retacería chica: los pedazos que ya no dan para otra prenda.
   smallRemnant    Decimal? @db.Decimal(12, 2)
 
+  // ── DE DÓNDE SALIÓ Y SI YA ENTRÓ AL CONCENTRADO ──────────────────────
+  // La otra planta captura sus pedidos en el sistema, pero no son de la casa
+  // hasta que aquí alguien los toma. Son LA MISMA orden, no una copia: si
+  // allá corrigen una talla mañana, el concentrado de acá lo refleja solo.
+
+  /// Quién la capturó: esta planta o la de abajo.
+  origin CuttingOrderOrigin @default(HOUSE)
+
+  /// Cuándo se jaló al concentrado de la casa.
+  ///
+  /// Vacío = "no agregada": existe, se ve en su módulo, y no estorba la lista
+  /// de órdenes de acá. Es todo el semáforo, y por eso es una fecha y no un
+  /// booleano: "cuándo la tomamos" es la pregunta que se hace después.
+  ///
+  /// Las de la casa nacen agregadas: sellándolo al crear se evita que la
+  /// lista tenga que preguntar por el origen antes de decidir si la muestra.
+  addedAt   DateTime? @default(now())
+  addedById String?
+  addedBy   User?     @relation("CuttingOrderAddedBy", fields: [addedById], references: [id])
+
   orderedAt DateTime  @default(now())
   dueDate   DateTime?
   closedAt  DateTime?
@@ -1670,6 +1692,7 @@ model CuttingOrder {
   @@index([status, orderedAt])
   @@index([clientId])
   @@index([folderId])
+  @@index([origin, addedAt])
   @@map("cutting_orders")
 }
 
@@ -1718,6 +1741,17 @@ model CuttingBatch {
   @@unique([orderId, number])
   @@index([orderId])
   @@map("cutting_batches")
+}
+
+/// De qué planta salió la orden.
+///
+/// No es un catálogo de plantas a propósito: hoy son dos y darle tabla propia
+/// a una lista de dos renglones fijos es una junta más para cada consulta.
+enum CuttingOrderOrigin {
+  /// Capturada aquí. Lo normal.
+  HOUSE
+  /// Capturada por la otra planta, en su propio módulo.
+  PLANT
 }
 
 enum CuttingOrderStatus {

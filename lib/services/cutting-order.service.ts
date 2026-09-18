@@ -2,6 +2,7 @@ import type {
   CuttingBatch,
   CuttingOrder,
   CuttingOrderComment,
+  CuttingOrderOrigin,
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
@@ -12,14 +13,32 @@ import {
 } from "@/lib/cut-lines";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import type {
+  AdoptPlantOrderInput,
   BatchProgressInput,
   CuttingBatchInput,
   CuttingOrderInput,
   CuttingProgressInput,
   OrderCommentInput,
+  PlantOrderInput,
 } from "@/lib/validations/cutting-order.schema";
 import { BaseService } from "./base.service";
 import { DocumentService } from "./document.service";
+
+/**
+ * La serie de folios de cada planta.
+ *
+ * Series separadas y no una sola con un campo al lado: en el concentrado el
+ * encabezado de columna ES el folio, y con `OP-2026-0007` se lee de dónde
+ * vino sin abrir nada. Con una serie compartida habría que entrar a la ficha
+ * de cada orden para saber cuál se capturó abajo.
+ */
+const ORDER_SERIES: Record<
+  CuttingOrderOrigin,
+  { key: string; prefix: string }
+> = {
+  HOUSE: { key: "PRODUCTION_ORDER", prefix: "PO" },
+  PLANT: { key: "PLANT_ORDER", prefix: "OP" },
+};
 
 /** La transacción que reparte `BaseService`. */
 type Tx = Parameters<Parameters<BaseService["transaction"]>[0]>[0];
@@ -33,16 +52,58 @@ type Tx = Parameters<Parameters<BaseService["transaction"]>[0]>[0];
  */
 export class CuttingOrderService extends BaseService {
   async create(input: CuttingOrderInput): Promise<CuttingOrder> {
+    return this.createOrder(input, "HOUSE");
+  }
+
+  /**
+   * Alta desde el módulo de la OTRA PLANTA.
+   *
+   * Nace SIN agregar: existe, se ve en su módulo y no estorba la lista de
+   * órdenes de la casa hasta que alguien de acá la jale con el botón. Ésa es
+   * la única diferencia real con un alta normal —el resto, tallas incluidas,
+   * es literalmente el mismo código.
+   */
+  async createFromPlant(input: PlantOrderInput): Promise<CuttingOrder> {
+    return this.createOrder(
+      {
+        ...input,
+        /* Los cinco campos que el formulario de planta no captura, dichos en
+           voz alta. El tipo los exige presentes aunque valgan `undefined`, y
+           eso resulta ser lo correcto: si mañana se agrega un campo de la
+           casa, esto deja de compilar y obliga a decidir qué hace la otra
+           planta con él, en vez de heredarlo en silencio. */
+        folderId: undefined,
+        clientPo: undefined,
+        metersDelivered: undefined,
+        metersSpread: undefined,
+        smallRemnant: undefined,
+      },
+      "PLANT",
+    );
+  }
+
+  private async createOrder(
+    input: CuttingOrderInput,
+    origin: CuttingOrderOrigin,
+  ): Promise<CuttingOrder> {
     return this.transaction(async (tx) => {
+      const series = ORDER_SERIES[origin];
       const code = await this.sequencesWith(tx).next(
-        "PRODUCTION_ORDER",
-        "PO",
+        series.key,
+        series.prefix,
         4,
       );
+
+      /* Las de la casa nacen agregadas: quien las captura ya decidió que se
+         cortan aquí. Las de planta esperan el botón. */
+      const adopted = origin === "HOUSE";
 
       const order = await tx.cuttingOrder.create({
         data: {
           code,
+          origin,
+          addedAt: adopted ? new Date() : null,
+          addedById: adopted ? this.context.userId : null,
           clientId: input.clientId,
           materialId: input.materialId,
           productionRunId: input.productionRunId,
@@ -79,11 +140,165 @@ export class CuttingOrderService extends BaseService {
         entityId: order.id,
         action: "CREATE",
         reference: code,
-        newValue: { code, lines: input.lines.length },
+        newValue: { code, origin, lines: input.lines.length },
         sensitivity: "LOW",
       });
 
       return order;
+    });
+  }
+
+  /**
+   * Corrección desde el módulo de la otra planta.
+   *
+   * Reusa `update()` entero —renglones, bloqueo de tallas con avance y
+   * bitácora— pero le devuelve los campos de la casa tal como están.
+   *
+   * Sin esto, cada corrección de allá los borraba: `update()` escribe esos
+   * campos con `?? null` a propósito —para que vaciar el selector de pedido
+   * de verdad saque la orden de la carpeta— y el formulario de planta ni
+   * siquiera los captura, así que llegaban en blanco. Una talla corregida
+   * abajo habría sacado la orden del concentrado y borrado los metros de una
+   * mesa ya levantada.
+   */
+  async updateFromPlant(
+    id: string,
+    input: PlantOrderInput,
+  ): Promise<CuttingOrder> {
+    const current = await this.db.cuttingOrder.findUnique({
+      where: { id },
+      select: {
+        origin: true,
+        code: true,
+        folderId: true,
+        clientPo: true,
+        metersDelivered: true,
+        metersSpread: true,
+        smallRemnant: true,
+      },
+    });
+    if (!current) throw new NotFoundError("la orden", id);
+
+    if (current.origin !== "PLANT") {
+      throw new BusinessRuleError(
+        `La orden ${current.code} es de esta planta y se corrige desde Órdenes.`,
+      );
+    }
+
+    return this.update(id, {
+      ...input,
+      folderId: current.folderId ?? undefined,
+      clientPo: current.clientPo ?? undefined,
+      metersDelivered: decimalToNumber(current.metersDelivered),
+      metersSpread: decimalToNumber(current.metersSpread),
+      smallRemnant: decimalToNumber(current.smallRemnant),
+    });
+  }
+
+  /**
+   * Jala una orden de la otra planta al concentrado de la casa.
+   *
+   * NO copia nada: sella la fecha en la MISMA orden. Si mañana allá corrigen
+   * la talla 38, el concentrado de acá lo refleja solo. Una copia habría
+   * empezado a mentir el primer día que alguien tocara cualquiera de las dos.
+   */
+  async adopt(input: AdoptPlantOrderInput): Promise<CuttingOrder> {
+    return this.transaction(async (tx) => {
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id: input.id },
+      });
+      if (!order) throw new NotFoundError("la orden", input.id);
+
+      if (order.origin !== "PLANT") {
+        throw new BusinessRuleError(
+          `La orden ${order.code} es de esta planta: ya está en el concentrado.`,
+        );
+      }
+
+      if (order.addedAt) {
+        throw new BusinessRuleError(
+          `La orden ${order.code} ya está agregada.`,
+        );
+      }
+
+      const adopted = await tx.cuttingOrder.update({
+        where: { id: order.id },
+        data: {
+          addedAt: new Date(),
+          addedById: this.context.userId,
+          folderId: input.folderId,
+        },
+      });
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: order.id,
+        action: "UPDATE",
+        reference: order.code,
+        oldValue: { addedAt: null, folderId: order.folderId },
+        newValue: { addedAt: adopted.addedAt, folderId: adopted.folderId },
+        sensitivity: "MEDIUM",
+      });
+
+      return adopted;
+    });
+  }
+
+  /**
+   * Deshace el agregado: la orden vuelve a ser sólo de la otra planta.
+   *
+   * Se bloquea en cuanto la orden ya trabajó aquí —tiene corte capturado o
+   * salió en un vale—. Quitarla entonces no la "devolvería": dejaría piezas
+   * cortadas y papel firmado colgando de una orden que esta planta dice no
+   * haber tomado nunca, y el concentrado del pedido perdería una columna que
+   * sí se tendió.
+   */
+  async unadopt(id: string): Promise<CuttingOrder> {
+    return this.transaction(async (tx) => {
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id },
+        include: {
+          lines: { select: { cutQuantity: true } },
+          _count: { select: { issues: true } },
+        },
+      });
+      if (!order) throw new NotFoundError("la orden", id);
+
+      if (order.origin !== "PLANT" || !order.addedAt) {
+        throw new BusinessRuleError(
+          `La orden ${order.code} no está agregada desde la otra planta.`,
+        );
+      }
+
+      const cut = order.lines.reduce((sum, line) => sum + line.cutQuantity, 0);
+      if (cut > 0) {
+        throw new BusinessRuleError(
+          `La orden ${order.code} ya lleva ${cut} piezas cortadas aquí: quitarla del concentrado dejaría ese corte sin dueño.`,
+        );
+      }
+
+      if (order._count.issues > 0) {
+        throw new BusinessRuleError(
+          `La orden ${order.code} ya salió en un vale y no se puede quitar del concentrado.`,
+        );
+      }
+
+      const removed = await tx.cuttingOrder.update({
+        where: { id },
+        data: { addedAt: null, addedById: null, folderId: null },
+      });
+
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: id,
+        action: "UPDATE",
+        reference: order.code,
+        oldValue: { addedAt: order.addedAt, folderId: order.folderId },
+        newValue: { addedAt: null, folderId: null },
+        sensitivity: "MEDIUM",
+      });
+
+      return removed;
     });
   }
 
@@ -1002,4 +1217,19 @@ export class CuttingOrderService extends BaseService {
       });
     });
   }
+}
+
+/**
+ * Un `Decimal` de Prisma como número plano, conservando el vacío.
+ *
+ * `Number(null)` es 0, y un cero aquí no es lo mismo que un campo sin
+ * capturar: `update()` escribe estos metros con `?? null`, así que un 0 colado
+ * convertiría "esta mesa no se ha medido" en "esta mesa midió cero" y el
+ * reporte de corte sacaría un promedio real de un tendido que no existe.
+ */
+function decimalToNumber(
+  value: { toString(): string } | null,
+): number | undefined {
+  if (value === null) return undefined;
+  return Number(value.toString());
 }

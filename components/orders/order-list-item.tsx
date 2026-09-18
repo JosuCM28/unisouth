@@ -34,6 +34,14 @@ export interface OrderListEntry {
    * pantalla que no los consulta no debe pintar un contador en blanco.
    */
   _count?: { comments: number };
+  /**
+   * Cuándo se jaló al concentrado de la casa.
+   *
+   * Opcional porque sólo el módulo de la otra planta lo pregunta: las órdenes
+   * de acá nacen agregadas y pintar ese semáforo en Órdenes sería un chip
+   * verde idéntico en cada renglón, que no informa nada.
+   */
+  addedAt?: Date | null;
 }
 
 /**
@@ -56,6 +64,21 @@ interface Props {
   /** Pedido al que pertenece. Sólo se pinta donde no sea obvio. */
   folderName?: string | null;
   /**
+   * A dónde lleva la tarjeta al picarla.
+   *
+   * El módulo de la otra planta pinta LAS MISMAS órdenes pero su ficha vive
+   * en otra ruta: sin esto, quien captura allá abajo acababa en `/orders`, que
+   * no tiene permiso de abrir.
+   */
+  basePath?: string;
+  /**
+   * El semáforo de agregada y su botón. Sólo lo manda el módulo de planta.
+   *
+   * Llega ya construido y no como datos: así la tarjeta no tiene que saber
+   * nada de pedidos ni de permisos para pintarlo.
+   */
+  adoptSlot?: React.ReactNode;
+  /**
    * Si se ofrece borrar la orden.
    *
    * Por omisión NO, para que quien sólo consulta nunca vea el bote de basura
@@ -74,6 +97,8 @@ interface Props {
 export function OrderListItem({
   order,
   folderName,
+  basePath = "/orders",
+  adoptSlot,
   canWrite = false,
 }: Props) {
   const ordered = order.lines.reduce(
@@ -86,16 +111,17 @@ export function OrderListItem({
   const fabric = orderFabric(order);
 
   return (
-    <div className="flat-surface relative flex items-start justify-between gap-3 p-3 transition-colors active:bg-accent">
+    <div className="flat-surface relative flex flex-col gap-2 p-3 transition-colors active:bg-accent">
       {/* El enlace va como capa sobre toda la tarjeta en vez de envolverla:
           un <button> dentro de un <a> no es HTML válido, y el botón de borrar
           tiene que quedar fuera del área que navega. */}
       <Link
-        href={`/orders/${order.id}`}
+        href={`${basePath}/${order.id}`}
         className="absolute inset-0 z-10"
         aria-label={`Abrir ${order.code}`}
       />
 
+      <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="tabular text-sm font-medium">{order.code}</span>
@@ -198,6 +224,16 @@ export function OrderListItem({
           />
         )}
       </div>
+      </div>
+
+      {/* El semáforo del concentrado, en su propio renglón y por encima de la
+          capa del enlace: lleva un botón, y dentro del área que navega el
+          toque abriría la orden en vez de agregarla. */}
+      {adoptSlot && (
+        <div className="relative z-20 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          {adoptSlot}
+        </div>
+      )}
     </div>
   );
 }

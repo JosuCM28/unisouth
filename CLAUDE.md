@@ -244,7 +244,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos. Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
-| `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · Ayudantes. Edita tareas, ayudantes y cálculos; NO recorre el almacén ni ve auditoría |
+| `MANAGEMENT` | Menú corto: Escanear · Cálculo · Tareas · **Órdenes de planta** · Ayudantes. Edita tareas, ayudantes y cálculos, y captura las órdenes de la OTRA PLANTA; NO recorre el almacén ni ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, foleos,
@@ -272,13 +272,41 @@ botón es comodidad, no seguridad: la barrera sigue siendo `executeAction`.
 Su barra inferior del celular queda vacía —ninguno de los cuatro destinos es
 suyo— y no se pinta; navega desde el menú del encabezado.
 
-Seis capacidades separan lo anterior:
+**La otra planta y su módulo.** Hay una segunda planta que captura sus
+propias órdenes de corte. Son `CuttingOrder` normales —la misma tabla, las
+mismas tallas, el mismo catálogo— marcadas con `origin = PLANT`, y viven en
+`/plant-orders`. Nacen FUERA del concentrado de la casa: existen, se ven en su
+módulo, y no aparecen en `/orders` hasta que alguien de acá las jala con el
+botón **Agregar**.
+
+Ese semáforo es una sola columna, `addedAt`: con fecha está agregada, sin ella
+no. Las de la casa nacen con fecha, así que el filtro nunca las esconde.
+Agregar NO copia nada —sella la fecha en la MISMA orden— porque una copia
+empieza a mentir el primer día que alguien corrija cualquiera de las dos. Se
+puede quitar mientras la orden no haya trabajado aquí; con corte capturado o
+vale firmado se bloquea, porque quitarla dejaría ese trabajo sin dueño.
+
+Serie de folios propia (`OP-2026-0001`) y no la de la casa: en el concentrado
+el encabezado de columna ES el folio, y así se lee de dónde vino sin abrir
+nada. El concentrado agrega un renglón "Planta" **sólo** cuando el pedido de
+verdad mezcla las dos.
+
+Lo que la otra planta NO captura, y por qué: el **pedido** al que entra la
+orden lo decide quien la agrega acá —dejarlo capturar allá sería meterse solos
+al concentrado saltándose el botón— y el **cierre del corte** son los metros
+que se miden cuando se levanta la mesa, y la mesa está aquí. Tampoco captura
+cortes, envíos a taller ni salidas: todo eso se hace desde Órdenes contra la
+misma orden, así que el avance nunca queda partido en dos lugares.
+
+Nueve capacidades separan lo anterior:
 
 | Capacidad | Qué gobierna |
 |---|---|
 | `inventory:read` | Consultar un dato suelto: escanear un rollo, el pizarrón de tareas |
 | `inventory:browse` | **Recorrer el almacén**: rollos, documentos y los catálogos que se eligen al capturar (materiales, prendas, ubicaciones, clientes, proveedores) |
 | `orders:browse` | Las **órdenes de corte** y su avance: la lista, los pedidos, la ficha de la orden, su impresión y su Excel. Aparte de `inventory:browse` para que se pueda dar sin abrir el almacén entero |
+| `plant-orders:browse` / `plant-orders:write` | El módulo de la **otra planta**: ver y capturar sus órdenes. Aparte de `orders:browse` porque son dos pantallas de públicos opuestos — allá abajo no tienen por qué ver el pedido que se corta acá, ni al revés |
+| `plant-orders:adopt` | **Agregar** una orden de la otra planta al concentrado de la casa, y quitarla. Llave propia que Dirección NO tiene: si colgara de `plant-orders:write` —la llave con la que capturan— se agregarían solos |
 | `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, foleos, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
@@ -398,6 +426,7 @@ con incremento atómico dentro de la transacción.
 | Movimiento | `MOV-2026-0000123` |
 | Cálculo | `CALC-2026-0057` |
 | Orden producción | `PO-2026-0113` |
+| Orden de otra planta | `OP-2026-0007` |
 | Requisición | `PR-2026-0074` |
 
 El folio del lote es el contenido del QR: `https://{APP_URL}/r/{code}`.

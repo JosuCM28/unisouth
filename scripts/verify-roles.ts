@@ -31,7 +31,8 @@ const ESPERADO: Record<Role, string[]> = {
     "Materiales", "Productos", "Prendas", "Tallas", "Foleos", "Talleres",
     "Almacenes", "Ubicaciones", "Clientes", "Producciones", "Proveedores",
     "Ayudantes",
-    "Recepciones", "Salidas", "Órdenes", "Movimientos", "Documentos",
+    "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
+    "Documentos",
     "Requisiciones", "Reportes", "Auditoría",
     "Usuarios",
   ],
@@ -66,7 +67,16 @@ const ESPERADO: Record<Role, string[]> = {
   ],
 
   // El menú corto del contrato: cuatro destinos, ni uno más.
-  MANAGEMENT: ["Escanear", "Cálculo", "Tareas", "Ayudantes"],
+  /* Cinco destinos: los cuatro de siempre más el módulo donde captura las
+     órdenes de su planta. Sigue sin `inventory:browse` ni `orders:browse`,
+     así que no recorre el almacén ni ve las órdenes de la casa. */
+  MANAGEMENT: [
+    "Escanear",
+    "Cálculo",
+    "Tareas",
+    "Órdenes de planta",
+    "Ayudantes",
+  ],
 
   /* Un solo destino: entra a mirar cómo va un pedido y de ahí no se mueve.
      Dentro de Órdenes tampoco puede tocar nada, porque no lleva

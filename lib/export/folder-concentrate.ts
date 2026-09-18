@@ -1,3 +1,4 @@
+import { CUTTING_ORDER_ORIGIN_LABELS } from "@/lib/constants/labels";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { formatDate } from "@/lib/utils";
 import type { PrintSetup, SheetRow } from "./xlsx";
@@ -242,6 +243,13 @@ function orderHeaderRows(orders: Order[]): SheetRow[] {
       (order) => order.material?.name ?? order.cutFabricText ?? "—",
     ),
     labelled("Molde", (order) => order.cutPattern ?? "—"),
+    /* De qué planta salió cada columna, y SÓLO cuando el pedido de verdad
+       mezcla las dos. Un renglón que dice "Esta planta" en las ocho columnas
+       gasta el alto que la hoja necesita para caber en una página, y esta
+       hoja existe para leerse de un vistazo. */
+    ...(orders.some((order) => order.origin === "PLANT")
+      ? [labelled("Planta", (order) => CUTTING_ORDER_ORIGIN_LABELS[order.origin])]
+      : []),
     [
       { at: 1, value: "TALLA", style: "gridHeader" },
       ...orders.map((_, index) => ({

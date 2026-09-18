@@ -189,6 +189,19 @@ export const NAVIGATION: NavSection[] = [
         permission: "orders:browse",
       },
       {
+        /* Las órdenes que captura la OTRA PLANTA.
+
+           Va pegada a Órdenes porque es la misma pregunta —qué se va a
+           cortar— hecha del otro lado, y quien administra las mira una
+           después de la otra. Para Dirección, que es quien captura allá, es
+           el único destino de esta sección: el resto pide `inventory:browse`,
+           que no tiene. */
+        href: "/plant-orders",
+        label: "Órdenes de planta",
+        icon: "plantOrders",
+        permission: "plant-orders:browse",
+      },
+      {
         // El kárdex, no los vales: aquí sólo aparece lo que YA afectó
         // existencias. Un vale en borrador no movió nada todavía, así que
         // vive en Salidas y no aquí.

@@ -3,6 +3,7 @@ import type {
   AuditAction,
   CutTag,
   CutVersion,
+  CuttingOrderOrigin,
   CuttingOrderStatus,
   DocumentStatus,
   DocumentType,
@@ -150,6 +151,17 @@ export const MEASUREMENT_SOURCE_LABELS: Record<MeasurementSource, string> = {
   ESTIMATED_WEIGHT: "Estimado por peso",
   ESTIMATED_VISUAL: "Estimado a ojo",
   PHYSICAL_COUNT: "Conteo físico",
+};
+
+/**
+ * De qué planta salió una orden de corte.
+ *
+ * "Esta planta" y no "UNISOUTH": la hoja se lee en el piso de cualquiera de
+ * las dos, y el nombre de la empresa no dice cuál es la de quien está mirando.
+ */
+export const CUTTING_ORDER_ORIGIN_LABELS: Record<CuttingOrderOrigin, string> = {
+  HOUSE: "Esta planta",
+  PLANT: "Otra planta",
 };
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {

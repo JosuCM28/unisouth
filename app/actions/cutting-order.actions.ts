@@ -4,15 +4,22 @@ import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, requiredText } from "@/lib/validations/common";
 import {
+  adoptPlantOrderSchema,
   batchProgressSchema,
   cuttingBatchSchema,
   cuttingOrderSchema,
   cuttingProgressSchema,
   orderCommentSchema,
+  plantOrderSchema,
 } from "@/lib/validations/cutting-order.schema";
 import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 
 const REVALIDATE = ["/orders", "/dashboard"];
+
+/* Agregar y quitar mueven las DOS listas: la orden desaparece de "no
+   agregadas" y aparece en Órdenes en el mismo clic. Revalidar sólo una dejaba
+   la otra mintiendo hasta que alguien recargara a mano. */
+const PLANT_REVALIDATE = ["/plant-orders", "/orders", "/dashboard"];
 
 /**
  * Mandar a salidas: la orden completa o UN corte suyo.
@@ -26,6 +33,7 @@ const sendToIssueSchema = z.object({
   batchId: cuidSchema.optional(),
 });
 const updateSchema = z.object({ id: cuidSchema, data: cuttingOrderSchema });
+const updatePlantSchema = z.object({ id: cuidSchema, data: plantOrderSchema });
 const cancelSchema = z.object({
   id: cuidSchema,
   reason: requiredText("El motivo", 500),
@@ -51,6 +59,63 @@ export async function createCuttingOrderAction(input: unknown) {
     successMessage: "Orden creada",
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).create(input),
+  });
+}
+
+/**
+ * Alta desde el módulo de la OTRA PLANTA.
+ *
+ * Pide `plant-orders:write` y no `inventory:write`: allá abajo capturan sus
+ * pedidos, pero no tienen nada que hacer en el inventario de acá.
+ */
+export async function createPlantOrderAction(input: unknown) {
+  return executeAction(input, {
+    schema: plantOrderSchema,
+    permission: "plant-orders:write",
+    revalidate: PLANT_REVALIDATE,
+    successMessage: "Orden creada",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).createFromPlant(input),
+  });
+}
+
+export async function updatePlantOrderAction(input: unknown) {
+  return executeAction(input, {
+    schema: updatePlantSchema,
+    permission: "plant-orders:write",
+    revalidate: PLANT_REVALIDATE,
+    successMessage: "Orden actualizada",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).updateFromPlant(input.id, input.data),
+  });
+}
+
+/**
+ * Jala una orden de la otra planta al concentrado de la casa.
+ *
+ * Llave propia `plant-orders:adopt`, que Dirección NO tiene: quien captura
+ * allá abajo no decide qué se tiende en la mesa de acá. Si esto colgara de
+ * `plant-orders:write` —la llave con la que capturan— se agregarían solos.
+ */
+export async function adoptPlantOrderAction(input: unknown) {
+  return executeAction(input, {
+    schema: adoptPlantOrderSchema,
+    permission: "plant-orders:adopt",
+    revalidate: PLANT_REVALIDATE,
+    successMessage: "Orden agregada al concentrado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).adopt(input),
+  });
+}
+
+export async function unadoptPlantOrderAction(input: unknown) {
+  return executeAction(input, {
+    schema: z.object({ id: cuidSchema }),
+    permission: "plant-orders:adopt",
+    revalidate: PLANT_REVALIDATE,
+    successMessage: "Orden quitada del concentrado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).unadopt(input.id),
   });
 }
 

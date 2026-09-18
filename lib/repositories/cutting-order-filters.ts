@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { CuttingOrderOrigin, Prisma } from "@prisma/client";
 import { fromDateInputValue } from "@/lib/utils";
 
 /**
@@ -41,6 +41,22 @@ export interface CuttingOrderFilters {
    * campo existe en vez de haber cambiado el comportamiento de uno solo.
    */
   dateField?: "orderedAt" | "updatedAt";
+  /**
+   * De qué planta salió. Sin esto, las dos listas se mezclan.
+   *
+   * `/orders` no lo usa —le basta con `adopted`, porque una orden de la casa
+   * siempre está agregada— pero el módulo de planta sí: ahí se ven las de
+   * allá abajo estén agregadas o no.
+   */
+  origin?: CuttingOrderOrigin;
+  /**
+   * Si ya entró al concentrado de la casa.
+   *
+   * `true` es lo que pide la lista de Órdenes: las de la casa (que nacen
+   * agregadas) más las de planta que alguien ya jaló. `false` es el chip de
+   * "pendientes" del módulo de planta. Sin valor, todas.
+   */
+  adopted?: boolean;
 }
 
 /** Valor del filtro que pide las órdenes que no están en ninguna carpeta. */
@@ -66,7 +82,19 @@ export function parseCuttingOrderFilters(
        un parámetro mal escrito en la URL no debe cambiar en silencio qué
        significa el rango de fechas que se está viendo. */
     dateField: params.dateField === "updatedAt" ? "updatedAt" : "orderedAt",
+    /* Sólo se lee de la URL el estado del agregado, que es un chip de la
+       pantalla. El ORIGEN no: lo fija cada página en el servidor, porque es
+       lo que separa las dos listas y no algo que el usuario deba poder
+       cambiar tecleando en la barra de direcciones. */
+    adopted: parseAdopted(params.agregadas),
   };
+}
+
+/** El chip de agregadas: "1" sí, "0" no, cualquier otra cosa no filtra. */
+function parseAdopted(value: string | undefined): boolean | undefined {
+  if (value === "1") return true;
+  if (value === "0") return false;
+  return undefined;
 }
 
 export function cuttingOrderWhere(
@@ -75,6 +103,14 @@ export function cuttingOrderWhere(
   const where: Prisma.CuttingOrderWhereInput = {};
 
   if (filters.clientId) where.clientId = filters.clientId;
+
+  if (filters.origin) where.origin = filters.origin;
+
+  /* `addedAt` es el semáforo entero: con fecha está en el concentrado, sin
+     ella sólo existe en el módulo de su planta. Las de la casa nacen con
+     fecha, así que este filtro nunca las esconde. */
+  if (filters.adopted === true) where.addedAt = { not: null };
+  if (filters.adopted === false) where.addedAt = null;
 
   if (filters.search) {
     /* AND de ORs: cada palabra tiene que aparecer en ALGÚN campo. Así

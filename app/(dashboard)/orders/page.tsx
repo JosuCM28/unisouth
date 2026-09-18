@@ -92,6 +92,15 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   const listFilters = {
     ...filters,
     folderId: filters.folderId ?? (isSearching ? undefined : LOOSE_ORDERS),
+    /* SÓLO lo que ya está en el concentrado de la casa.
+
+       Las órdenes de la otra planta existen desde que las capturan allá, pero
+       aquí no son nuestras hasta que alguien las jala con el botón de
+       Agregar. Sin esta línea aparecerían en esta lista el día que se
+       capturan —y nadie de acá se enteraría de que todavía no se decidió
+       cortarlas—. Las de la casa nacen agregadas, así que el filtro no les
+       hace nada. */
+    adopted: true,
   };
   const where = cuttingOrderWhere(listFilters);
 

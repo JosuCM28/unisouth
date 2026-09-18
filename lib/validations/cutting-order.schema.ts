@@ -89,6 +89,45 @@ export type CuttingOrderInput = z.infer<typeof cuttingOrderSchema>;
 export type CuttingOrderLineInput = z.infer<typeof cuttingOrderLineSchema>;
 
 /**
+ * Lo que captura la OTRA PLANTA.
+ *
+ * Es el mismo esquema de arriba con cinco campos menos, y por eso se deriva de
+ * él en vez de escribirse aparte: el día que se agregue una talla o un campo
+ * al pedido, las dos pantallas lo reciben juntas. Copiarlo entero era
+ * garantizar que dentro de tres meses dijeran cosas distintas.
+ *
+ * `folderId` fuera: a qué pedido de la casa entra lo decide quien la agrega
+ * acá, no quien la captura allá. Dejarlo pasar sería meterse solos al
+ * concentrado por la puerta de atrás, saltando el botón de Agregar.
+ *
+ * El cierre del corte fuera: son los metros que se miden cuando SE LEVANTA LA
+ * MESA, y la mesa está aquí. Allá no tienen cómo saberlos.
+ */
+export const plantOrderSchema = cuttingOrderSchema.omit({
+  folderId: true,
+  clientPo: true,
+  metersDelivered: true,
+  metersSpread: true,
+  smallRemnant: true,
+});
+
+export type PlantOrderInput = z.infer<typeof plantOrderSchema>;
+
+/**
+ * Agregar una orden de la otra planta al concentrado de la casa.
+ *
+ * `folderId` opcional: entra al pedido que se elija, o suelta si se deja en
+ * blanco. Quedar suelta es un estado normal —igual que cualquier orden de
+ * acá— y no un a medias: ya está agregada, sólo que todavía sin agrupar.
+ */
+export const adoptPlantOrderSchema = z.object({
+  id: cuidSchema,
+  folderId: optionalCuid,
+});
+
+export type AdoptPlantOrderInput = z.infer<typeof adoptPlantOrderSchema>;
+
+/**
  * Un avance de corte.
  *
  * La cantidad puede ser NEGATIVA a propósito: así se corrige un conteo de más
