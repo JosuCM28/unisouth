@@ -81,6 +81,7 @@ model User {
   garmentFolders            GarmentFolder[]     @relation("GarmentFolderCreatedBy")
   garmentsCreated           Garment[]           @relation("GarmentCreatedBy")
   garmentPhotos             GarmentPhoto[]      @relation("GarmentPhotoCreatedBy")
+  attachments               Attachment[]        @relation("AttachmentUploadedBy")
   orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
 
   @@index([active, role])
@@ -1660,6 +1661,8 @@ model CuttingOrder {
   batches   CuttingBatch[]
   shipments GarmentShipment[]
   comments  CuttingOrderComment[]
+  /// Photos of the paper the client handed over. The order's backup.
+  attachments Attachment[]
   /// The issue vouchers born from this order. Read to show whether it already
   /// left and whether that delivery is still standing.
   issues    InventoryDocument[] @relation("DocumentCuttingOrder")
@@ -1940,12 +1943,21 @@ model Sequence {
 }
 
 model Attachment {
-  id        String         @id @default(cuid())
-  url       String
-  name      String
-  mimeType  String?
-  sizeBytes Int?
-  type      AttachmentType @default(PHOTO)
+  id String @id @default(cuid())
+  /// Where the bytes live, as the storage layer names them ("2026-09/<uuid>.jpg").
+  ///
+  /// A KEY and not an absolute path: the row must not know which folder the
+  /// server mounted today, or moving the photos to another disk would mean
+  /// rewriting every row. Optional only because the rows that existed before
+  /// files were ever uploaded carry none.
+  storageKey String?
+  /// What the file was called when it was picked. Shown and used to name the
+  /// download; NEVER used to write to disk — the storage layer invents that.
+  url        String
+  name       String
+  mimeType   String?
+  sizeBytes  Int?
+  type       AttachmentType @default(PHOTO)
 
   lotId             String?
   lot               Lot?               @relation(fields: [lotId], references: [id], onDelete: Cascade)
@@ -1956,11 +1968,25 @@ model Attachment {
   purchaseRequestId String?
   purchaseRequest   PurchaseRequest?   @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
 
+  /// The cutting order this photo backs up.
+  ///
+  /// The shop is handed the order on PAPER — sizes, notes, the client's stamp —
+  /// and that sheet is the only copy. Photographing it into the order is what
+  /// stops the record from living in one folder on one desk. Cascade like its
+  /// siblings: deleting the order takes its photos, because a file nobody can
+  /// reach from any screen is just disk that never gets freed.
+  cuttingOrderId String?
+  cuttingOrder   CuttingOrder? @relation(fields: [cuttingOrderId], references: [id], onDelete: Cascade)
+
+  /// Who uploaded it. A real relation, like every other "who did this" in the
+  /// system: the name has to survive on screen, and a loose id cannot show one.
   uploadedById String?
+  uploadedBy   User?    @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id])
   createdAt    DateTime @default(now())
 
   @@index([lotId])
   @@index([receiptId])
+  @@index([cuttingOrderId])
   @@map("attachments")
 }
 

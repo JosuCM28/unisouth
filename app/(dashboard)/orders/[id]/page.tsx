@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requirePermission } from "@/lib/core/session";
+import { storageIsWritable } from "@/lib/core/storage";
+import { OrderPhotos } from "@/components/orders/order-photos";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { sumBundlePieces } from "@/lib/bundles";
 import {
@@ -159,7 +161,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages, issues] = await Promise.all([
+  const [balances, shipments, workshops, stages, issues, photos, storageReady] =
+    await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
       where: { orderId: id },
@@ -212,6 +215,24 @@ export default async function OrderDetailPage({ params }: PageProps) {
         cutLines: { select: { quantity: true, bundles: true } },
       },
     }),
+    /* Las fotos del papel que entregó el cliente. Van en la misma ida a la
+       base que todo lo demás: son una consulta más y encadenarlas sumaría un
+       viaje a la pantalla más pesada del módulo. */
+    prisma.attachment.findMany({
+      where: { cuttingOrderId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        sizeBytes: true,
+        createdAt: true,
+        uploadedBy: { select: { name: true } },
+      },
+    }),
+    /* Si el almacén está montado. Se pregunta aquí para poder avisar ANTES de
+       que alguien intente subir, en vez de dejarlo fallar con la foto ya
+       tomada. */
+    storageIsWritable(),
   ]);
 
   const shipmentViews: ShipmentView[] = shipments.map((shipment) => ({
@@ -589,6 +610,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
           canWrite={canWrite}
         />
       </section>
+
+      {/* El respaldo del papel, junto a los comentarios y antes de lo
+          operativo: es lo que se consulta al contestar "¿qué decía la hoja?",
+          que es una pregunta de lectura, no de captura. Sólo lectura lo ve
+          completo —con su visor y su descarga— pero sin subir ni borrar. */}
+      <OrderPhotos
+        orderId={order.id}
+        photos={photos.map((photo) => ({
+          id: photo.id,
+          name: photo.name,
+          sizeBytes: photo.sizeBytes,
+          createdAt: photo.createdAt,
+          uploadedByName: photo.uploadedBy?.name ?? null,
+        }))}
+        canWrite={canWrite}
+        storageReady={storageReady}
+      />
 
       {/* Arriba del todo cuando la orden ya salió: es lo primero que hay que
           saber antes de mandar otro vale, no algo que se descubre al final de
