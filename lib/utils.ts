@@ -275,7 +275,9 @@ export function cutProgress(ordered: number, cut: number): CutProgress {
 export interface CutTotals {
   ordered: number;
   cut: number;
+  /** Piezas SIN cortar, sumando talla por talla. Un excedente no las tapa. */
   pending: number;
+  /** Piezas cortadas DE MÁS, sumando talla por talla. */
   surplus: number;
 }
 

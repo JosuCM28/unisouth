@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Archive, FolderOpen } from "lucide-react";
 import type { OrderFolderWithTotals } from "@/lib/repositories/order-folder.repository";
-import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { FolderDeleteButton } from "./folder-delete-button";
 
 interface Props {
@@ -22,10 +22,13 @@ interface Props {
  * para que "cómo va el pedido de Ternium" se responda sin abrir nada.
  */
 export function FolderCard({ folder, canWrite = false }: Props) {
-  const { pending, surplus } = cutProgress(
-    folder.orderedQuantity,
-    folder.cutQuantity,
-  );
+  /* Ya vienen contados talla por talla desde la base: sacarlos aquí de
+     "pedidas − cortadas" dejaría que el excedente de una talla descontara el
+     faltante de otra, y la tarjeta diría que falta menos de lo que falta. */
+  const pending = folder.pendingQuantity;
+  const surplus = folder.surplusQuantity;
+  // Sin nada pendiente, el excedente toma el lugar del número grande.
+  const onlySurplus = pending === 0 && surplus > 0;
   const isArchived = Boolean(folder.archivedAt);
   const late = isLate(folder.dueDate, pending);
 
@@ -104,14 +107,21 @@ export function FolderCard({ folder, canWrite = false }: Props) {
               <p
                 className={cn(
                   "tabular text-lg font-bold leading-none",
-                  surplus > 0 && "text-state-remnant",
+                  onlySurplus && "text-state-remnant",
                 )}
               >
-                {surplus > 0 ? `+${surplus}` : pending}
+                {onlySurplus ? `+${surplus}` : pending}
               </p>
               <p className="tabular text-xs text-muted-foreground">
-                {surplus > 0 ? "sobran" : `de ${folder.orderedQuantity}`}
+                {onlySurplus ? "sobran" : `de ${folder.orderedQuantity}`}
               </p>
+              {/* Con faltante Y excedente se pintan los dos: son dos
+                  problemas distintos y se arreglan por separado. */}
+              {pending > 0 && surplus > 0 && (
+                <p className="tabular text-xs text-state-remnant">
+                  +{surplus} sobran
+                </p>
+              )}
               <p className="tabular mt-0.5 text-xs text-muted-foreground">
                 {folder.cutQuantity} cortadas
               </p>

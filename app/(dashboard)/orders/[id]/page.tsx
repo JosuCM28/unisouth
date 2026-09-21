@@ -26,6 +26,7 @@ import {
   cn,
   contrastText,
   cutProgress,
+  cutTotals,
   formatDate,
   formatDateTime,
 } from "@/lib/utils";
@@ -301,9 +302,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
     };
   });
 
-  const ordered = order.lines.reduce((s, l) => s + l.orderedQuantity, 0);
-  const cut = order.lines.reduce((s, l) => s + l.cutQuantity, 0);
-  const { pending, surplus } = cutProgress(ordered, cut);
+  /* Talla por talla y NO del neto: sumar `pedidas − cortadas` de toda la
+     orden deja que el excedente de una talla descuente el faltante de otra, y
+     el encabezado acaba diciendo "faltan 834" donde el desglose de abajo —y la
+     hoja impresa, que sí cuenta por columna— dicen "faltan 902 y sobran 68".
+     Son dos problemas distintos y se arreglan por separado. */
+  const { ordered, cut, pending, surplus } = cutTotals(order.lines);
   const isCancelled = order.status === "CANCELLED";
   /* Una orden cancelada no se toca, y quien sólo consulta tampoco la toca:
      las dos condiciones gobiernan los mismos botones, así que viven juntas. */
@@ -596,16 +600,30 @@ export default async function OrderDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Los tres números que se buscan al abrir la orden. */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Los números que se buscan al abrir la orden.
+
+          "Faltan" y "Sobran" pueden salir LOS DOS a la vez, y entonces se
+          pintan los dos: una orden puede ir corta en las tallas chicas y
+          pasada en las grandes, y enseñar sólo uno de los dos esconde la
+          mitad del problema justo en la pantalla donde se va a decidir qué
+          se corta mañana. */}
+      <div
+        className={cn(
+          "grid gap-2",
+          pending > 0 && surplus > 0
+            ? "grid-cols-2 md:grid-cols-4"
+            : "grid-cols-3",
+        )}
+      >
         <Stat label="Pedidas" value={ordered} />
         <Stat label="Cortadas" value={cut} />
+        {(pending > 0 || surplus === 0) && (
+          <Stat label="Faltan" value={pending} tone="pending" />
+        )}
         {/* Rebasar el pedido no es un error: se cortó de más y hay que saber
             cuánto sobra, no ver un cero que oculta el excedente. */}
-        {surplus > 0 ? (
+        {surplus > 0 && (
           <Stat label="Sobran" value={surplus} tone="surplus" prefix="+" />
-        ) : (
-          <Stat label="Faltan" value={pending} tone="pending" />
         )}
       </div>
 

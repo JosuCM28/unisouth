@@ -5,7 +5,7 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
-import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { cn, cutTotals, formatDate } from "@/lib/utils";
 import { OrderDeleteButton } from "./order-delete-button";
 
 /** Lo mínimo que la tarjeta necesita saber de una orden. */
@@ -101,12 +101,13 @@ export function OrderListItem({
   adoptSlot,
   canWrite = false,
 }: Props) {
-  const ordered = order.lines.reduce(
-    (sum, line) => sum + line.orderedQuantity,
-    0,
-  );
-  const cut = order.lines.reduce((sum, line) => sum + line.cutQuantity, 0);
-  const { pending, surplus } = cutProgress(ordered, cut);
+  /* Talla por talla: con el neto, las 67 piezas que sobran de la 32 se comían
+     67 de las que faltan de la 34 y la tarjeta enseñaba un pendiente menor al
+     real. Lo que falta es EL número de esta lista y no puede venir descontado
+     por un excedente. */
+  const { ordered, cut, pending, surplus } = cutTotals(order.lines);
+  // Sin nada pendiente, el excedente toma el lugar del número grande.
+  const onlySurplus = pending === 0 && surplus > 0;
   const commentCount = order._count?.comments ?? 0;
   const fabric = orderFabric(order);
 
@@ -191,22 +192,28 @@ export function OrderListItem({
         </div>
       </div>
 
-      {/* Lo que falta es el número que se busca al abrir la lista. Si se cortó
-          de más, ese excedente pasa a ser el dato: un cero escondería que
-          sobran piezas. */}
+      {/* Lo que falta es el número que se busca al abrir la lista. Sin nada
+          pendiente, el excedente pasa a ser el dato: un cero escondería que
+          sobran piezas. Y si hay de las dos, el excedente va DEBAJO del
+          faltante en vez de reemplazarlo —ninguno de los dos se tapa—. */}
       <div className="flex shrink-0 items-start gap-1">
         <div className="text-right">
           <p
             className={cn(
               "tabular text-lg font-bold leading-none",
-              surplus > 0 && "text-state-remnant",
+              onlySurplus && "text-state-remnant",
             )}
           >
-            {surplus > 0 ? `+${surplus}` : pending}
+            {onlySurplus ? `+${surplus}` : pending}
           </p>
           <p className="tabular text-xs text-muted-foreground">
-            {surplus > 0 ? "sobran" : `de ${ordered}`}
+            {onlySurplus ? "sobran" : `de ${ordered}`}
           </p>
+          {pending > 0 && surplus > 0 && (
+            <p className="tabular text-xs text-state-remnant">
+              +{surplus} sobran
+            </p>
+          )}
           {/* Cuánto se lleva cortado: sin esto, "faltan 300" no distingue una
               orden recién abierta de una casi lista. */}
           <p className="tabular mt-0.5 text-xs text-muted-foreground">

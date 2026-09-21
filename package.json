@@ -18,7 +18,8 @@
     "user:create": "tsx scripts/create-user.ts",
     "user:list": "tsx scripts/manage-users.ts list",
     "user:role": "tsx scripts/manage-users.ts role",
-    "user:disable": "tsx scripts/manage-users.ts disable"
+    "user:disable": "tsx scripts/manage-users.ts disable",
+    "resync:orders": "tsx scripts/resync-order-status.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

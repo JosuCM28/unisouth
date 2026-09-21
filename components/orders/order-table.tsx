@@ -6,7 +6,7 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
-import { cn, cutProgress, formatDate } from "@/lib/utils";
+import { cn, cutTotals, formatDate } from "@/lib/utils";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { usePageParam } from "@/components/shared/use-page-param";
@@ -316,15 +316,16 @@ export function OrderTable({
   );
 }
 
-/** Lo pedido, lo cortado y lo que falta, en un solo lugar. */
+/**
+ * Lo pedido, lo cortado y lo que falta, en un solo lugar.
+ *
+ * "Faltan" y "sobran" salen talla por talla —`cutTotals`— y no del neto de la
+ * orden: restarlos entre sí hace que un excedente en una talla descuente el
+ * faltante de otra, y esta columna es justo por la que se ordena la lista
+ * para saber a qué orden hay que correrle.
+ */
 function totalsOf(order: OrderTableRow) {
-  const ordered = order.lines.reduce(
-    (sum, line) => sum + line.orderedQuantity,
-    0,
-  );
-  const cut = order.lines.reduce((sum, line) => sum + line.cutQuantity, 0);
-
-  return { ordered, cut, ...cutProgress(ordered, cut) };
+  return cutTotals(order.lines);
 }
 
 /** Qué porcentaje del pedido ya se cortó. Se topa en 100 aunque sobre. */
@@ -364,21 +365,30 @@ function DueDate({ order }: { order: OrderTableRow }) {
 }
 
 /**
- * Lo que falta por cortar, o lo que sobró.
+ * Lo que falta por cortar, y lo que sobró.
  *
- * Si se cortó de más, ese excedente pasa a ser el dato: un cero escondería
- * que sobran piezas, que es justo lo que hay que ir a revisar.
+ * Los dos números pueden existir a la vez —corta en las chicas, pasada en las
+ * grandes— y entonces se pintan los dos, el excedente en pequeño al lado. Sin
+ * nada pendiente, el excedente pasa a ser el dato: un cero escondería que
+ * sobran piezas, que es justo lo que hay que ir a revisar.
  */
 function Pending({ order }: { order: OrderTableRow }) {
   const { pending, surplus } = totalsOf(order);
 
-  if (surplus > 0) {
+  if (pending === 0 && surplus > 0) {
     return (
       <span className="tabular font-bold text-state-remnant">+{surplus}</span>
     );
   }
 
-  return <span className="tabular font-bold">{pending}</span>;
+  return (
+    <span className="tabular flex items-baseline gap-1.5">
+      <span className="font-bold">{pending}</span>
+      {surplus > 0 && (
+        <span className="text-xs text-state-remnant">+{surplus}</span>
+      )}
+    </span>
+  );
 }
 
 /**

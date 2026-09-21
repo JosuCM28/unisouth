@@ -188,6 +188,39 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
     return `${size.cut} de ${size.ordered} · ${rest}`;
   }
 
+  /**
+   * Las tallas que este corte dejaría POR ENCIMA de lo pedido.
+   *
+   * Existe porque la captura por bultos multiplica: "69 piezas por bulto × 2
+   * bultos" son 138, y sobre una talla a la que le faltaban 71 eso son 67 de
+   * más sin que nada lo diga. El diálogo de UNA talla ya avisaba de esto; el
+   * de la tanda —que es la captura normal— no, y ahí es donde entran los
+   * números que después nadie entiende en la ficha de la orden.
+   *
+   * Avisa, NO bloquea: cortar de más pasa de verdad, y obligar a falsear el
+   * número para poder guardar es peor que registrarlo.
+   */
+  const overshooting = sizes.flatMap((size) => {
+    const typed = sumBundlePieces(
+      captured.filter((row) => row.value === size.lineId),
+    );
+    if (typed <= 0) return [];
+
+    // Guardar REEMPLAZA lo de este corte: la base es lo que dieron los OTROS.
+    const total = size.cut - alreadyHere(size.lineId) + typed;
+    if (total <= size.ordered) return [];
+
+    return [
+      {
+        lineId: size.lineId,
+        code: size.code,
+        total,
+        ordered: size.ordered,
+        surplus: total - size.ordered,
+      },
+    ];
+  });
+
   function reset() {
     setBatchId(batches[0]?.id ?? NEW_BATCH);
     setNewLabel("");
@@ -345,6 +378,31 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
             {total} piezas · {bundles} {bundles === 1 ? "bulto" : "bultos"} ·{" "}
             {capturedSizes} {capturedSizes === 1 ? "talla" : "tallas"}
           </p>
+        )}
+
+        {/* El último dato antes de guardar, y el que atrapa el error de
+            teclear el TOTAL de la talla en "piezas por bulto". */}
+        {overshooting.length > 0 && (
+          <div className="flex items-start gap-2 border border-state-reserved bg-card p-3 text-sm">
+            <AlertTriangle
+              className="size-4 shrink-0 text-state-reserved"
+              aria-hidden
+            />
+            <div className="flex flex-col gap-1">
+              <span>
+                Con esta captura se rebasa lo pedido. Revisa que la cantidad
+                sea la de CADA bulto y no el total de la talla.
+              </span>
+              <ul className="tabular flex flex-col">
+                {overshooting.map((row) => (
+                  <li key={row.lineId}>
+                    Talla {row.code}: quedaría en {row.total} de {row.ordered}{" "}
+                    · sobran {row.surplus}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
 
         <SubmitButton

@@ -1,4 +1,7 @@
-import type { OrderFolder, Prisma } from "@prisma/client";
+import type { OrderFolder } from "@prisma/client";
+/* Valor y no sólo tipo: `Prisma.join` arma la lista de ids del `IN` del SQL
+   crudo sin concatenar cadenas, que es cómo se cuela una inyección. */
+import { Prisma } from "@prisma/client";
 import {
   BaseRepository,
   type PaginationInput,
@@ -31,6 +34,15 @@ export interface OrderFolderWithTotals extends OrderFolder {
   /** Piezas pedidas y cortadas sumando TODAS sus órdenes. */
   orderedQuantity: number;
   cutQuantity: number;
+  /**
+   * Piezas sin cortar y cortadas de más, sumadas TALLA POR TALLA.
+   *
+   * Viajan calculadas desde la base y no se sacan de "pedidas − cortadas"
+   * porque ese neto miente: el excedente de una talla descuenta el faltante
+   * de otra y la tarjeta enseña un pendiente menor al real.
+   */
+  pendingQuantity: number;
+  surplusQuantity: number;
   /** Órdenes que ya no tienen nada pendiente. */
   completedCount: number;
 }
@@ -100,6 +112,8 @@ export class OrderFolderRepository extends BaseRepository<
         orderCount: folder._count.orders,
         orderedQuantity: total?.ordered ?? 0,
         cutQuantity: total?.cut ?? 0,
+        pendingQuantity: total?.pending ?? 0,
+        surplusQuantity: total?.surplus ?? 0,
         completedCount: total?.completed ?? 0,
       };
     });
@@ -283,64 +297,78 @@ export class OrderFolderRepository extends BaseRepository<
   }
 
   /**
-   * Suma pedido y cortado de cada carpeta en una sola consulta.
+   * Suma pedido, cortado, faltante y excedente de cada carpeta.
    *
-   * Se agrupa por orden y no por carpeta porque el renglón no conoce a la
-   * carpeta: hay que pasar por la orden. Se resuelve con dos consultas planas
-   * en vez de un include anidado, que es lo que evita traer las tallas.
+   * Va en SQL crudo por el FALTANTE: `GREATEST(pedidas − cortadas, 0)` tiene
+   * que evaluarse renglón por renglón, que es la única forma de que el
+   * excedente de una talla no descuente el faltante de otra. El `groupBy` de
+   * Prisma sólo sabe sumar columnas enteras, así que con él el pendiente
+   * salía neteado y la tarjeta del pedido decía que falta menos de lo que
+   * falta.
+   *
+   * Sigue devolviendo una fila por ORDEN y no por talla —y ahora en una sola
+   * consulta en vez de dos—: es lo que evita traerse las tallas de cuarenta
+   * pedidos para pintar una lista.
    */
   private async totalsByFolder(folderIds: string[]) {
-    const orders = await this.db.cuttingOrder.findMany({
-      where: { folderId: { in: folderIds }, status: { not: "CANCELLED" } },
-      select: { id: true, folderId: true },
-    });
-
-    if (orders.length === 0) return new Map<string, FolderTotals>();
-
-    const grouped = await this.db.cuttingOrderLine.groupBy({
-      by: ["orderId"],
-      where: { orderId: { in: orders.map((order) => order.id) } },
-      _sum: { orderedQuantity: true, cutQuantity: true },
-    });
-
-    const byOrder = new Map(
-      grouped.map((row) => [
-        row.orderId,
-        {
-          ordered: row._sum.orderedQuantity ?? 0,
-          cut: row._sum.cutQuantity ?? 0,
-        },
-      ]),
-    );
-
     const totals = new Map<string, FolderTotals>();
+    if (folderIds.length === 0) return totals;
 
-    for (const order of orders) {
-      if (!order.folderId) continue;
+    const rows = await this.db.$queryRaw<OrderTotalsRow[]>`
+      SELECT o."folderId"                               AS "folderId",
+             COALESCE(SUM(l."orderedQuantity"), 0)::int AS "ordered",
+             COALESCE(SUM(l."cutQuantity"), 0)::int     AS "cut",
+             COALESCE(
+               SUM(GREATEST(l."orderedQuantity" - l."cutQuantity", 0)), 0
+             )::int                                     AS "pending",
+             COALESCE(
+               SUM(GREATEST(l."cutQuantity" - l."orderedQuantity", 0)), 0
+             )::int                                     AS "surplus"
+      FROM cutting_orders o
+      JOIN cutting_order_lines l ON l."orderId" = o.id
+      WHERE o."folderId" IN (${Prisma.join(folderIds)})
+        AND o.status <> 'CANCELLED'
+      GROUP BY o."folderId", o.id
+    `;
 
-      const current = totals.get(order.folderId) ?? {
+    for (const row of rows) {
+      const current = totals.get(row.folderId) ?? {
         ordered: 0,
         cut: 0,
+        pending: 0,
+        surplus: 0,
         completed: 0,
       };
-      const line = byOrder.get(order.id) ?? { ordered: 0, cut: 0 };
 
-      current.ordered += line.ordered;
-      current.cut += line.cut;
-      /* Una orden sin tallas capturadas no cuenta como terminada: `cut >=
-         ordered` con ambos en cero diría que ya está lista sin haber cortado
-         nada. */
-      if (line.ordered > 0 && line.cut >= line.ordered) current.completed += 1;
+      current.ordered += row.ordered;
+      current.cut += row.cut;
+      current.pending += row.pending;
+      current.surplus += row.surplus;
+      /* Terminada = NINGUNA talla corta. Una orden sin tallas capturadas no
+         cuenta: con todo en cero, `pending === 0` diría que ya está lista sin
+         haber cortado nada. */
+      if (row.ordered > 0 && row.pending === 0) current.completed += 1;
 
-      totals.set(order.folderId, current);
+      totals.set(row.folderId, current);
     }
 
     return totals;
   }
 }
 
+/** Una fila del agregado: los totales de UNA orden, ya con su carpeta. */
+interface OrderTotalsRow {
+  folderId: string;
+  ordered: number;
+  cut: number;
+  pending: number;
+  surplus: number;
+}
+
 interface FolderTotals {
   ordered: number;
   cut: number;
+  pending: number;
+  surplus: number;
   completed: number;
 }

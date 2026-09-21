@@ -7,7 +7,7 @@ import {
 } from "@/lib/repositories/cutting-order-filters";
 import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 import { CUTTING_ORDER_STATUS_LABELS } from "@/lib/constants/labels";
-import { cutProgress, formatDate } from "@/lib/utils";
+import { cutTotals, formatDate } from "@/lib/utils";
 import { PrintSheet, PrintTable } from "@/components/shared/print-sheet";
 
 export const metadata: Metadata = { title: "Órdenes impresas" };
@@ -49,9 +49,10 @@ export default async function PrintOrdersPage({ searchParams }: PageProps) {
   });
 
   const rows = orders.map((order) => {
-    const ordered = order.lines.reduce((sum, l) => sum + l.orderedQuantity, 0);
-    const cut = order.lines.reduce((sum, l) => sum + l.cutQuantity, 0);
-    const { pending, surplus } = cutProgress(ordered, cut);
+    /* Talla por talla, igual que la hoja de UNA orden: si el neto mandara,
+       esta lista diría "faltan 834" donde la hoja de esa misma orden dice
+       "faltan 902 · sobran 68", y las dos se imprimen para la misma junta. */
+    const { ordered, cut, pending, surplus } = cutTotals(order.lines);
 
     return [
       order.code,
@@ -63,7 +64,9 @@ export default async function PrintOrdersPage({ searchParams }: PageProps) {
       order.dueDate ? formatDate(order.dueDate) : "—",
       ordered,
       cut,
-      pending || (surplus ? `+${surplus}` : 0),
+      /* Los dos cuando hay de los dos: "902 (+68)". Enseñar sólo uno deja
+         fuera de la hoja piezas que ya se cortaron o que faltan por cortar. */
+      pendingCell(pending, surplus),
     ];
   });
 
@@ -105,4 +108,18 @@ export default async function PrintOrdersPage({ searchParams }: PageProps) {
       />
     </PrintSheet>
   );
+}
+
+/**
+ * La celda de "Faltan" de una orden.
+ *
+ * Una orden puede ir corta en unas tallas y pasada en otras a la vez, así que
+ * el excedente va ENTRE PARÉNTESIS junto al faltante en vez de reemplazarlo:
+ * en la hoja impresa no hay dónde picar para ver el desglose, y un solo
+ * número tendría que ser el neto, que es justo el que miente.
+ */
+function pendingCell(pending: number, surplus: number): string | number {
+  if (pending > 0 && surplus > 0) return `${pending} (+${surplus})`;
+  if (surplus > 0) return `+${surplus}`;
+  return pending;
 }

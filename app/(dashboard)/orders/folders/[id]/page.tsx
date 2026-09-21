@@ -8,7 +8,7 @@ import { OrderFolderRepository } from "@/lib/repositories/order-folder.repositor
 import { prisma } from "@/lib/prisma";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import { buildFolderSendPreview } from "@/lib/folder-send-preview";
-import { cutProgress, formatDate, toDateInputValue } from "@/lib/utils";
+import { cutTotals, formatDate, toDateInputValue } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ExportButton } from "@/components/shared/export-button";
@@ -62,20 +62,16 @@ export default async function OrderFolderPage({ params }: PageProps) {
     ? await buildSendContext(repository, id)
     : null;
 
-  const totals = folder.orders
-    .filter((order) => order.status !== "CANCELLED")
-    .reduce(
-      (sum, order) => {
-        for (const line of order.lines) {
-          sum.ordered += line.orderedQuantity;
-          sum.cut += line.cutQuantity;
-        }
-        return sum;
-      },
-      { ordered: 0, cut: 0 },
-    );
-
-  const { pending, surplus } = cutProgress(totals.ordered, totals.cut);
+  /* Talla por talla y de TODAS las órdenes vivas del pedido. Netear aquí era
+     el peor sitio para hacerlo: un pedido de veinte órdenes esconde el
+     faltante de una detrás del excedente de otra y el encabezado dice que
+     falta menos de lo que falta. */
+  const totals = cutTotals(
+    folder.orders
+      .filter((order) => order.status !== "CANCELLED")
+      .flatMap((order) => order.lines),
+  );
+  const { pending, surplus } = totals;
   const isArchived = Boolean(folder.archivedAt);
 
   /* El alta de orden entra con el pedido, el cliente y la entrega ya puestos:
@@ -113,11 +109,15 @@ export default async function OrderFolderPage({ params }: PageProps) {
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <Total label="Pedidas" value={totals.ordered} />
           <Total label="Cortadas" value={totals.cut} />
-          <Total
-            label={surplus > 0 ? "Sobran" : "Faltan"}
-            value={surplus > 0 ? surplus : pending}
-            highlight={surplus > 0}
-          />
+          {/* Los dos, cuando los dos existen: el excedente de una talla no
+              cancela el faltante de otra y el pedido se cierra con las dos
+              cosas por resolver. */}
+          {(pending > 0 || surplus === 0) && (
+            <Total label="Faltan" value={pending} />
+          )}
+          {surplus > 0 && (
+            <Total label="Sobran" value={surplus} highlight />
+          )}
           <Total
             label={folder.orders.length === 1 ? "Orden" : "Órdenes"}
             value={folder.orders.length}

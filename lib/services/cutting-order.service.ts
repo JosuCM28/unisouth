@@ -6,6 +6,7 @@ import type {
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
+import { cutTotals } from "@/lib/utils";
 import {
   toCutLines,
   type CutLineDraft,
@@ -42,6 +43,25 @@ const ORDER_SERIES: Record<
 
 /** La transacción que reparte `BaseService`. */
 type Tx = Parameters<Parameters<BaseService["transaction"]>[0]>[0];
+
+/**
+ * En qué estado deja a la orden lo que lleva capturado.
+ *
+ * "Terminada" es que NINGUNA talla quede corta, y por eso mira `pending` —que
+ * se suma talla por talla— y no el neto `cortadas >= pedidas`. Con el neto,
+ * cortar de más en una talla tapaba el faltante de otra: una orden con 780
+ * piezas de sobra en las grandes y 585 sin cortar en las chicas se marcaba
+ * COMPLETED, se cerraba con fecha y desaparecía del pendiente del tablero. El
+ * neto contesta "cuánta tela se gastó"; nunca contesta "¿ya está?".
+ *
+ * Función suelta y no una ternaria anidada dentro de `syncStatus`: son tres
+ * salidas con nombre y se leen mejor una debajo de otra.
+ */
+function statusFromProgress(cut: number, pending: number) {
+  if (cut === 0) return "OPEN";
+  if (pending === 0) return "COMPLETED";
+  return "IN_PROGRESS";
+}
 
 /**
  * Órdenes de corte: qué pidió el cliente y cómo va el corte.
@@ -1130,11 +1150,8 @@ export class CuttingOrderService extends BaseService {
       select: { orderedQuantity: true, cutQuantity: true },
     });
 
-    const ordered = lines.reduce((sum, l) => sum + l.orderedQuantity, 0);
-    const cut = lines.reduce((sum, l) => sum + l.cutQuantity, 0);
-
-    const status =
-      cut === 0 ? "OPEN" : cut >= ordered ? "COMPLETED" : "IN_PROGRESS";
+    const { cut, pending } = cutTotals(lines);
+    const status = statusFromProgress(cut, pending);
 
     await tx.cuttingOrder.update({
       where: { id: orderId },
