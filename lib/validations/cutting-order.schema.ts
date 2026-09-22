@@ -143,6 +143,10 @@ export const cuttingProgressSchema = z.object({
     .number({ message: "Escribe cuántas piezas se cortaron" })
     .int("Las piezas se cuentan enteras")
     .refine((value) => value !== 0, "El avance no puede ser cero"),
+  /* El foleo del bulto, igual que en la captura por tanda. Opcional: un
+     avance suelto puede ser una corrección de conteo, que no trae papelito
+     ninguno. Sin él, el vale se cae al foleo del renglón de la orden. */
+  tagId: optionalCuid,
   notes: optionalText,
 });
 

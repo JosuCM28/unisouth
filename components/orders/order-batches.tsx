@@ -11,6 +11,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CutTagChip, SizeNote, type SizeAnnotation } from "./size-note";
+import type { CutTagChoice } from "./size-bundle-rows";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 import {
   OrderShipmentDialog,
@@ -88,6 +89,7 @@ export function OrderBatches({
   shippableSizes = [],
   workshops = [],
   stages = [],
+  tags = [],
 }: {
   batches: BatchView[];
   orderId: string;
@@ -104,6 +106,8 @@ export function OrderBatches({
   /* Lo que necesita el diálogo de taller para poder abrirse desde el corte:
      las tallas de la orden con lo ya mandado a cada etapa, y los catálogos. */
   shippableSizes?: ShippableSize[];
+  /** Los foleos vigentes: los pide el diálogo de taller que abre desde aquí. */
+  tags?: CutTagChoice[];
   workshops?: { id: string; name: string }[];
   stages?: { id: string; name: string }[];
 }) {
@@ -144,6 +148,9 @@ export function OrderBatches({
             sizeId: entry.sizeId,
             quantity: entry.quantity,
             bundles: entry.bundles,
+            // El foleo viaja con el bulto: el vale del taller se imprime de
+            // estos renglones y tiene que decir el color que va en el camión.
+            tagId: entry.tagId,
           }));
 
         const canShip =
@@ -304,6 +311,7 @@ export function OrderBatches({
                     orderId={orderId}
                     orderCode={orderCode}
                     sizes={shippableSizes}
+                    tags={tags}
                     workshops={workshops}
                     stages={stages}
                     batch={{

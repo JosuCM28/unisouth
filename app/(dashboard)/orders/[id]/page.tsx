@@ -188,7 +188,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
         document: { select: { id: true, code: true, status: true } },
         lines: {
           orderBy: { position: "asc" },
-          include: { size: { select: { code: true } } },
+          include: {
+            size: { select: { code: true } },
+            // El foleo del bulto que salió: se coteja contra el papelito.
+            cutTag: { select: { name: true, color: true } },
+          },
         },
       },
     }),
@@ -291,6 +295,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       sizeCode: line.size.code,
       sentQuantity: line.sentQuantity,
       bundles: line.bundles,
+      tag: line.cutTag,
       returnedQuantity: line.returnedQuantity,
       scrapQuantity: line.scrapQuantity,
     })),
@@ -586,6 +591,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   sizes={shippableSizes}
                   workshops={workshops}
                   stages={stages}
+                  tags={cutTags}
                 />
               )}
               {canEdit && (
@@ -843,6 +849,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     ordered={line.orderedQuantity}
                     cut={line.cutQuantity}
                     batches={batchOptions}
+                    tags={cutTags}
+                    suggestedTagId={line.tagId}
                     trigger={
                       <Button
                         variant="outline"
@@ -957,6 +965,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           shippableSizes={shippableSizes}
           workshops={workshops}
           stages={stages}
+          tags={cutTags}
         />
       </section>
     </div>

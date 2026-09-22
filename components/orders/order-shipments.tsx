@@ -14,6 +14,7 @@ import {
 } from "@/lib/constants/labels";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
+import { CutTagChip } from "./size-note";
 import { ShipmentDeleteButton } from "./shipment-delete-button";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -28,6 +29,8 @@ export interface ShipmentLineView {
   /** Piezas POR BULTO: lo que salió es `sentQuantity * bundles`. */
   sentQuantity: number;
   bundles: number;
+  /** El foleo con el que salió el bulto, si llevaba uno. */
+  tag: { name: string; color: string } | null;
   returnedQuantity: number;
   scrapQuantity: number;
 }
@@ -162,7 +165,12 @@ export function OrderShipments({
                   key={line.id}
                   className="flex items-center justify-between gap-3 border-t border-border pt-1 text-sm"
                 >
-                  <span className="tabular font-medium">{line.sizeCode}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="tabular font-medium">{line.sizeCode}</span>
+                    {/* Al lado de la talla y no al final: es lo que se coteja
+                        contra el papelito del bulto al bajarlo del camión. */}
+                    {line.tag && <CutTagChip tag={line.tag} className="text-xs" />}
+                  </span>
 
                   {/* Sin retornos sólo se dice qué salió, que es el caso
                       normal. Las otras cifras aparecen únicamente cuando

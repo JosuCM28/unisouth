@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   cuidSchema,
   localDate,
+  optionalCuid,
   optionalText,
   requiredText,
 } from "./common";
@@ -28,6 +29,11 @@ export const garmentShipmentLineSchema = z.object({
     .int("Los bultos se cuentan enteros")
     .positive("Al menos un bulto")
     .default(1),
+  /* El foleo del bulto que se sube al camión. Opcional, igual que en la
+     captura del corte: hay envíos que salen sin papelito. Viene copiado del
+     corte del que salió y se puede cambiar, porque un bulto se puede volver
+     a amarrar al cargarlo. */
+  tagId: optionalCuid,
   notes: optionalText,
 });
 

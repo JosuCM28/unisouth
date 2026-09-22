@@ -10,6 +10,7 @@ import { runAction } from "@/lib/offline/run-action";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SearchSelect } from "@/components/shared/search-select";
 import type { BatchOption } from "./order-batch-dialog";
+import type { CutTagChoice } from "./size-bundle-rows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,10 @@ interface Props {
   cut: number;
   /** Los cortes abiertos de la orden, del más nuevo al más viejo. */
   batches: BatchOption[];
+  /** Los foleos vigentes del catálogo. Se administran en /cut-tags. */
+  tags: CutTagChoice[];
+  /** El foleo que la orden sugiere para esta talla, si trae uno. */
+  suggestedTagId: string | null;
   trigger: ReactNode;
 }
 
@@ -43,12 +48,19 @@ export function OrderProgressDialog({
   ordered,
   cut,
   batches,
+  tags,
+  suggestedTagId,
   trigger,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState(batches[0]?.id ?? "");
   const [quantity, setQuantity] = useState("");
+  /* Abre con el foleo que la orden le puso a la talla, si le puso alguno: es
+     la sugerencia, y quien captura la cambia si en la mesa se amarró otro
+     papelito. Vacío es "sin foleo" y es un estado normal —una corrección de
+     conteo no trae color—, así que no se exige para guardar. */
+  const [tagId, setTagId] = useState(suggestedTagId ?? "");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -71,6 +83,7 @@ export function OrderProgressDialog({
       lineId,
       batchId,
       quantity: typed,
+      tagId: tagId || undefined,
       notes: notes || undefined,
     }));
     setIsSaving(false);
@@ -83,6 +96,7 @@ export function OrderProgressDialog({
     toast.success(`Talla ${sizeCode}: ${typed > 0 ? "+" : ""}${typed} piezas`);
     setOpen(false);
     setQuantity("");
+    setTagId(suggestedTagId ?? "");
     setNotes("");
     router.refresh();
   }
@@ -92,6 +106,7 @@ export function OrderProgressDialog({
     if (!next) {
       setBatchId(batches[0]?.id ?? "");
       setQuantity("");
+      setTagId(suggestedTagId ?? "");
       setNotes("");
     }
   }
@@ -150,6 +165,37 @@ export function OrderProgressDialog({
             pedidas: sobran {cut + typed - ordered}.
           </p>
         )}
+
+        {/* El foleo del bulto. Igual de opcional que en la captura por tanda:
+            si no se pone, el vale se cae al color del renglón de la orden. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="progress-tag">Foleo</Label>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <SearchSelect
+                id="progress-tag"
+                options={tags.map((tag) => ({
+                  value: tag.id,
+                  label: tag.name,
+                }))}
+                value={tagId}
+                onChange={setTagId}
+                placeholder="Sin foleo"
+                searchPlaceholder="Buscar color…"
+                clearLabel="Sin foleo"
+              />
+            </div>
+            {tags.find((tag) => tag.id === tagId) && (
+              <span
+                className="size-9 shrink-0 border border-border"
+                style={{
+                  backgroundColor: tags.find((tag) => tag.id === tagId)?.color,
+                }}
+                aria-hidden
+              />
+            )}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="progress-notes">Notas</Label>

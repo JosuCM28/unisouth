@@ -940,9 +940,10 @@ model CutTagOption {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  cutLines          DocumentCutLine[]
-  cuttingOrderLines CuttingOrderLine[]
-  cuttingProgress   CuttingProgress[]
+  cutLines             DocumentCutLine[]
+  cuttingOrderLines    CuttingOrderLine[]
+  cuttingProgress      CuttingProgress[]
+  garmentShipmentLines GarmentShipmentLine[]
 
   @@index([active, order])
   @@map("cut_tag_options")
@@ -2307,6 +2308,17 @@ model GarmentShipmentLine {
   /// Bundles tied with this exact count. The same size travels twice —30 in
   /// one bundle, 20 in another— and each is its own row.
   bundles      Int @default(1)
+
+  /// The tag tied to THIS bundle, carried over from the capture it came out
+  /// of and changeable on the way out.
+  ///
+  /// It has to live here and not be read back from the cut: the workshop
+  /// voucher is printed from these rows, and a bundle can be re-tied with a
+  /// different colour when it is loaded. Without the column the paper the
+  /// workshop signs would be the only document in the chain with no colour on
+  /// it.
+  tagId  String?
+  cutTag CutTagOption? @relation(fields: [tagId], references: [id])
 
   /// Live counters. ONLY written in the same transaction as the GarmentReturn
   /// that justifies them, exactly like Lot.currentQuantity and its Movement.

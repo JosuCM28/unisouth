@@ -16,6 +16,7 @@ import {
   emptyRow,
   SizeBundleRows,
   usableRows,
+  type CutTagChoice,
   type SizeBundleRow,
 } from "@/components/orders/size-bundle-rows";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,8 @@ export interface ShipmentPrefillRow {
   /** Piezas POR BULTO, igual que en la captura del corte. */
   quantity: number;
   bundles: number;
+  /** El foleo con el que se amarró en la mesa, para copiarlo tal cual. */
+  tagId: string | null;
 }
 
 /** El corte del que se copian los bultos. */
@@ -62,6 +65,8 @@ interface Props {
   sizes: ShippableSize[];
   workshops: { id: string; name: string }[];
   stages: { id: string; name: string }[];
+  /** Los foleos vigentes del catálogo. Se administran en /cut-tags. */
+  tags: CutTagChoice[];
   /**
    * Los bultos de un corte, precargados.
    *
@@ -93,11 +98,11 @@ function initialRows(batch?: ShipmentBatchPrefill): SizeBundleRow[] {
     value: row.sizeId,
     quantity: String(row.quantity),
     bundles: String(row.bundles),
-    /* Vacío: aquí no se elige foleo. El color se amarra en la mesa al
-       capturar el corte y el envío manda lo que ese bulto ya trae; volver a
-       preguntarlo sería invitar a que el papel del taller diga un color y el
-       vale de la orden otro. */
-    tagId: "",
+    /* El color con el que salió de la mesa, copiado tal cual. Se puede
+       cambiar —un bulto se vuelve a amarrar al cargarlo— pero arranca en lo
+       que ya trae, que es lo que evita que el papel del taller diga un color
+       y el del corte otro. */
+    tagId: row.tagId ?? "",
   }));
 }
 
@@ -124,6 +129,7 @@ export function OrderShipmentDialog({
   sizes,
   workshops,
   stages,
+  tags,
   batch,
   trigger,
 }: Props) {
@@ -200,6 +206,7 @@ export function OrderShipmentDialog({
           sizeId: row.value,
           sentQuantity: row.quantity,
           bundles: row.bundles,
+          tagId: row.tagId,
         })),
       }),
     );
@@ -325,6 +332,7 @@ export function OrderShipmentDialog({
               tienen corte capturado: el conteo del corte no siempre está al
               día y el camión no espera a que alguien lo teclee. */}
           <SizeBundleRows
+            tags={tags}
             label="Bultos que van"
             options={sizes.map((size) => ({
               value: size.sizeId,

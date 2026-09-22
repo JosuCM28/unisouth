@@ -479,6 +479,9 @@ export class OrderFolderService extends BaseService {
             sizeId: line.sizeId,
             sentQuantity: line.quantity,
             bundles: line.bundles,
+            // El color con el que salió de la mesa: `toCutLines` ya lo
+            // resolvió —el del bulto, o el del renglón si no se capturó—.
+            tagId: line.tagId,
             notes: line.notes,
           })),
         });

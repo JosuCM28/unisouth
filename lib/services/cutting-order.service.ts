@@ -520,6 +520,9 @@ export class CuttingOrderService extends BaseService {
           lineId: input.lineId,
           batchId: batch.id,
           quantity: input.quantity,
+          // El color que se le amarró, si se le amarró alguno: un avance
+          // suelto también sale en el vale y tiene que decir de qué color va.
+          tagId: input.tagId,
           notes: input.notes,
           userId: this.context.userId,
         },

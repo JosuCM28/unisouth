@@ -134,6 +134,7 @@ export class GarmentShipmentService extends BaseService {
               sizeId: line.sizeId,
               sentQuantity: line.sentQuantity,
               bundles: line.bundles,
+              tagId: line.tagId,
               notes: line.notes,
               position: index,
             })),
@@ -212,6 +213,8 @@ export class GarmentShipmentService extends BaseService {
         sizeId: string;
         sentQuantity: number;
         bundles: number;
+        /** El foleo del bulto: se imprime en la tabla de corte del vale. */
+        tagId?: string;
         notes?: string;
       }[];
     },
@@ -257,9 +260,12 @@ export class GarmentShipmentService extends BaseService {
         sizeId: line.sizeId,
         quantity: line.sentQuantity,
         bundles: line.bundles,
-        // El foleo se pone en el vale: al mandar a bordar todavía no se sabe
-        // con qué color va a viajar el bulto.
-        tagId: undefined,
+        /* El foleo que trae amarrado el bulto. Antes salía vacío porque el
+           color sólo existía en el renglón de la orden y al mandar a bordar
+           todavía no se sabía; ahora se amarra al capturar el corte y viaja
+           hasta aquí, así que el papel que firma el taller dice de qué color
+           es lo que está recibiendo. */
+        tagId: line.tagId,
         notes: line.notes,
       })),
       cutDescription: order.description ?? undefined,
