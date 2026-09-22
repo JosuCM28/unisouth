@@ -27,6 +27,15 @@ export interface SizeBundleRow {
   /** Texto, no número: el input vive a medio teclear. */
   quantity: string;
   bundles: string;
+  /** El foleo de ESTE bulto. Cadena vacía = sin foleo. */
+  tagId: string;
+}
+
+/** Un foleo del catálogo, como se ofrece en el renglón. */
+export interface CutTagChoice {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface Props {
@@ -39,11 +48,25 @@ interface Props {
   renderHint?: (value: string) => React.ReactNode;
   /** Nota al pie del bloque. */
   footnote?: React.ReactNode;
+  /**
+   * Los foleos que se pueden amarrar a un bulto.
+   *
+   * Ausente = el bloque no pregunta por color. Lo pide la captura de corte,
+   * que es donde el papelito se amarra de verdad; el envío a taller manda lo
+   * que ya trae capturado y no vuelve a elegirlo.
+   */
+  tags?: CutTagChoice[];
 }
 
 /** Un renglón vacío, listo para teclear. */
-export function emptyRow(): SizeBundleRow {
-  return { key: crypto.randomUUID(), value: "", quantity: "", bundles: "1" };
+export function emptyRow(tagId = ""): SizeBundleRow {
+  return {
+    key: crypto.randomUUID(),
+    value: "",
+    quantity: "",
+    bundles: "1",
+    tagId,
+  };
 }
 
 /**
@@ -63,6 +86,9 @@ export function usableRows(rows: SizeBundleRow[]) {
       value: row.value,
       quantity: Number(row.quantity),
       bundles: row.bundles.trim() === "" ? 1 : Number(row.bundles),
+      // Vacío se manda como `undefined`: en la base es "sin foleo", no una
+      // cadena vacía que después nadie sabe si es un color sin nombre.
+      tagId: row.tagId === "" ? undefined : row.tagId,
     }))
     .filter(
       (row) =>
@@ -95,6 +121,7 @@ export function SizeBundleRows({
   label,
   renderHint,
   footnote,
+  tags,
 }: Props) {
   function updateRow(key: string, patch: Partial<SizeBundleRow>) {
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -122,6 +149,7 @@ export function SizeBundleRows({
 
   // La anotación del renglón elegido, para pintarla dentro de su tarjeta.
   const byValue = new Map(options.map((option) => [option.value, option]));
+  const tagById = new Map((tags ?? []).map((tag) => [tag.id, tag]));
 
   return (
     <div className="flex flex-col gap-2">
@@ -173,6 +201,41 @@ export function SizeBundleRows({
                   a su renglón: es la instrucción que hay que tener enfrente
                   justo antes de teclear cuántas salieron. */}
               <SizeNote note={option?.note} tag={option?.tag} />
+
+              {/* El foleo va ARRIBA de las cantidades y no al lado: en el
+                  celular una tercera columna dejaba los tres campos
+                  demasiado angostos para teclear con el pulgar, y el color
+                  se elige una vez mientras los números se corrigen varias. */}
+              {tags && (
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SearchSelect
+                      options={tags.map((tag) => ({
+                        value: tag.id,
+                        label: tag.name,
+                      }))}
+                      value={row.tagId}
+                      onChange={(value) =>
+                        updateRow(row.key, { tagId: value })
+                      }
+                      placeholder="Sin foleo"
+                      searchPlaceholder="Buscar color…"
+                      clearLabel="Sin foleo"
+                    />
+                  </div>
+                  {/* El cuadrito del color al lado del nombre: el papelito se
+                      reconoce por el color, no por leer "Naranja". */}
+                  {tagById.get(row.tagId) && (
+                    <span
+                      className="size-6 shrink-0 border border-border"
+                      style={{
+                        backgroundColor: tagById.get(row.tagId)?.color,
+                      }}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">

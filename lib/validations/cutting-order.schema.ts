@@ -208,6 +208,12 @@ export const batchProgressSchema = z.object({
           .int("Los bultos se cuentan enteros")
           .positive("Al menos un bulto")
           .default(1),
+        /* El foleo QUE SE LE AMARRÓ A ESTE BULTO. Opcional: el color se sabe
+           en la mesa y hay cortes que salen sin papelito. Va por renglón y no
+           por corte porque de un mismo tendido pueden salir bultos de dos
+           colores, y un solo campo arriba obligaría a abrir dos cortes para
+           algo que en la mesa fue uno. */
+        tagId: optionalCuid,
       }),
     )
     .transform((lines) => lines.filter((line) => line.quantity !== 0))

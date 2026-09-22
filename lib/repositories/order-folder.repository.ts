@@ -230,7 +230,15 @@ export class OrderFolderRepository extends BaseRepository<
             label: true,
             entries: {
               orderBy: { createdAt: "asc" },
-              select: { lineId: true, quantity: true, bundles: true },
+              /* Con su foleo: el vale global del pedido arma los mismos
+                 renglones que el de una orden suelta, y sin el color aquí el
+                 papel saldría distinto según por dónde se mandara. */
+              select: {
+                lineId: true,
+                quantity: true,
+                bundles: true,
+                tagId: true,
+              },
             },
             /* Los dos caminos por los que un corte ya pudo salir: su propio
                vale y el vale global de un pedido. Se preguntan juntos porque

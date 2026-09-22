@@ -10,6 +10,31 @@ export interface SizeAnnotation {
 }
 
 /**
+ * El papelito del foleo: el color con su nombre encima.
+ *
+ * Se saca de `SizeNote` porque ahora se pinta también suelto —un bulto puede
+ * llevar su propio foleo, y una talla con bultos de dos colores enseña los
+ * dos— y tener el chip escrito en dos lados es cómo acaban siendo dos chips
+ * distintos.
+ */
+export function CutTagChip({
+  tag,
+  className,
+}: {
+  tag: { name: string; color: string };
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn("shrink-0 px-1 py-0.5 leading-tight", className)}
+      style={{ backgroundColor: tag.color, color: contrastText(tag.color) }}
+    >
+      {tag.name}
+    </span>
+  );
+}
+
+/**
  * La anotación de una talla, en chiquito y al lado de su número.
  *
  * Existe porque la instrucción del renglón —"va sin bolsa", la etiqueta
@@ -36,14 +61,7 @@ export function SizeNote({
         className,
       )}
     >
-      {tag && (
-        <span
-          className="shrink-0 px-1 py-0.5 leading-tight"
-          style={{ backgroundColor: tag.color, color: contrastText(tag.color) }}
-        >
-          {tag.name}
-        </span>
-      )}
+      {tag && <CutTagChip tag={tag} />}
 
       {note && (
         <>

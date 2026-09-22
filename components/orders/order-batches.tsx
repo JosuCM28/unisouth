@@ -10,7 +10,7 @@ import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { SizeNote, type SizeAnnotation } from "./size-note";
+import { CutTagChip, SizeNote, type SizeAnnotation } from "./size-note";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
 import {
   OrderShipmentDialog,
@@ -29,6 +29,14 @@ export interface BatchEntryView extends SizeAnnotation {
   /** Piezas POR BULTO: lo que vale la captura es `quantity * bundles`. */
   quantity: number;
   bundles: number;
+  /**
+   * El foleo AMARRADO a este bulto, por id.
+   *
+   * Aparte de `tag` —que es el chip ya resuelto para pintar— porque el
+   * diálogo de captura vuelve a abrir con lo guardado y necesita el id para
+   * dejarlo elegido en el selector.
+   */
+  tagId: string | null;
   createdAt: Date;
   userName: string | null;
   notes: string | null;
@@ -203,11 +211,18 @@ export function OrderBatches({
                   >
                     <span className="flex min-w-0 flex-col gap-0.5">
                       <span className="tabular">Talla {row.sizeCode}</span>
+                      {row.tags.length > 0 && (
+                        <span className="flex flex-wrap items-center gap-1 text-xs">
+                          {row.tags.map((tag) => (
+                            <CutTagChip key={tag.name} tag={tag} />
+                          ))}
+                        </span>
+                      )}
                       {/* La anotación con la que se levantó la orden, también
                           en el corte ya guardado: al revisar lo capturado se
                           quiere saber qué llevaba esa talla sin subir a la
                           sección de Tallas. */}
-                      <SizeNote note={row.note} tag={row.tag} />
+                      <SizeNote note={row.note} />
                     </span>
                     <span className="tabular flex shrink-0 items-baseline gap-2">
                       {/* Los bultos sólo cuando son más de uno: con uno solo
@@ -244,6 +259,11 @@ export function OrderBatches({
                   {batch.entries.map((entry) => (
                     <li key={entry.id} className="tabular">
                       Talla {entry.sizeCode}
+                      {/* El foleo DE ESTE bulto: arriba se leen juntos y aquí
+                          es donde se ve cuál cayó en cuál. */}
+                      {entry.tag && (
+                        <CutTagChip tag={entry.tag} className="mx-1 inline-block" />
+                      )}
                       {/* La anotación del renglón, aquí sí una por captura:
                           es lo que desempata dos bultos de la misma talla que
                           arriba se leen sumados. */}
@@ -371,6 +391,22 @@ function IssueChip({
   );
 }
 
+/**
+ * Los foleos distintos de un puñado de capturas, sin repetir.
+ *
+ * Por nombre y no por id: la vista ya recibe el chip resuelto, y dos capturas
+ * del mismo color tienen que pintar un solo papelito.
+ */
+function distinctTags(rows: BatchEntryView[]) {
+  const byName = new Map<string, { name: string; color: string }>();
+
+  for (const row of rows) {
+    if (row.tag) byName.set(row.tag.name, row.tag);
+  }
+
+  return [...byName.values()];
+}
+
 /** Suma las capturas de una misma talla dentro del corte. */
 function groupBySize(entries: BatchEntryView[]) {
   const totals = new Map<string, BatchEntryView[]>();
@@ -389,7 +425,11 @@ function groupBySize(entries: BatchEntryView[]) {
          volvería ilegible justo lo que se quería leer de un vistazo: el
          desglose completo sigue en "Ver las capturas". */
       note: rows.find((row) => row.note)?.note ?? null,
-      tag: rows.find((row) => row.tag)?.tag ?? null,
+      /* Los foleos, en plural y TODOS: de una misma talla pueden salir un
+         bulto azul y otro verde en el mismo tendido, y enseñar sólo el
+         primero haría creer que el corte entero es de un color. Es justo el
+         dato que hay que ver antes de mandarlo al taller. */
+      tags: distinctTags(rows),
     }))
     .sort((a, b) => a.sizeCode.localeCompare(b.sizeCode, "es", { numeric: true }));
 }

@@ -28,6 +28,8 @@ export interface CutEntry {
   lineId: string;
   quantity: number;
   bundles: number;
+  /** El foleo que se le amarró a ESTE bulto, si se capturó uno. */
+  tagId?: string | null;
 }
 
 /**
@@ -74,15 +76,28 @@ export function toCutLines(
        va a entregar —el bulto de 30 ya no lleva 30— y el vale se firma contra
        bultos de verdad. Entonces va el neto en un solo renglón y el auxiliar
        anota los bultos al empacar. Sin correcciones, que es el caso normal,
-       cada bulto viaja como su propio renglón. */
-    const cutRows =
-      sumBundlePieces(captured) === net ? captured : [{ quantity: net, bundles: 1 }];
+       cada bulto viaja como su propio renglón.
+
+       Ese renglón único se queda con el foleo del PRIMER bulto positivo: lo
+       que se corrigió salió del mismo tendido y lleva el mismo papelito. */
+    const cutRows: Array<{
+      quantity: number;
+      bundles: number;
+      tagId?: string | null;
+    }> =
+      sumBundlePieces(captured) === net
+        ? captured
+        : [{ quantity: net, bundles: 1, tagId: captured[0]?.tagId ?? null }];
 
     return cutRows.map((row) => ({
       sizeId: line.sizeId,
       quantity: row.quantity,
       bundles: row.bundles,
-      tagId: line.tagId ?? undefined,
+      /* El foleo del BULTO manda sobre el del renglón de la orden. El vale se
+         firma contra los bultos que van en el camión, así que tiene que decir
+         el color que traen amarrado; el del renglón queda como el sugerido
+         para quien captura, y como respaldo si en la mesa no se puso ninguno. */
+      tagId: row.tagId ?? line.tagId ?? undefined,
       notes: line.notes ?? undefined,
     }));
   });

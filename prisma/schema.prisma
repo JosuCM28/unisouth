@@ -57,34 +57,34 @@ model User {
 
   // ── Traceability: who did what ──
   auditLogs                 AuditLog[]
-  movements                 Movement[]          @relation("MovementUser")
-  lotsCreated               Lot[]               @relation("LotCreatedBy")
-  receiptsRecorded          Receipt[]           @relation("ReceiptRecordedBy")
-  documentsCreated          InventoryDocument[] @relation("DocumentCreatedBy")
-  documentsApplied          InventoryDocument[] @relation("DocumentAppliedBy")
-  documentsCancelled        InventoryDocument[] @relation("DocumentCancelledBy")
-  reservationsCreated       Reservation[]       @relation("ReservationCreatedBy")
-  countsResponsible         Count[]             @relation("CountResponsible")
-  countLinesCounted         CountLine[]         @relation("CountLineCountedBy")
-  billsOfMaterialsCreated   BillOfMaterials[]   @relation("BomCreatedBy")
-  billsOfMaterialsApproved  BillOfMaterials[]   @relation("BomApprovedBy")
-  calculationsCreated       Calculation[]       @relation("CalculationCreatedBy")
-  productionOrdersCreated   ProductionOrder[]   @relation("ProductionOrderCreatedBy")
-  purchaseRequestsRequested PurchaseRequest[]   @relation("PurchaseRequestRequestedBy")
-  purchaseRequestsApproved  PurchaseRequest[]   @relation("PurchaseRequestApprovedBy")
-  cuttingOrders             CuttingOrder[]      @relation("CuttingOrderCreatedBy")
+  movements                 Movement[]            @relation("MovementUser")
+  lotsCreated               Lot[]                 @relation("LotCreatedBy")
+  receiptsRecorded          Receipt[]             @relation("ReceiptRecordedBy")
+  documentsCreated          InventoryDocument[]   @relation("DocumentCreatedBy")
+  documentsApplied          InventoryDocument[]   @relation("DocumentAppliedBy")
+  documentsCancelled        InventoryDocument[]   @relation("DocumentCancelledBy")
+  reservationsCreated       Reservation[]         @relation("ReservationCreatedBy")
+  countsResponsible         Count[]               @relation("CountResponsible")
+  countLinesCounted         CountLine[]           @relation("CountLineCountedBy")
+  billsOfMaterialsCreated   BillOfMaterials[]     @relation("BomCreatedBy")
+  billsOfMaterialsApproved  BillOfMaterials[]     @relation("BomApprovedBy")
+  calculationsCreated       Calculation[]         @relation("CalculationCreatedBy")
+  productionOrdersCreated   ProductionOrder[]     @relation("ProductionOrderCreatedBy")
+  purchaseRequestsRequested PurchaseRequest[]     @relation("PurchaseRequestRequestedBy")
+  purchaseRequestsApproved  PurchaseRequest[]     @relation("PurchaseRequestApprovedBy")
+  cuttingOrders             CuttingOrder[]        @relation("CuttingOrderCreatedBy")
   /// Las órdenes de la otra planta que este usuario jaló al concentrado.
-  plantOrdersAdded          CuttingOrder[]      @relation("CuttingOrderAddedBy")
-  cuttingProgress           CuttingProgress[]   @relation("CuttingProgressBy")
-  cuttingBatches            CuttingBatch[]      @relation("CuttingBatchOpenedBy")
+  plantOrdersAdded          CuttingOrder[]        @relation("CuttingOrderAddedBy")
+  cuttingProgress           CuttingProgress[]     @relation("CuttingProgressBy")
+  cuttingBatches            CuttingBatch[]        @relation("CuttingBatchOpenedBy")
   orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
-  garmentReturns            GarmentReturn[]     @relation("GarmentReturnBy")
-  garmentShipments          GarmentShipment[]   @relation("GarmentShipmentCreatedBy")
-  garmentFolders            GarmentFolder[]     @relation("GarmentFolderCreatedBy")
-  garmentsCreated           Garment[]           @relation("GarmentCreatedBy")
-  garmentPhotos             GarmentPhoto[]      @relation("GarmentPhotoCreatedBy")
-  attachments               Attachment[]        @relation("AttachmentUploadedBy")
-  orderFolders              OrderFolder[]       @relation("OrderFolderCreatedBy")
+  garmentReturns            GarmentReturn[]       @relation("GarmentReturnBy")
+  garmentShipments          GarmentShipment[]     @relation("GarmentShipmentCreatedBy")
+  garmentFolders            GarmentFolder[]       @relation("GarmentFolderCreatedBy")
+  garmentsCreated           Garment[]             @relation("GarmentCreatedBy")
+  garmentPhotos             GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
+  attachments               Attachment[]          @relation("AttachmentUploadedBy")
+  orderFolders              OrderFolder[]         @relation("OrderFolderCreatedBy")
 
   @@index([active, role])
   @@map("user")
@@ -942,6 +942,7 @@ model CutTagOption {
 
   cutLines          DocumentCutLine[]
   cuttingOrderLines CuttingOrderLine[]
+  cuttingProgress   CuttingProgress[]
 
   @@index([active, order])
   @@map("cut_tag_options")
@@ -1679,15 +1680,15 @@ model CuttingOrder {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  lines     CuttingOrderLine[]
-  batches   CuttingBatch[]
-  shipments GarmentShipment[]
-  comments  CuttingOrderComment[]
+  lines       CuttingOrderLine[]
+  batches     CuttingBatch[]
+  shipments   GarmentShipment[]
+  comments    CuttingOrderComment[]
   /// Photos of the paper the client handed over. The order's backup.
   attachments Attachment[]
   /// The issue vouchers born from this order. Read to show whether it already
   /// left and whether that delivery is still standing.
-  issues    InventoryDocument[] @relation("DocumentCuttingOrder")
+  issues      InventoryDocument[]   @relation("DocumentCuttingOrder")
 
   @@index([status, orderedAt])
   @@index([clientId])
@@ -1729,10 +1730,10 @@ model CuttingBatch {
 
   createdAt DateTime @default(now())
 
-  entries CuttingProgress[]
+  entries      CuttingProgress[]
   /// The issue vouchers for THIS cutting run. More than one only after
   /// cancelling: a live voucher blocks sending the run again.
-  issues  InventoryDocument[] @relation("DocumentCuttingBatch")
+  issues       InventoryDocument[] @relation("DocumentCuttingBatch")
   /// The folder-wide vouchers that took this run along with other orders'.
   /// Read by the same lock as `issues`: a live one here blocks it just the
   /// same, because the garments already left on that paper.
@@ -1829,8 +1830,21 @@ model CuttingProgress {
   /// 20— and each one is its own row. Collapsing them into a single number
   /// would force the floor to average by hand what the paper sheet never asked
   /// them to.
-  bundles  Int @default(1)
+  bundles  Int     @default(1)
   notes    String?
+
+  /// The tag tied to THIS bundle on the table.
+  ///
+  /// Lives on the capture and not only on the order line because the colour is
+  /// decided when the bundle comes off the lay, not when the order is written:
+  /// plenty of orders are raised with no tag at all and get one at the table.
+  ///
+  /// It WINS over the order line's tag when building the issue voucher. That
+  /// paper is signed against the bundles themselves, so it has to say the
+  /// colour the bundle actually carries; the line's tag stays as the suggested
+  /// default for whoever captures.
+  tagId  String?
+  cutTag CutTagOption? @relation(fields: [tagId], references: [id])
 
   userId String?
   user   User?   @relation("CuttingProgressBy", fields: [userId], references: [id])
@@ -1977,7 +1991,7 @@ model Sequence {
 }
 
 model Attachment {
-  id String @id @default(cuid())
+  id         String         @id @default(cuid())
   /// Where the bytes live, as the storage layer names them ("2026-09/<uuid>.jpg").
   ///
   /// A KEY and not an absolute path: the row must not know which folder the
@@ -2356,7 +2370,7 @@ model CuttingOrderComment {
   body String
 
   createdById String?
-  createdBy   User?   @relation("CuttingOrderCommentBy", fields: [createdById], references: [id])
+  createdBy   User?    @relation("CuttingOrderCommentBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
   /// Newest first is how they are read, and the index serves that order.
@@ -2412,7 +2426,7 @@ model Garment {
   folderId String
   folder   GarmentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
-  name String
+  name      String
   /// The client's own name or code for it, when it differs from ours.
   reference String?
   notes     String?

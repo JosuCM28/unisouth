@@ -629,6 +629,9 @@ export class CuttingOrderService extends BaseService {
             batchId: batch.id,
             quantity: entry.quantity,
             bundles: entry.bundles,
+            // El color que se le amarró a este bulto. Sin él, el vale se cae
+            // al foleo del renglón de la orden, que es sólo el sugerido.
+            tagId: entry.tagId,
             notes: input.notes,
             userId: this.context.userId,
           },
@@ -1130,7 +1133,9 @@ export class CuttingOrderService extends BaseService {
     const entries = await tx.cuttingProgress.findMany({
       where: { batchId },
       orderBy: { createdAt: "asc" },
-      select: { lineId: true, quantity: true, bundles: true },
+      // El foleo del bulto viaja al vale: es el papelito que va amarrado a lo
+      // que el taller recibe y firma.
+      select: { lineId: true, quantity: true, bundles: true, tagId: true },
     });
 
     /* La regla vive en `lib/cut-lines` y no aquí porque la salida global de un

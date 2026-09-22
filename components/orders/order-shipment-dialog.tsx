@@ -93,6 +93,11 @@ function initialRows(batch?: ShipmentBatchPrefill): SizeBundleRow[] {
     value: row.sizeId,
     quantity: String(row.quantity),
     bundles: String(row.bundles),
+    /* Vacío: aquí no se elige foleo. El color se amarra en la mesa al
+       capturar el corte y el envío manda lo que ese bulto ya trae; volver a
+       preguntarlo sería invitar a que el papel del taller diga un color y el
+       vale de la orden otro. */
+    tagId: "",
   }));
 }
 

@@ -121,7 +121,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
           cutTag: { select: { name: true, color: true } },
           progress: {
             orderBy: { createdAt: "desc" },
-            include: { user: { select: { name: true } } },
+            include: {
+              user: { select: { name: true } },
+              /* El foleo DEL BULTO, que puede no ser el del renglón: el color
+                 se amarra en la mesa y es el que sale en el vale. */
+              cutTag: { select: { name: true, color: true } },
+            },
           },
         },
       },
@@ -163,8 +168,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* El tablero de prendas: cuánto de cada talla está aquí y cuánto anda en
      un taller. Se calcula sumando envíos y retornos, nunca leyendo un campo. */
-  const [balances, shipments, workshops, stages, issues, files, storageReady] =
-    await Promise.all([
+  const [
+    balances,
+    shipments,
+    workshops,
+    stages,
+    cutTags,
+    issues,
+    files,
+    storageReady,
+  ] = await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
       where: { orderId: id },
@@ -188,6 +201,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
       where: { deletedAt: null, active: true },
       select: { id: true, name: true },
       orderBy: [{ position: "asc" }, { name: "asc" }],
+    }),
+    /* Los foleos vigentes: se eligen al capturar el corte. Sólo los activos,
+       igual que en el alta de la orden —un color dado de baja sigue leyéndose
+       en los vales viejos, pero ya no se ofrece para amarrar nada nuevo—. */
+    prisma.cutTagOption.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true, color: true },
+      orderBy: [{ order: "asc" }, { name: "asc" }],
     }),
     /* Las salidas nacidas de esta orden.
 
@@ -346,7 +367,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
         /* La anotación del renglón viaja con cada captura: el corte guardado
            la pinta al lado de su talla para no tener que subir a Tallas. */
         lineNote: line.notes,
-        lineTag: line.cutTag,
+        /* El del BULTO manda; el del renglón queda de respaldo para las
+           capturas viejas, que se guardaron antes de que el color se pudiera
+           amarrar aquí. */
+        lineTag: entry.cutTag ?? line.cutTag,
       })),
     )
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -368,6 +392,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         sizeCode: entry.sizeCode,
         quantity: entry.quantity,
         bundles: entry.bundles,
+        tagId: entry.tagId,
         createdAt: entry.createdAt,
         userName: entry.user?.name ?? null,
         notes: entry.notes,
@@ -432,6 +457,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           lineId: entry.lineId,
           quantity: entry.quantity,
           bundles: entry.bundles,
+          tagId: entry.tagId,
         })),
       issue: live
         ? { code: live.code, isDraft: live.status === "DRAFT" }
@@ -450,6 +476,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
     cut: line.cutQuantity,
     note: line.notes,
     tag: line.cutTag,
+    // El foleo con el que abre el renglón en la captura, si la orden lo trae.
+    tagId: line.tagId,
   }));
 
   return (
@@ -478,6 +506,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   orderId={order.id}
                   batches={batchOptions}
                   sizes={batchSizes}
+                  tags={cutTags}
                 />
               )}
               {/* Imprimir y Excel son lo único que alcanza quien sólo
