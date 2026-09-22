@@ -191,14 +191,16 @@ export function OrderBatchDialog({ orderId, batches, sizes }: Props) {
   /**
    * Las tallas que este corte dejaría POR ENCIMA de lo pedido.
    *
-   * Existe porque la captura por bultos multiplica: "69 piezas por bulto × 2
-   * bultos" son 138, y sobre una talla a la que le faltaban 71 eso son 67 de
-   * más sin que nada lo diga. El diálogo de UNA talla ya avisaba de esto; el
-   * de la tanda —que es la captura normal— no, y ahí es donde entran los
-   * números que después nadie entiende en la ficha de la orden.
+   * La captura por bultos multiplica —"69 por bulto × 2 bultos" son 138—, así
+   * que rebasar lo pedido se hace con dos teclas y sin que nada lo diga. El
+   * diálogo de UNA talla ya avisaba; el de la tanda, que es la captura
+   * normal, no.
    *
-   * Avisa, NO bloquea: cortar de más pasa de verdad, y obligar a falsear el
-   * número para poder guardar es peor que registrarlo.
+   * Avisa, NO bloquea, y no supone que sea un error: cortar de más pasa de
+   * verdad —el tendido sale como sale— y obligar a falsear el número para
+   * poder guardar es peor que registrarlo. Lo que sirve es que quien captura
+   * lo vea ANTES de guardar y decida, en vez de descubrirlo semanas después
+   * en la ficha de la orden.
    */
   const overshooting = sizes.flatMap((size) => {
     const typed = sumBundlePieces(
