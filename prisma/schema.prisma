@@ -2519,3 +2519,33 @@ model GarmentPhoto {
 
   @@map("garment_photos")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  WHATSAPP — a quién le llega el vale al aplicarse
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A phone that receives the issue voucher PDF by WhatsApp.
+///
+/// A table and not an env var because the list changes from week to week —
+/// four people today, five tomorrow— and editing it must not need a deploy.
+///
+/// `active` is the switch for "not for now": the number stays typed in, it
+/// just stops being pre-checked when a voucher is sent. Deleting is physical:
+/// nothing references a contact, and the record of every send lives in
+/// AuditLog with the phone written out.
+model WhatsappContact {
+  id    String @id @default(cuid())
+  /// Who it is, so the send dialog reads "Taller Sitex" and not a number.
+  name  String
+  /// Digits only, with country code ("5212291234567"): the exact form the
+  /// Evolution API expects, so nothing gets reformatted at send time.
+  phone String @unique
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, name])
+  @@map("whatsapp_contacts")
+}

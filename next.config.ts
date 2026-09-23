@@ -70,7 +70,9 @@ const nextConfig: NextConfig = {
   },
 
   // Prisma usa binarios nativos: no debe pasar por el bundler del servidor.
-  serverExternalPackages: ["@prisma/client"],
+  // react-pdf trae sus propias fuentes y un motor de layout que el bundler
+  // rompe al empaquetarlos: se carga de node_modules tal cual.
+  serverExternalPackages: ["@prisma/client", "@react-pdf/renderer"],
 
   // No anunciar la versión del framework: es información gratis para quien
   // busca vulnerabilidades conocidas.

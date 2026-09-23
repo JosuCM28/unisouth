@@ -15,6 +15,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DocumentActions } from "@/components/documents/document-actions";
 import { RuleCard } from "@/components/rules/rule-card";
 import { StandingRuleRepository } from "@/lib/repositories/standing-rule.repository";
+import { WhatsappContactRepository } from "@/lib/repositories/whatsapp-contact.repository";
+import { EvolutionClient } from "@/lib/core/evolution-client";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -66,12 +68,17 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   /* Las reglas del cliente, para poder cotejarlas contra lo que dice el vale.
      Sólo en las salidas: son reglas sobre cómo se corta y se entrega, y en una
      recepción o un traspaso no significan nada. */
-  const rules =
-    document.type === "ISSUE"
-      ? await new StandingRuleRepository().findApplicable(
+  const isIssue = document.type === "ISSUE";
+
+  const [rules, whatsappContacts] = isIssue
+    ? await Promise.all([
+        new StandingRuleRepository().findApplicable(
           document.clientId ?? undefined,
-        )
-      : [];
+        ),
+        // A quién se le puede mandar el vale por WhatsApp al aplicarlo.
+        new WhatsappContactRepository().findAll(),
+      ])
+    : [[], []];
 
   return (
     <div className="flex flex-col gap-4">
@@ -114,7 +121,15 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         status={document.status}
         lineCount={document.lines.length}
         cutLineCount={document.cutLines.length}
-        isIssue={document.type === "ISSUE"}
+        isIssue={isIssue}
+        whatsapp={
+          isIssue
+            ? {
+                configured: EvolutionClient.isConfigured(),
+                contacts: whatsappContacts,
+              }
+            : undefined
+        }
       />
 
       {rules.length > 0 && (

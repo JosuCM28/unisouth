@@ -16,6 +16,12 @@ import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ApplyIssueDialog } from "./apply-issue-dialog";
+import { ResendWhatsappDialog } from "./resend-whatsapp-dialog";
+import {
+  canSendWhatsapp,
+  type VoucherWhatsappOptions,
+} from "./whatsapp-recipients";
 
 interface Props {
   documentId: string;
@@ -26,6 +32,11 @@ interface Props {
   cutLineCount?: number;
   /** Sólo las salidas tienen pantalla de corrección. */
   isIssue?: boolean;
+  /**
+   * Contactos y configuración de WhatsApp. Sólo llega en las salidas: es el
+   * único vale que se manda al taller.
+   */
+  whatsapp?: VoucherWhatsappOptions;
 }
 
 /**
@@ -41,6 +52,7 @@ export function DocumentActions({
   lineCount,
   cutLineCount = 0,
   isIssue,
+  whatsapp,
 }: Props) {
   const router = useRouter();
 
@@ -54,18 +66,29 @@ export function DocumentActions({
   const [reason, setReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
 
-  async function handleApply() {
+  /**
+   * Aplica el vale SIN refrescar la pantalla. Devuelve si se aplicó.
+   *
+   * El refresco va aparte porque, al refrescar, el vale ya aplicado deja de
+   * pintar el diálogo de "Aplicar": si pasara antes del envío por WhatsApp,
+   * el diálogo desaparecería a media entrega sin decir si llegó.
+   */
+  async function applyDocument(): Promise<boolean> {
     setIsApplying(true);
     const result = await runAction(() => applyDocumentAction({ id: documentId }));
     setIsApplying(false);
 
     if (!result.success) {
       toast.error(result.error);
-      return;
+      return false;
     }
 
     toast.success(`${documentCode} aplicado: se movió el inventario`);
-    router.refresh();
+    return true;
+  }
+
+  async function handleApply() {
+    if (await applyDocument()) router.refresh();
   }
 
   /**
@@ -153,7 +176,20 @@ export function DocumentActions({
         </Button>
       )}
 
-      {status === "DRAFT" && (
+      {/* Una salida pregunta si se manda por WhatsApp al aplicarla; los
+          demás vales se aplican con el botón de siempre. */}
+      {status === "DRAFT" && whatsapp && (
+        <ApplyIssueDialog
+          documentId={documentId}
+          documentCode={documentCode}
+          disabled={isApplying || !canApply}
+          whatsapp={whatsapp}
+          onApply={applyDocument}
+          onFinished={() => router.refresh()}
+        />
+      )}
+
+      {status === "DRAFT" && !whatsapp && (
         <Button
           type="button"
           onClick={handleApply}
@@ -163,6 +199,16 @@ export function DocumentActions({
           <Check className="size-4" aria-hidden />
           {isApplying ? "Aplicando…" : "Aplicar"}
         </Button>
+      )}
+
+      {/* Sólo ya aplicada: un borrador todavía puede cambiar y uno cancelado
+          ya no vale. */}
+      {status === "APPLIED" && whatsapp && canSendWhatsapp(whatsapp) && (
+        <ResendWhatsappDialog
+          documentId={documentId}
+          documentCode={documentCode}
+          whatsapp={whatsapp}
+        />
       )}
 
       {status !== "CANCELLED" && (

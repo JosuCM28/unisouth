@@ -486,7 +486,16 @@ DIRECT_URL="postgresql://USUARIO:CLAVE@HOST:5438/unisouthdb"   # para migracione
 BETTER_AUTH_SECRET="..."   # openssl rand -base64 32
 BETTER_AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+EVOLUTION_API_URL="https://evolution.dominio.com"   # WhatsApp, sin diagonal final
+EVOLUTION_API_KEY="..."
+EVOLUTION_INSTANCE="unisouth"   # la instancia donde se vinculó el celular
 ```
+
+Las tres `EVOLUTION_*` son opcionales: sin ellas la app funciona igual y sólo
+deja de ofrecer el envío del vale por WhatsApp. El único archivo que habla con
+Evolution es `lib/core/evolution-client.ts`. El vale se manda **después** de
+aplicarse y nunca dentro de su transacción: aplicar no puede depender de que
+el celular tenga señal.
 
 **Las dos cadenas son la misma hoy** porque el Postgres del VPS se conecta
 directo, sin pooler. `DIRECT_URL` existe aparte de todos modos: un pooler
