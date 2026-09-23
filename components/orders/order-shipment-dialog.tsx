@@ -38,6 +38,13 @@ export interface ShippableSize {
   cut: number;
   /** Lo ya mandado a cada etapa, por id de etapa. */
   sentByStage: Record<string, number>;
+  /**
+   * La anotación que se le escribió a la talla al levantar la orden.
+   *
+   * Se copia al renglón en cuanto se elige la talla, para que salga en el
+   * vale del taller sin volver a teclearla.
+   */
+  note: string | null;
 }
 
 /** Un bulto ya capturado que se copia al abrir el diálogo. */
@@ -48,6 +55,8 @@ export interface ShipmentPrefillRow {
   bundles: number;
   /** El foleo con el que se amarró en la mesa, para copiarlo tal cual. */
   tagId: string | null;
+  /** La anotación del renglón de la orden del que salió el bulto. */
+  note: string | null;
 }
 
 /** El corte del que se copian los bultos. */
@@ -103,6 +112,8 @@ function initialRows(batch?: ShipmentBatchPrefill): SizeBundleRow[] {
        que ya trae, que es lo que evita que el papel del taller diga un color
        y el del corte otro. */
     tagId: row.tagId ?? "",
+    // La anotación de la talla, tal cual se escribió en la orden.
+    note: row.note ?? "",
   }));
 }
 
@@ -207,6 +218,7 @@ export function OrderShipmentDialog({
           sentQuantity: row.quantity,
           bundles: row.bundles,
           tagId: row.tagId,
+          notes: row.note,
         })),
       }),
     );
@@ -333,12 +345,14 @@ export function OrderShipmentDialog({
               día y el camión no espera a que alguien lo teclee. */}
           <SizeBundleRows
             tags={tags}
+            editableNotes
             label="Bultos que van"
             options={sizes.map((size) => ({
               value: size.sizeId,
               code: size.sizeCode,
               hint: size.sizeName,
               keywords: size.sizeName,
+              note: size.note,
             }))}
             rows={rows}
             onChange={setRows}

@@ -199,6 +199,7 @@ export class GarmentShipmentService extends BaseService {
       parts?: string;
       order: {
         code: string;
+        reference: string | null;
         clientId: string | null;
         productionRunId: string | null;
         materialId: string | null;
@@ -245,8 +246,13 @@ export class GarmentShipmentService extends BaseService {
       // Tampoco cuelga de un pedido: el envío es de una orden y ya la trae.
       orderFolderId: undefined,
       concept: order.description ?? undefined,
-      // El folio de la orden, que es contra lo que el taller cotiza y cobra.
-      reference: order.code,
+      /* El número de orden que se escribió al levantarla —el del papel del
+         cliente, el que el taller conoce— y no el folio interno PO-…: en el
+         encabezado del vale el campo se lee "Orden", y un folio que nadie
+         fuera de este sistema reconoce no le dice al taller de qué pedido es.
+         El folio queda como respaldo para la orden que se levantó sin número,
+         igual que al mandar a salidas. */
+      reference: order.reference ?? order.code,
       // Quien entrega se firma en el papel, no se teclea aquí.
       handedOverBy: undefined,
       receivedBy: input.workshopName,

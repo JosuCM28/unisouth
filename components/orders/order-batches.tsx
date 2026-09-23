@@ -151,6 +151,8 @@ export function OrderBatches({
             // El foleo viaja con el bulto: el vale del taller se imprime de
             // estos renglones y tiene que decir el color que va en el camión.
             tagId: entry.tagId,
+            // La anotación de su talla en la orden: tiene que salir en el vale.
+            note: entry.note ?? null,
           }));
 
         const canShip =

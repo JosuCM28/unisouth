@@ -325,6 +325,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           stage.sent,
         ]),
       ),
+      note: sizeNoteOf(order.lines, line.sizeId),
     };
   });
 
@@ -1040,4 +1041,26 @@ function batchLabelOf(
   if (!batchId) return null;
   const batch = batches.find((item) => item.id === batchId);
   return batch ? cutBatchLabel(batch.number, batch.label) : null;
+}
+
+/**
+ * La anotación de una talla para el envío a taller.
+ *
+ * El envío elige TALLA y no renglón, así que si la orden trae la misma talla
+ * dos veces con anotaciones distintas se juntan las dos: quedarse con una
+ * sola borraría del vale la instrucción de la otra. Quien manda la recorta
+ * en el diálogo si ese envío sólo lleva una.
+ */
+function sizeNoteOf(
+  lines: { sizeId: string; notes: string | null }[],
+  sizeId: string,
+): string | null {
+  const notes = [
+    ...new Set(
+      lines.flatMap((line) =>
+        line.sizeId === sizeId && line.notes ? [line.notes] : [],
+      ),
+    ),
+  ];
+  return notes.length > 0 ? notes.join(" / ") : null;
 }

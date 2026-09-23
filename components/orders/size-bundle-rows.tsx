@@ -29,6 +29,13 @@ export interface SizeBundleRow {
   bundles: string;
   /** El foleo de ESTE bulto. Cadena vacía = sin foleo. */
   tagId: string;
+  /**
+   * La anotación que viaja con ESTE bulto al vale.
+   *
+   * Sólo la usan los bloques con `editableNotes`: la captura del corte la lee
+   * de la orden y no la guarda. Cadena vacía = sin anotación.
+   */
+  note: string;
 }
 
 /** Un foleo del catálogo, como se ofrece en el renglón. */
@@ -56,6 +63,15 @@ interface Props {
    * que ya trae capturado y no vuelve a elegirlo.
    */
   tags?: CutTagChoice[];
+  /**
+   * La anotación de la talla se vuelve un campo editable del renglón.
+   *
+   * Lo pide el envío a taller: la anotación que se escribió al levantar la
+   * orden tiene que salir en el vale que firma el taller, llega copiada tal
+   * cual y quien manda la corrige ahí si ese envío lleva otra instrucción. En
+   * la captura del corte se queda como texto de sólo lectura.
+   */
+  editableNotes?: boolean;
 }
 
 /** Un renglón vacío, listo para teclear. */
@@ -66,6 +82,7 @@ export function emptyRow(tagId = ""): SizeBundleRow {
     quantity: "",
     bundles: "1",
     tagId,
+    note: "",
   };
 }
 
@@ -89,6 +106,8 @@ export function usableRows(rows: SizeBundleRow[]) {
       // Vacío se manda como `undefined`: en la base es "sin foleo", no una
       // cadena vacía que después nadie sabe si es un color sin nombre.
       tagId: row.tagId === "" ? undefined : row.tagId,
+      // Igual que el foleo: vacía no se guarda como cadena vacía.
+      note: row.note.trim() === "" ? undefined : row.note.trim(),
     }))
     .filter(
       (row) =>
@@ -98,6 +117,22 @@ export function usableRows(rows: SizeBundleRow[]) {
         Number.isInteger(row.bundles) &&
         row.bundles > 0,
     );
+}
+
+/**
+ * Lo que cambia en el renglón al elegirle talla.
+ *
+ * Con anotación editable, la de la talla nueva REEMPLAZA a la que había: la
+ * anotación es de la talla, y dejar la de la 38 sobre un bulto que ahora es
+ * de la 42 mandaría al taller la instrucción equivocada.
+ */
+function selectSize(
+  value: string,
+  byValue: Map<string, SizeRowOption>,
+  editableNotes: boolean,
+): Partial<SizeBundleRow> {
+  if (!editableNotes) return { value };
+  return { value, note: byValue.get(value)?.note ?? "" };
 }
 
 /**
@@ -122,6 +157,7 @@ export function SizeBundleRows({
   renderHint,
   footnote,
   tags,
+  editableNotes = false,
 }: Props) {
   function updateRow(key: string, patch: Partial<SizeBundleRow>) {
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -180,7 +216,9 @@ export function SizeBundleRows({
                   <SearchSelect
                     options={selectOptions}
                     value={row.value}
-                    onChange={(value) => updateRow(row.key, { value })}
+                    onChange={(value) =>
+                      updateRow(row.key, selectSize(value, byValue, editableNotes))
+                    }
                     placeholder="Talla"
                     searchPlaceholder="Buscar talla…"
                   />
@@ -200,7 +238,26 @@ export function SizeBundleRows({
               {/* Lo que se le anotó a esta talla al levantar la orden, pegado
                   a su renglón: es la instrucción que hay que tener enfrente
                   justo antes de teclear cuántas salieron. */}
-              <SizeNote note={option?.note} tag={option?.tag} />
+              <SizeNote
+                note={editableNotes ? null : option?.note}
+                tag={option?.tag}
+              />
+
+              {editableNotes && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    Anotación
+                  </span>
+                  <Input
+                    placeholder="Sin anotación"
+                    value={row.note}
+                    onChange={(event) =>
+                      updateRow(row.key, { note: event.target.value })
+                    }
+                    className="touch-target"
+                  />
+                </label>
+              )}
 
               {/* El foleo va ARRIBA de las cantidades y no al lado: en el
                   celular una tercera columna dejaba los tres campos

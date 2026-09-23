@@ -541,6 +541,8 @@ function rowsOf(
       // Lo ya capturado manda también en el color: precargar el de la orden
       // encima cambiaría el foleo del bulto al guardar sin que nadie lo pida.
       tagId: entry.tagId ?? "",
+      // La captura no guarda anotación: la lee de la orden.
+      note: "",
     }));
   });
 
