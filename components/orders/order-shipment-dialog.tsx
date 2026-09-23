@@ -45,6 +45,11 @@ export interface ShippableSize {
    * vale del taller sin volver a teclearla.
    */
   note: string | null;
+  /**
+   * El foleo con el que se ofrece la talla: el del último bulto capturado,
+   * o el del renglón de la orden si ninguno lo lleva. Se pone al elegirla.
+   */
+  tagId: string | null;
 }
 
 /** Un bulto ya capturado que se copia al abrir el diálogo. */
@@ -193,6 +198,15 @@ export function OrderShipmentDialog({
     setParts("");
   }
 
+  /* Los bultos se vuelven a copiar CADA vez que se abre, no sólo al montar:
+     el diálogo sigue montado después de capturar o corregir el corte, y sin
+     esto abría con la copia vieja —la de antes de amarrarle el foleo— y el
+     vale del taller salía sin color aunque el corte ya lo tuviera. */
+  function handleOpenChange(next: boolean) {
+    if (next) setRows(initialRows(batch));
+    setOpen(next);
+  }
+
   async function handleSave() {
     if (!workshopId || !stageId) {
       toast.error("Elige el taller y la etapa.");
@@ -238,7 +252,7 @@ export function OrderShipmentDialog({
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       title={`Mandar a taller · ${batch ? batch.label : orderCode}`}
       description="Prendas ya cortadas que salen a un proceso. No mueve tela."
       trigger={
@@ -353,6 +367,7 @@ export function OrderShipmentDialog({
               hint: size.sizeName,
               keywords: size.sizeName,
               note: size.note,
+              defaultTagId: size.tagId,
             }))}
             rows={rows}
             onChange={setRows}

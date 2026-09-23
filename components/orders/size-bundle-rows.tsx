@@ -17,6 +17,14 @@ export interface SizeRowOption extends SizeAnnotation {
   hint?: string;
   /** Texto extra por el que también se busca sin enseñarlo. */
   keywords?: string;
+  /**
+   * El foleo que se pone en el renglón al elegir esta talla.
+   *
+   * Lo manda el envío a taller: ahí la talla se elige a mano y sin esto el
+   * bulto salía sin el color que ya se le había amarrado en el corte.
+   * Ausente = elegir la talla no toca el foleo del renglón.
+   */
+  defaultTagId?: string | null;
 }
 
 /** Un renglón a medio teclear. */
@@ -122,17 +130,24 @@ export function usableRows(rows: SizeBundleRow[]) {
 /**
  * Lo que cambia en el renglón al elegirle talla.
  *
- * Con anotación editable, la de la talla nueva REEMPLAZA a la que había: la
- * anotación es de la talla, y dejar la de la 38 sobre un bulto que ahora es
- * de la 42 mandaría al taller la instrucción equivocada.
+ * La anotación y el foleo de la talla nueva REEMPLAZAN a los que había: son
+ * de la talla, y dejar los de la 38 sobre un bulto que ahora es de la 42
+ * mandaría al taller la instrucción y el color equivocados.
  */
 function selectSize(
   value: string,
   byValue: Map<string, SizeRowOption>,
   editableNotes: boolean,
 ): Partial<SizeBundleRow> {
-  if (!editableNotes) return { value };
-  return { value, note: byValue.get(value)?.note ?? "" };
+  const option = byValue.get(value);
+  const patch: Partial<SizeBundleRow> = { value };
+
+  if (editableNotes) patch.note = option?.note ?? "";
+  if (option?.defaultTagId !== undefined) {
+    patch.tagId = option.defaultTagId ?? "";
+  }
+
+  return patch;
 }
 
 /**

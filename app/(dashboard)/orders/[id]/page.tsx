@@ -326,6 +326,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         ]),
       ),
       note: sizeNoteOf(order.lines, line.sizeId),
+      tagId: sizeTagOf(order.lines, line.sizeId),
     };
   });
 
@@ -1063,4 +1064,30 @@ function sizeNoteOf(
     ),
   ];
   return notes.length > 0 ? notes.join(" / ") : null;
+}
+
+/**
+ * El foleo con el que se ofrece una talla al mandarla a taller sin corte.
+ *
+ * El del ÚLTIMO bulto capturado de esa talla: es el papelito que trae
+ * amarrado lo que está en la bodega, y el del renglón de la orden es sólo el
+ * sugerido de cuando se levantó. Ése queda de respaldo para la talla que
+ * todavía no tiene captura con color.
+ */
+function sizeTagOf(
+  lines: {
+    sizeId: string;
+    tagId: string | null;
+    progress: { quantity: number; tagId: string | null; createdAt: Date }[];
+  }[],
+  sizeId: string,
+): string | null {
+  const ofSize = lines.filter((line) => line.sizeId === sizeId);
+
+  const latest = ofSize
+    .flatMap((line) => line.progress)
+    .filter((entry) => entry.quantity > 0 && entry.tagId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+  return latest?.tagId ?? ofSize.find((line) => line.tagId)?.tagId ?? null;
 }
