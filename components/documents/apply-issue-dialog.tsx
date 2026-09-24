@@ -9,6 +9,7 @@ import {
   sendVoucherByWhatsapp,
   useRecipientSelection,
   WhatsappRecipients,
+  WhatsappUnavailable,
   type VoucherWhatsappOptions,
 } from "./whatsapp-recipients";
 
@@ -95,7 +96,10 @@ export function ApplyIssueDialog({
           />
         )}
 
-        <UnavailableNote whatsapp={whatsapp} />
+        <WhatsappUnavailable
+          whatsapp={whatsapp}
+          suffix="El vale se aplica sin enviarse."
+        />
 
         {offerWhatsapp && (
           <Button
@@ -131,17 +135,3 @@ const BUTTON_LABELS = {
   sending: "Enviando por WhatsApp…",
 } as const;
 
-/** Por qué no se ofrece el envío, cuando no se ofrece. */
-function UnavailableNote({ whatsapp }: { whatsapp: VoucherWhatsappOptions }) {
-  if (canSendWhatsapp(whatsapp)) return null;
-
-  const reason = whatsapp.configured
-    ? "No hay contactos de WhatsApp dados de alta."
-    : "WhatsApp no está configurado en el servidor.";
-
-  return (
-    <p className="border border-border bg-muted p-2 text-xs text-muted-foreground">
-      {reason} El vale se aplica sin enviarse.
-    </p>
-  );
-}

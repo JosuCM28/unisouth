@@ -49,6 +49,34 @@ export function useRecipientSelection(contacts: WhatsappRecipient[]) {
   };
 }
 
+/**
+ * Por qué no se puede enviar, dicho en el diálogo.
+ *
+ * Se explica en vez de esconder el botón: un botón que no aparece no le dice
+ * a nadie que faltan las variables del servidor o los contactos, y quien lo
+ * busca acaba creyendo que la función no existe.
+ */
+export function WhatsappUnavailable({
+  whatsapp,
+  suffix,
+}: {
+  whatsapp: VoucherWhatsappOptions;
+  suffix?: string;
+}) {
+  if (canSendWhatsapp(whatsapp)) return null;
+
+  const reason = whatsapp.configured
+    ? "No hay contactos de WhatsApp: un administrador los da de alta en Administración → WhatsApp."
+    : "WhatsApp no está configurado en el servidor: faltan las variables EVOLUTION_API_URL, EVOLUTION_API_KEY y EVOLUTION_INSTANCE.";
+
+  return (
+    <p className="border border-border bg-muted p-2 text-xs text-muted-foreground">
+      {reason}
+      {suffix && ` ${suffix}`}
+    </p>
+  );
+}
+
 /** La lista de contactos, cada uno con su interruptor. */
 export function WhatsappRecipients({
   contacts,

@@ -18,10 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ApplyIssueDialog } from "./apply-issue-dialog";
 import { ResendWhatsappDialog } from "./resend-whatsapp-dialog";
-import {
-  canSendWhatsapp,
-  type VoucherWhatsappOptions,
-} from "./whatsapp-recipients";
+import type { VoucherWhatsappOptions } from "./whatsapp-recipients";
 
 interface Props {
   documentId: string;
@@ -202,8 +199,9 @@ export function DocumentActions({
       )}
 
       {/* Sólo ya aplicada: un borrador todavía puede cambiar y uno cancelado
-          ya no vale. */}
-      {status === "APPLIED" && whatsapp && canSendWhatsapp(whatsapp) && (
+          ya no vale. Se pinta aunque falte configurar: el diálogo dice qué
+          falta, que es mejor que un botón que no aparece. */}
+      {status === "APPLIED" && whatsapp && (
         <ResendWhatsappDialog
           documentId={documentId}
           documentCode={documentCode}

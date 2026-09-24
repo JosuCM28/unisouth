@@ -5,9 +5,11 @@ import { MessageCircle } from "lucide-react";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  canSendWhatsapp,
   sendVoucherByWhatsapp,
   useRecipientSelection,
   WhatsappRecipients,
+  WhatsappUnavailable,
   type VoucherWhatsappOptions,
 } from "./whatsapp-recipients";
 
@@ -32,6 +34,7 @@ export function ResendWhatsappDialog({
   const [open, setOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const { selected, toggle, reset } = useRecipientSelection(whatsapp.contacts);
+  const canSend = canSendWhatsapp(whatsapp);
 
   function handleOpenChange(next: boolean) {
     if (isSending) return;
@@ -60,16 +63,20 @@ export function ResendWhatsappDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        <WhatsappRecipients
-          contacts={whatsapp.contacts}
-          selected={selected}
-          onToggle={toggle}
-        />
+        <WhatsappUnavailable whatsapp={whatsapp} />
+
+        {canSend && (
+          <WhatsappRecipients
+            contacts={whatsapp.contacts}
+            selected={selected}
+            onToggle={toggle}
+          />
+        )}
 
         <Button
           type="button"
           onClick={handleSend}
-          disabled={isSending || selected.size === 0}
+          disabled={!canSend || isSending || selected.size === 0}
           className="h-12 w-full"
         >
           <MessageCircle className="size-4" aria-hidden />
