@@ -13,7 +13,11 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { getPileFilterOptions, getPileSheetData } from "@/lib/pile-sheet-data";
 import { materialPath } from "@/lib/material-url";
-import { getMaterialKpis, getMaterialDailyReport } from "@/lib/material-history";
+import {
+  getMaterialKpis,
+  getMaterialDailyReport,
+  getMaterialOutboundByShade,
+} from "@/lib/material-history";
 import { resolveRange, toLocalInputValue } from "@/lib/history-range";
 import { MovementRepository } from "@/lib/repositories/movement.repository";
 import {
@@ -30,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { MovementList } from "@/components/movements/movement-list";
 import { MaterialKpis } from "@/components/materials/material-kpis";
 import { MaterialDailyReport } from "@/components/materials/material-daily-report";
+import { MaterialShadeOutbound } from "@/components/materials/material-shade-outbound";
 import { MaterialHistoryFilters } from "@/components/materials/material-history-filters";
 import { PileFilters } from "@/components/materials/pile-filters";
 
@@ -149,19 +154,17 @@ export default async function MaterialDetailPage({
 
   const movements = new MovementRepository();
 
-  const [kpis, daily, history] = await Promise.all([
-    getMaterialKpis({
-      materialId: material.id,
-      unit: spec.baseUnit,
-      from: range.from,
-      to: range.to,
-    }),
-    getMaterialDailyReport({
-      materialId: material.id,
-      unit: spec.baseUnit,
-      from: range.from,
-      to: range.to,
-    }),
+  const scope = {
+    materialId: material.id,
+    unit: spec.baseUnit,
+    from: range.from,
+    to: range.to,
+  };
+
+  const [kpis, daily, byShade, history] = await Promise.all([
+    getMaterialKpis(scope),
+    getMaterialDailyReport(scope),
+    getMaterialOutboundByShade(scope),
     movements.search({
       materialId: material.id,
       from: range.from,
@@ -238,6 +241,10 @@ export default async function MaterialDetailPage({
 
         <MaterialKpis kpis={kpis} />
       </section>
+
+      {/* Justo bajo "Salieron": desglosa esa misma cifra por partida de
+          tintura, que es lo que decide si un tono alcanza para un pedido. */}
+      <MaterialShadeOutbound report={byShade} />
 
       {/* El desglose por día va entre los KPIs y el kárdex: el total responde
           "cuánto", este responde "qué día", y el kárdex "en qué movimiento".

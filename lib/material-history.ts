@@ -219,3 +219,81 @@ export async function getMaterialDailyReport(params: {
     truncated: all.length > MAX_DAYS,
   };
 }
+
+/** Lo que salió de un tono en la ventana. */
+export interface ShadeOutboundRow {
+  /** `null` = rollos capturados sin tono. */
+  shade: string | null;
+  quantity: number;
+  /** Rollos DISTINTOS de los que salió tela. */
+  lots: number;
+}
+
+export interface MaterialOutboundByShade {
+  rows: ShadeOutboundRow[];
+  /** Vales de salida DISTINTOS que tocaron este material. */
+  documents: number;
+  unit: Unit;
+}
+
+/**
+ * Salidas del periodo separadas por tono.
+ *
+ * El total de "Salieron" no dice de QUÉ partida de tintura se fue la tela, y
+ * es lo que se necesita para saber si el tono que queda alcanza para terminar
+ * un pedido: dos tonos en un tendido son prenda rechazada.
+ *
+ * El tono se lee del ROLLO y no del movimiento porque el movimiento no lo
+ * guarda; el tono de un rollo no cambia en su vida, así que leerlo hoy da el
+ * mismo resultado que haberlo copiado al salir.
+ *
+ * `documents` cuenta vales y no asientos: un vale de 12 rollos es UNA salida
+ * para quien la firmó, aunque en el kárdex sean 12 renglones.
+ */
+export async function getMaterialOutboundByShade(params: {
+  materialId: string;
+  unit: Unit;
+  from?: Date;
+  to?: Date;
+}): Promise<MaterialOutboundByShade> {
+  const movements = await prisma.movement.findMany({
+    where: { ...buildWhere(params), direction: "OUT" },
+    select: {
+      lotId: true,
+      quantity: true,
+      documentId: true,
+      lot: { select: { shade: true } },
+    },
+  });
+
+  const byShade = new Map<string, { row: ShadeOutboundRow; lots: Set<string> }>();
+  const documents = new Set<string>();
+
+  for (const movement of movements) {
+    if (movement.documentId) documents.add(movement.documentId);
+
+    const shade = movement.lot.shade;
+    const key = shade ?? "";
+    const entry =
+      byShade.get(key) ??
+      { row: { shade, quantity: 0, lots: 0 }, lots: new Set<string>() };
+
+    entry.row.quantity = round4(
+      entry.row.quantity + Math.abs(Number(movement.quantity)),
+    );
+    entry.lots.add(movement.lotId);
+    byShade.set(key, entry);
+  }
+
+  // De mayor a menor: el tono que más se consume es el primero que se acaba.
+  const rows = [...byShade.values()]
+    .map((entry) => ({ ...entry.row, lots: entry.lots.size }))
+    .sort((a, b) => b.quantity - a.quantity);
+
+  return { rows, documents: documents.size, unit: params.unit };
+}
+
+/** Los mismos 4 decimales que guarda la base: sumar en coma flotante deja cola. */
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}

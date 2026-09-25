@@ -1,4 +1,4 @@
-import { Package } from "lucide-react";
+import { Package, Palette } from "lucide-react";
 import type { Unit } from "@prisma/client";
 import { UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { formatQuantity } from "@/lib/utils";
@@ -9,6 +9,14 @@ interface MaterialRow {
   name: string;
   code: string;
   unit: Unit;
+  quantity: number;
+  lots: number;
+  shades: ShadeRow[];
+}
+
+interface ShadeRow {
+  /** `null` = rollos capturados sin tono. */
+  shade: string | null;
   quantity: number;
   lots: number;
 }
@@ -47,24 +55,25 @@ export function ReceiptMaterialTotals({ lots }: { lots: ReceiptLotRow[] }) {
 
       <ul className="divide-y divide-border">
         {rows.map((row) => (
-          <li
-            key={row.key}
-            className="flex items-baseline justify-between gap-3 py-2"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{row.name}</p>
-              <p className="tabular text-xs text-muted-foreground">
-                {row.code} · {row.lots} {row.lots === 1 ? "rollo" : "rollos"}
-              </p>
+          <li key={row.key} className="py-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{row.name}</p>
+                <p className="tabular text-xs text-muted-foreground">
+                  {row.code} · {row.lots} {row.lots === 1 ? "rollo" : "rollos"}
+                </p>
+              </div>
+
+              {/* Grande: es la cifra que se compara con la factura, de pie y
+                  con el papel en la otra mano. */}
+              <span className="tabular shrink-0 text-lg font-semibold">
+                {formatQuantity(row.quantity, {
+                  unit: UNIT_SHORT_LABELS[row.unit],
+                })}
+              </span>
             </div>
 
-            {/* Grande: es la cifra que se compara con la factura, de pie y
-                con el papel en la otra mano. */}
-            <span className="tabular shrink-0 text-lg font-semibold">
-              {formatQuantity(row.quantity, {
-                unit: UNIT_SHORT_LABELS[row.unit],
-              })}
-            </span>
+            <ShadeBreakdown shades={row.shades} unit={row.unit} />
           </li>
         ))}
       </ul>
@@ -85,25 +94,85 @@ function groupByMaterial(lots: ReceiptLotRow[]): MaterialRow[] {
     const key = `${lot.material.code}:${lot.unit}`;
     const existing = grouped.get(key);
 
-    if (existing) {
-      existing.quantity = round4(existing.quantity + lot.initialQuantity);
-      existing.lots += 1;
-      continue;
-    }
+    const row =
+      existing ??
+      {
+        key,
+        name: lot.material.name,
+        code: lot.material.code,
+        unit: lot.unit,
+        quantity: 0,
+        lots: 0,
+        shades: [],
+      };
 
-    grouped.set(key, {
-      key,
-      name: lot.material.name,
-      code: lot.material.code,
-      unit: lot.unit,
-      quantity: lot.initialQuantity,
-      lots: 1,
-    });
+    row.quantity = round4(row.quantity + lot.initialQuantity);
+    row.lots += 1;
+    addToShade(row.shades, lot);
+    grouped.set(key, row);
   }
 
   // De mayor a menor: la tela de la que más llegó es la que da nombre a la
-  // guía y la primera que se revisa.
-  return [...grouped.values()].sort((a, b) => b.quantity - a.quantity);
+  // guía y la primera que se revisa. Los tonos, igual.
+  const rows = [...grouped.values()].sort((a, b) => b.quantity - a.quantity);
+  for (const row of rows) row.shades.sort((a, b) => b.quantity - a.quantity);
+
+  return rows;
+}
+
+function addToShade(shades: ShadeRow[], lot: ReceiptLotRow): void {
+  const shade = lot.shade ?? null;
+  const existing = shades.find((entry) => entry.shade === shade);
+
+  if (existing) {
+    existing.quantity = round4(existing.quantity + lot.initialQuantity);
+    existing.lots += 1;
+    return;
+  }
+
+  shades.push({ shade, quantity: lot.initialQuantity, lots: 1 });
+}
+
+/**
+ * Cuánto llegó de cada tono de ESA tela.
+ *
+ * Una misma tela llega en varias partidas de tintura, y dos tonos en un
+ * tendido son prenda rechazada: saber cuántos rollos y metros vinieron de
+ * cada uno es lo que dice qué pedido se puede cortar de un solo tono.
+ *
+ * Si ningún rollo trae tono no se pinta: un único renglón "Sin tono" que
+ * repite el total de arriba sólo estorba.
+ */
+function ShadeBreakdown({ shades, unit }: { shades: ShadeRow[]; unit: Unit }) {
+  if (shades.every((entry) => entry.shade === null)) return null;
+
+  return (
+    <ul className="mt-2 flex flex-col border-l-2 border-border pl-3">
+      {shades.map((entry) => (
+        <li
+          key={entry.shade ?? ""}
+          className="flex items-baseline justify-between gap-3 py-0.5 text-sm"
+        >
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Palette
+              className="size-3 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            <span className="tabular truncate">
+              {entry.shade ?? "Sin tono"}
+            </span>
+          </span>
+          <span className="tabular shrink-0 text-right">
+            {formatQuantity(entry.quantity, { unit: UNIT_SHORT_LABELS[unit] })}
+            <span className="text-muted-foreground">
+              {" "}
+              · {entry.lots} {entry.lots === 1 ? "rollo" : "rollos"}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** Los mismos 4 decimales que guarda la base: sumar en coma flotante deja cola. */
