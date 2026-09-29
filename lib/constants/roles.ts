@@ -98,11 +98,12 @@ export const PERMISSIONS = [
   "purchase:approve",
   "audit:read",
   "user:manage",
-  /* A qué números les llega el vale por WhatsApp. Sólo la administra ADMIN:
-     esos números reciben datos del cliente, y quien captura puede MANDAR el
+  /* A quién le llega el vale y por dónde: los números de WhatsApp, los
+     correos y qué canales están prendidos. Sólo la administra ADMIN: esos
+     destinatarios reciben datos del cliente, y quien captura puede MANDAR el
      vale al aplicarlo —eso cuelga de `inventory:write`— pero no decidir a
      quién le llega. */
-  "whatsapp:write",
+  "notifications:write",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

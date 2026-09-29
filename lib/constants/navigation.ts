@@ -249,11 +249,11 @@ export const NAVIGATION: NavSection[] = [
         permission: "user:manage",
       },
       {
-        // Los números a los que se manda el vale al aplicarlo.
-        href: "/whatsapp-contacts",
-        label: "WhatsApp",
-        icon: "whatsapp",
-        permission: "whatsapp:write",
+        // A quién le llega el vale al aplicarlo, y por qué canal.
+        href: "/notifications",
+        label: "Notificaciones",
+        icon: "notifications",
+        permission: "notifications:write",
       },
     ],
   },

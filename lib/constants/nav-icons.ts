@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Bell,
   BookOpen,
   Boxes,
   Building2,
@@ -13,7 +14,6 @@ import {
   FileText,
   LayoutDashboard,
   MapPin,
-  MessageCircle,
   Package,
   Package2,
   PackageMinus,
@@ -67,7 +67,7 @@ export const NAV_ICONS = {
   /* `users` ya lo ocupa Clientes. El engrane distingue "las personas que
      entran al sistema" de "las empresas que mandan a maquilar". */
   accounts: UserCog,
-  whatsapp: MessageCircle,
+  notifications: Bell,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

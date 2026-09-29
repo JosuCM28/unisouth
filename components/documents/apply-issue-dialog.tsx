@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Check, MessageCircle } from "lucide-react";
+import { Check, Send } from "lucide-react";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  canSendWhatsapp,
-  sendVoucherByWhatsapp,
-  useRecipientSelection,
-  WhatsappRecipients,
-  WhatsappUnavailable,
-  type VoucherWhatsappOptions,
-} from "./whatsapp-recipients";
+  anyChannelEnabled,
+  canDeliver,
+  deliverVoucher,
+  DeliveryRecipients,
+  useDeliverySelection,
+  type VoucherDeliveryOptions,
+} from "./voucher-delivery";
 
 interface Props {
   documentId: string;
   documentCode: string;
   disabled: boolean;
-  whatsapp: VoucherWhatsappOptions;
+  delivery: VoucherDeliveryOptions;
   /** Aplica el vale. Devuelve si se aplicó, para saber si ya se puede enviar. */
   onApply: () => Promise<boolean>;
   /** Al terminar todo —aplicar y, si tocaba, enviar—: refresca la pantalla. */
@@ -25,26 +25,27 @@ interface Props {
 }
 
 /**
- * Aplicar una salida, con la pregunta de si se manda por WhatsApp.
+ * Aplicar una salida, con la pregunta de a quién se le manda.
  *
- * El orden es fijo: PRIMERO se aplica y, ya aplicada, se manda. Así nunca
- * sale por WhatsApp un vale que después no se pudo aplicar, y un celular sin
- * señal no detiene la entrega: si el envío falla, la salida queda aplicada y
- * se reenvía desde su ficha.
+ * El orden es fijo: PRIMERO se aplica y, ya aplicada, se manda por los
+ * canales que ADMIN tenga prendidos. Así nunca sale un vale que después no
+ * se pudo aplicar, y un celular sin señal o un correo caído no detienen la
+ * entrega: si el envío falla, la salida queda aplicada y se reenvía desde su
+ * ficha.
  */
 export function ApplyIssueDialog({
   documentId,
   documentCode,
   disabled,
-  whatsapp,
+  delivery,
   onApply,
   onFinished,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"idle" | "applying" | "sending">("idle");
-  const { selected, toggle, reset } = useRecipientSelection(whatsapp.contacts);
+  const { selected, toggle, total, reset } = useDeliverySelection(delivery);
 
-  const offerWhatsapp = canSendWhatsapp(whatsapp);
+  const offerDelivery = canDeliver(delivery);
   const busy = step !== "idle";
 
   function handleOpenChange(next: boolean) {
@@ -60,7 +61,7 @@ export function ApplyIssueDialog({
 
     if (applied && send) {
       setStep("sending");
-      await sendVoucherByWhatsapp(documentId, [...selected]);
+      await deliverVoucher(documentId, selected);
     }
 
     setStep("idle");
@@ -76,9 +77,7 @@ export function ApplyIssueDialog({
       onOpenChange={handleOpenChange}
       title={`Aplicar ${documentCode}`}
       description={
-        offerWhatsapp
-          ? "¿Enviar el vale por WhatsApp?"
-          : "La salida quedará aplicada."
+        offerDelivery ? "¿A quién se le manda el vale?" : "La salida quedará aplicada."
       }
       trigger={
         <Button type="button" disabled={disabled} className="touch-target">
@@ -88,40 +87,35 @@ export function ApplyIssueDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        {offerWhatsapp && (
-          <WhatsappRecipients
-            contacts={whatsapp.contacts}
+        {anyChannelEnabled(delivery) && (
+          <DeliveryRecipients
+            options={delivery}
             selected={selected}
             onToggle={toggle}
           />
         )}
 
-        <WhatsappUnavailable
-          whatsapp={whatsapp}
-          suffix="El vale se aplica sin enviarse."
-        />
-
-        {offerWhatsapp && (
+        {offerDelivery && (
           <Button
             type="button"
             onClick={() => run(true)}
-            disabled={busy || selected.size === 0}
+            disabled={busy || total === 0}
             className="h-12 w-full"
           >
-            <MessageCircle className="size-4" aria-hidden />
+            <Send className="size-4" aria-hidden />
             {BUTTON_LABELS[step]}
           </Button>
         )}
 
         <Button
           type="button"
-          variant={offerWhatsapp ? "outline" : "default"}
+          variant={offerDelivery ? "outline" : "default"}
           onClick={() => run(false)}
           disabled={busy}
           className="h-12 w-full"
         >
           <Check className="size-4" aria-hidden />
-          {offerWhatsapp ? "Sólo aplicar" : "Aplicar"}
+          {offerDelivery ? "Sólo aplicar" : "Aplicar"}
         </Button>
       </div>
     </ResponsiveFormDialog>
@@ -132,6 +126,5 @@ export function ApplyIssueDialog({
 const BUTTON_LABELS = {
   idle: "Aplicar y enviar",
   applying: "Aplicando…",
-  sending: "Enviando por WhatsApp…",
+  sending: "Enviando…",
 } as const;
-

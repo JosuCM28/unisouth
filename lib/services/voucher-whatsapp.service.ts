@@ -1,10 +1,5 @@
 import { EvolutionClient } from "@/lib/core/evolution-client";
-import {
-  BusinessRuleError,
-  DomainError,
-  NotFoundError,
-} from "@/lib/core/errors";
-import { VoucherRepository } from "@/lib/repositories/voucher.repository";
+import { BusinessRuleError, DomainError } from "@/lib/core/errors";
 import {
   WhatsappContactRepository,
   type WhatsappRecipient,
@@ -12,19 +7,12 @@ import {
 import type { SendVoucherWhatsappInput } from "@/lib/validations/whatsapp.schema";
 import { renderVoucherPdf } from "@/lib/vouchers/voucher-pdf";
 import {
-  toVoucherSheet,
   voucherFileName,
   type VoucherSheet,
 } from "@/lib/vouchers/voucher-sheet";
 import { BaseService } from "./base.service";
-
-/** Cómo le fue al envío, contacto por contacto. */
-export interface VoucherWhatsappResult {
-  /** Los nombres a los que sí les llegó. */
-  sent: string[];
-  /** A quién no, y por qué, para poder reenviarles sólo a ellos. */
-  failed: { name: string; reason: string }[];
-}
+import { NotificationSettingsService } from "./notification-settings.service";
+import { SendableVoucher, type VoucherDeliveryResult } from "./sendable-voucher";
 
 /**
  * Manda el PDF de UN vale aplicado por WhatsApp.
@@ -39,9 +27,12 @@ export interface VoucherWhatsappResult {
  * manda. Si el envío falla, la salida sigue aplicada y se puede reenviar.
  */
 export class VoucherWhatsappService extends BaseService {
-  async send(input: SendVoucherWhatsappInput): Promise<VoucherWhatsappResult> {
+  async send(input: SendVoucherWhatsappInput): Promise<VoucherDeliveryResult> {
+    await new NotificationSettingsService(this.context, this.db).requireEnabled(
+      "whatsapp",
+    );
     const client = requireClient();
-    const sheet = await this.loadSendableSheet(input.documentId);
+    const sheet = await new SendableVoucher(this.db).load(input.documentId);
     const recipients = await this.loadRecipients(input.contactIds);
 
     // El PDF se arma UNA vez: es el mismo archivo para todos.
@@ -79,32 +70,6 @@ export class VoucherWhatsappService extends BaseService {
         error === null ? [] : [{ name: recipient.name, reason: error }],
       ),
     };
-  }
-
-  /**
-   * El vale, sólo si es una salida aplicada.
-   *
-   * Un borrador todavía puede cambiar: mandarlo sería repartir un papel que
-   * mañana dice otra cosa. Uno cancelado ya no vale, y mandarlo haría creer
-   * que esa entrega sigue en pie.
-   */
-  private async loadSendableSheet(documentId: string): Promise<VoucherSheet> {
-    const document = await new VoucherRepository(this.db).findSheetDocument(
-      documentId,
-    );
-    if (!document) throw new NotFoundError("el vale", documentId);
-
-    if (document.type !== "ISSUE") {
-      throw new BusinessRuleError("Sólo las salidas se mandan por WhatsApp.");
-    }
-
-    if (document.status !== "APPLIED") {
-      throw new BusinessRuleError(
-        `${document.code} no está aplicada: sólo se manda un vale ya aplicado.`,
-      );
-    }
-
-    return toVoucherSheet(document);
   }
 
   private async loadRecipients(ids: string[]): Promise<WhatsappRecipient[]> {

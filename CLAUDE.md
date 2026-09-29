@@ -489,6 +489,8 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 EVOLUTION_API_URL="https://evolution.dominio.com"   # WhatsApp, sin diagonal final
 EVOLUTION_API_KEY="..."
 EVOLUTION_INSTANCE="unisouth"   # la instancia donde se vinculó el celular
+RESEND_API_KEY="re_..."         # correo; con esto basta
+RESEND_FROM="..."               # opcional; por omisión salidas@aux.unisoutheast.com
 ```
 
 Las tres `EVOLUTION_*` son opcionales: sin ellas la app funciona igual y sólo
@@ -496,6 +498,13 @@ deja de ofrecer el envío del vale por WhatsApp. El único archivo que habla con
 Evolution es `lib/core/evolution-client.ts`. El vale se manda **después** de
 aplicarse y nunca dentro de su transacción: aplicar no puede depender de que
 el celular tenga señal.
+
+El correo sigue la misma regla: `RESEND_API_KEY` es opcional, el único archivo
+que habla con Resend es `lib/core/resend-client.ts`, y el asunto es
+`SALIDA DE CORTE {orden}` con el PDF adjunto y el encabezado en texto plano.
+Qué canales se ofrecen al aplicar —WhatsApp, correo, ambos o ninguno— lo
+decide ADMIN en **Administración → Notificaciones** (`notifications:write`),
+guardado en la tabla `Setting`; el servidor lo vuelve a revisar al enviar.
 
 **Las dos cadenas son la misma hoy** porque el Postgres del VPS se conecta
 directo, sin pooler. `DIRECT_URL` existe aparte de todos modos: un pooler

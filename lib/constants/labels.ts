@@ -21,6 +21,7 @@ import type {
   Unit,
 } from "@prisma/client";
 import type { UserStatus } from "./user-status";
+import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
 
 /**
  * Traducciones de los enums.
@@ -506,4 +507,10 @@ export const USER_STATUS_STYLES: Record<UserStatus, string> = {
   ACTIVE: "bg-state-available text-state-available-foreground",
   SUSPENDED: "bg-state-reserved text-state-reserved-foreground",
   DELETED: "bg-state-defective text-state-defective-foreground",
+};
+
+/** Los canales por los que sale el vale, como se nombran en pantalla. */
+export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  whatsapp: "WhatsApp",
+  email: "correo",
 };

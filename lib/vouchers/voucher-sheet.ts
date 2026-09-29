@@ -89,6 +89,8 @@ export interface VoucherField {
 
 export interface VoucherSheet {
   code: string;
+  /** La fecha del vale. El papel no la imprime; el correo sí la dice. */
+  date: Date;
   status: string;
   title: string;
   /** Empresa, orden, descripción, tela… sólo los que traen dato. */
@@ -113,6 +115,7 @@ export function toVoucherSheet(document: VoucherDocument): VoucherSheet {
 
   return {
     code: document.code,
+    date: document.date,
     status: DOCUMENT_STATUS_LABELS[document.status],
     title: sheetTitleFor(document.type, cutRows.length > 0),
     header: headerOf(document, cutRows.length > 0),

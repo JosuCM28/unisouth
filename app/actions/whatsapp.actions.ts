@@ -10,7 +10,7 @@ import {
 import { VoucherWhatsappService } from "@/lib/services/voucher-whatsapp.service";
 import { WhatsappContactService } from "@/lib/services/whatsapp-contact.service";
 
-const CONTACTS_PATH = "/whatsapp-contacts";
+const CONTACTS_PATH = "/notifications";
 
 const updateContactSchema = z.object({
   id: cuidSchema,
@@ -20,7 +20,7 @@ const updateContactSchema = z.object({
 export async function createWhatsappContactAction(input: unknown) {
   return executeAction(input, {
     schema: whatsappContactSchema,
-    permission: "whatsapp:write",
+    permission: "notifications:write",
     revalidate: [CONTACTS_PATH],
     successMessage: "Contacto agregado",
     handler: ({ input, auditContext }) =>
@@ -31,7 +31,7 @@ export async function createWhatsappContactAction(input: unknown) {
 export async function updateWhatsappContactAction(input: unknown) {
   return executeAction(input, {
     schema: updateContactSchema,
-    permission: "whatsapp:write",
+    permission: "notifications:write",
     revalidate: [CONTACTS_PATH],
     successMessage: "Contacto actualizado",
     handler: ({ input, auditContext }) =>
@@ -42,7 +42,7 @@ export async function updateWhatsappContactAction(input: unknown) {
 export async function removeWhatsappContactAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
-    permission: "whatsapp:write",
+    permission: "notifications:write",
     revalidate: [CONTACTS_PATH],
     successMessage: "Contacto eliminado",
     handler: ({ input, auditContext }) =>

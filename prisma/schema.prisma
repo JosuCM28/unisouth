@@ -2549,3 +2549,29 @@ model WhatsappContact {
   @@index([active, name])
   @@map("whatsapp_contacts")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CORREO — a quién le llega el vale al aplicarse
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// An address that receives the issue voucher PDF by email.
+///
+/// The same shape as WhatsappContact and for the same reasons: the list
+/// changes week to week and must not need a deploy. A separate table and not
+/// a `channel` column on one "contacts" table because a person often has a
+/// phone OR a mailbox, and a shared row would carry an empty half forever.
+model EmailContact {
+  id    String @id @default(cuid())
+  /// Who it is, so the send dialog reads "Taller Sitex" and not an address.
+  name  String
+  /// Lowercased on save, so "Taller@X.com" and "taller@x.com" are one row.
+  email String @unique
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, name])
+  @@map("email_contacts")
+}

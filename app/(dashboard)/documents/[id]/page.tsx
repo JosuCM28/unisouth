@@ -15,8 +15,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DocumentActions } from "@/components/documents/document-actions";
 import { RuleCard } from "@/components/rules/rule-card";
 import { StandingRuleRepository } from "@/lib/repositories/standing-rule.repository";
-import { WhatsappContactRepository } from "@/lib/repositories/whatsapp-contact.repository";
-import { EvolutionClient } from "@/lib/core/evolution-client";
+import { loadVoucherDeliveryOptions } from "@/lib/vouchers/voucher-delivery-options";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -70,15 +69,15 @@ export default async function DocumentDetailPage({ params }: PageProps) {
      recepción o un traspaso no significan nada. */
   const isIssue = document.type === "ISSUE";
 
-  const [rules, whatsappContacts] = isIssue
+  const [rules, delivery] = isIssue
     ? await Promise.all([
         new StandingRuleRepository().findApplicable(
           document.clientId ?? undefined,
         ),
-        // A quién se le puede mandar el vale por WhatsApp al aplicarlo.
-        new WhatsappContactRepository().findAll(),
+        // Por dónde y a quién se le puede mandar el vale al aplicarlo.
+        loadVoucherDeliveryOptions(),
       ])
-    : [[], []];
+    : [[], undefined];
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,14 +121,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         lineCount={document.lines.length}
         cutLineCount={document.cutLines.length}
         isIssue={isIssue}
-        whatsapp={
-          isIssue
-            ? {
-                configured: EvolutionClient.isConfigured(),
-                contacts: whatsappContacts,
-              }
-            : undefined
-        }
+        delivery={delivery}
       />
 
       {rules.length > 0 && (

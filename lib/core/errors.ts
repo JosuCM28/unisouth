@@ -102,7 +102,7 @@ export class InsufficientStockError extends DomainError {
 }
 
 /**
- * Un servicio de afuera —WhatsApp— no respondió o rechazó la petición.
+ * Un servicio de afuera —WhatsApp, el correo— no respondió o rechazó la petición.
  *
  * Es un error ESPERADO y no un bug: el celular vinculado se queda sin señal,
  * la sesión de WhatsApp se cierra. Por eso extiende DomainError y su mensaje

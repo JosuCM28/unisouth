@@ -17,8 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ApplyIssueDialog } from "./apply-issue-dialog";
-import { ResendWhatsappDialog } from "./resend-whatsapp-dialog";
-import type { VoucherWhatsappOptions } from "./whatsapp-recipients";
+import { ResendVoucherDialog } from "./resend-voucher-dialog";
+import {
+  anyChannelEnabled,
+  type VoucherDeliveryOptions,
+} from "./voucher-delivery";
 
 interface Props {
   documentId: string;
@@ -30,10 +33,10 @@ interface Props {
   /** Sólo las salidas tienen pantalla de corrección. */
   isIssue?: boolean;
   /**
-   * Contactos y configuración de WhatsApp. Sólo llega en las salidas: es el
-   * único vale que se manda al taller.
+   * Canales y contactos para mandar el vale. Sólo llega en las salidas: es
+   * el único vale que se manda al taller.
    */
-  whatsapp?: VoucherWhatsappOptions;
+  delivery?: VoucherDeliveryOptions;
 }
 
 /**
@@ -49,7 +52,7 @@ export function DocumentActions({
   lineCount,
   cutLineCount = 0,
   isIssue,
-  whatsapp,
+  delivery,
 }: Props) {
   const router = useRouter();
 
@@ -67,7 +70,7 @@ export function DocumentActions({
    * Aplica el vale SIN refrescar la pantalla. Devuelve si se aplicó.
    *
    * El refresco va aparte porque, al refrescar, el vale ya aplicado deja de
-   * pintar el diálogo de "Aplicar": si pasara antes del envío por WhatsApp,
+   * pintar el diálogo de "Aplicar": si pasara antes del envío del vale,
    * el diálogo desaparecería a media entrega sin decir si llegó.
    */
   async function applyDocument(): Promise<boolean> {
@@ -173,20 +176,20 @@ export function DocumentActions({
         </Button>
       )}
 
-      {/* Una salida pregunta si se manda por WhatsApp al aplicarla; los
-          demás vales se aplican con el botón de siempre. */}
-      {status === "DRAFT" && whatsapp && (
+      {/* Una salida pregunta a quién se le manda al aplicarla; los demás
+          vales se aplican con el botón de siempre. */}
+      {status === "DRAFT" && delivery && (
         <ApplyIssueDialog
           documentId={documentId}
           documentCode={documentCode}
           disabled={isApplying || !canApply}
-          whatsapp={whatsapp}
+          delivery={delivery}
           onApply={applyDocument}
           onFinished={() => router.refresh()}
         />
       )}
 
-      {status === "DRAFT" && !whatsapp && (
+      {status === "DRAFT" && !delivery && (
         <Button
           type="button"
           onClick={handleApply}
@@ -200,12 +203,13 @@ export function DocumentActions({
 
       {/* Sólo ya aplicada: un borrador todavía puede cambiar y uno cancelado
           ya no vale. Se pinta aunque falte configurar: el diálogo dice qué
-          falta, que es mejor que un botón que no aparece. */}
-      {status === "APPLIED" && whatsapp && (
-        <ResendWhatsappDialog
+          falta, que es mejor que un botón que no aparece. Sólo se esconde
+          si ADMIN apagó todos los canales: ahí no hay nada que ofrecer. */}
+      {status === "APPLIED" && delivery && anyChannelEnabled(delivery) && (
+        <ResendVoucherDialog
           documentId={documentId}
           documentCode={documentCode}
-          whatsapp={whatsapp}
+          delivery={delivery}
         />
       )}
 
