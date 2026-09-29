@@ -88,6 +88,7 @@ export default async function PrintOrderPage({ params }: PageProps) {
           label="Entrega"
           value={order.dueDate ? formatDate(order.dueDate) : null}
         />
+        <Field label="Lugar de entrega" value={order.deliveryPlace} />
         <Field
           label="Material"
           value={

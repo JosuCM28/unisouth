@@ -96,6 +96,7 @@ export default async function PlantOrderPage({ params }: PageProps) {
     reference: order.reference,
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
+    deliveryPlace: order.deliveryPlace,
     notes: order.notes,
     cutHeader: {
       cutFabricText: order.cutFabricText ?? "",

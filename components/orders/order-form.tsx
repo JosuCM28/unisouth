@@ -76,6 +76,7 @@ export interface EditableOrder {
   reference: string | null;
   orderedAt: string;
   dueDate: string | null;
+  deliveryPlace: string | null;
   notes: string | null;
   cutHeader: OrderCutHeaderDraft;
   cutClosing: OrderCutClosingDraft;
@@ -165,6 +166,9 @@ export function OrderForm({
   const [dueDate, setDueDate] = useState(
     order?.dueDate ?? defaults?.dueDate ?? "",
   );
+  const [deliveryPlace, setDeliveryPlace] = useState(
+    order?.deliveryPlace ?? "",
+  );
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [cutHeader, setCutHeader] = useState<OrderCutHeaderDraft>(
     order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
@@ -187,6 +191,7 @@ export function OrderForm({
       reference: order?.reference ?? "",
       orderedAt: order?.orderedAt ?? todayInputValue(),
       dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
+      deliveryPlace: order?.deliveryPlace ?? "",
       notes: order?.notes ?? "",
       cutHeader: order?.cutHeader ?? EMPTY_ORDER_CUT_HEADER,
       cutClosing: order?.cutClosing ?? EMPTY_ORDER_CUT_CLOSING,
@@ -257,6 +262,7 @@ export function OrderForm({
       reference,
       orderedAt,
       dueDate,
+      deliveryPlace,
       notes,
       cutHeader,
       cutClosing,
@@ -284,6 +290,7 @@ export function OrderForm({
       reference: reference || undefined,
       orderedAt: orderedAt || undefined,
       dueDate: dueDate || undefined,
+      deliveryPlace: deliveryPlace || undefined,
       notes: notes || undefined,
       cutFabricText: cutHeader.cutFabricText || undefined,
       cutPattern: cutHeader.cutPattern || undefined,
@@ -601,6 +608,17 @@ export function OrderForm({
               </div>
             </div>
 
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="order-delivery-place">Lugar de entrega</Label>
+              <Input
+                id="order-delivery-place"
+                placeholder="Opcional"
+                value={deliveryPlace}
+                onChange={(event) => setDeliveryPlace(event.target.value)}
+                className="touch-target"
+              />
+            </div>
+
             <FormSelectField id="order-run" label="Producción">
               <SearchSelect
                 id="order-run"
@@ -688,6 +706,7 @@ function snapshot(state: {
   reference: string;
   orderedAt: string;
   dueDate: string;
+  deliveryPlace: string;
   notes: string;
   cutHeader: OrderCutHeaderDraft;
   cutClosing: OrderCutClosingDraft;

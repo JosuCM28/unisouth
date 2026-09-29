@@ -141,6 +141,8 @@ async function loadTemplate(id: string) {
     orderedAt: todayInputValue(),
     // La fecha de entrega es de aquel compromiso, no de éste.
     dueDate: null,
+    // El lugar sí se copia: el mismo cliente suele recibir en el mismo sitio.
+    deliveryPlace: order.deliveryPlace,
     notes: order.notes,
     cutHeader: {
       cutFabricText: order.cutFabricText ?? "",

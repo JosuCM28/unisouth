@@ -917,6 +917,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             value={order.dueDate ? formatDate(order.dueDate) : null}
             tabular
           />
+          <Row label="Lugar de entrega" value={order.deliveryPlace} />
           <Row
             label="Material"
             value={

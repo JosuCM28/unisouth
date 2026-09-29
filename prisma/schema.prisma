@@ -1612,6 +1612,10 @@ model CuttingOrder {
   description String?
   /// The client's own order number, written on the paper.
   reference   String?
+  /// Where the finished garments go ("Planta Ternium Pesquería, almacén 3").
+  /// Free text and not a catalogue: it changes order by order and the client
+  /// dictates it on the phone. Printed on the order sheet next to the due date.
+  deliveryPlace String?
 
   // ── Header of the CUTTING BREAKDOWN ──────────────────────────────────────
   // The same boxes the issue voucher prints. They live HERE because the order

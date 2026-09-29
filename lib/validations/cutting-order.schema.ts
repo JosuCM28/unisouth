@@ -48,6 +48,7 @@ export const cuttingOrderSchema = z.object({
   reference: optionalText,
   orderedAt: localDate.optional(),
   dueDate: localDate.optional(),
+  deliveryPlace: optionalText,
   notes: optionalText,
 
   /* El encabezado del corte, el mismo que imprime el vale de salida.

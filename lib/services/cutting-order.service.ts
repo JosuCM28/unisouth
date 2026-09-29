@@ -132,6 +132,7 @@ export class CuttingOrderService extends BaseService {
           reference: input.reference,
           orderedAt: input.orderedAt ?? new Date(),
           dueDate: input.dueDate,
+          deliveryPlace: input.deliveryPlace,
           notes: input.notes,
           cutFabricText: input.cutFabricText,
           cutPattern: input.cutPattern,
@@ -413,6 +414,8 @@ export class CuttingOrderService extends BaseService {
           reference: input.reference,
           orderedAt: input.orderedAt ?? current.orderedAt,
           dueDate: input.dueDate,
+          // Vaciar el lugar llega como undefined: `?? null` para que sí se borre.
+          deliveryPlace: input.deliveryPlace ?? null,
           notes: input.notes,
           /* `?? null` por la misma razón que la carpeta: vaciar el molde o la
              versión llega como undefined y Prisma lo ignoraría, dejando el
