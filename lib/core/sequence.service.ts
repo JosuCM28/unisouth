@@ -54,6 +54,34 @@ export class SequenceService {
     return this.format(fullPrefix, consecutive, sequence.padding);
   }
 
+  /**
+   * Aparta `count` números seguidos de una serie SIN año ni prefijo.
+   *
+   * Para contadores que no son folios —el número de ítem de lo que se manda
+   * por correo— y que siguen corriendo de un año al siguiente. `firstValue`
+   * es por dónde arranca la serie la primera vez: se venía numerando a mano y
+   * el sistema continúa donde se quedó el papel.
+   *
+   * Mismo `increment` atómico que `next()`: dos envíos simultáneos nunca
+   * reciben el mismo número.
+   */
+  async reserveNumbers(
+    seriesKey: string,
+    count: number,
+    firstValue: number,
+  ): Promise<number[]> {
+    if (count <= 0) return [];
+
+    const sequence = await this.db.sequence.upsert({
+      where: { key: seriesKey },
+      update: { next: { increment: count } },
+      create: { key: seriesKey, prefix: "", next: firstValue + count, padding: 0 },
+    });
+
+    const first = sequence.next - count;
+    return Array.from({ length: count }, (_, index) => first + index);
+  }
+
   /** Sólo consulta cuál sería el próximo folio. No aparta nada. */
   async peek(seriesKey: string, prefix: string, padding = 5): Promise<string> {
     const year = new Date().getFullYear();

@@ -1,4 +1,4 @@
-import { formatDate, formatQuantity } from "@/lib/utils";
+import { formatQuantity } from "@/lib/utils";
 import type { ReceiptSummary } from "./receipt-summary";
 
 /**
@@ -15,15 +15,14 @@ export function receiptEmailSubject(summary: ReceiptSummary): string {
 export function receiptEmailText(summary: ReceiptSummary): string {
   const header = [
     `RECEPCIÓN DE TELA ${summary.code}`,
-    `Fecha: ${formatDate(summary.date)}`,
-    `Guía: ${summary.guide}`,
-    `Paquetería: ${summary.carrier}`,
+    `Fecha: ${summary.sentOn}`,
+    `Paquetería y guía: ${summary.shipping}`,
     `Rollos recibidos: ${summary.totalRolls}`,
   ];
 
-  const detail = summary.rows.map((row, index) =>
+  const detail = summary.rows.map((row) =>
     [
-      `${index + 1}. ${row.fabric} (${row.fabricCode})`,
+      `Ítem ${row.item}. ${row.fabric}`,
       `   Tono: ${row.shade}`,
       `   Rollos: ${row.rolls} · Cantidad: ${formatQuantity(row.quantity, { unit: row.unitShort })}`,
       `   Cliente dueño: ${row.owner}`,

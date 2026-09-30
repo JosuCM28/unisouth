@@ -586,6 +586,29 @@ export class ReceiptRepository extends BaseRepository<
     return this.findWithLots({ code });
   }
 
+  /**
+   * Bloquea la recepción hasta el final de la transacción.
+   *
+   * Dos envíos del mismo correo al mismo tiempo leerían la recepción sin
+   * números y apartarían cada uno los suyos: la misma fila saldría con dos
+   * ítems distintos. Con la fila bloqueada, el segundo espera y encuentra
+   * los números del primero.
+   */
+  async lockForUpdate(id: string): Promise<void> {
+    await this.db.$queryRaw`SELECT id FROM receipts WHERE id = ${id} FOR UPDATE`;
+  }
+
+  /** Guarda el número de ítem de cada renglón del Excel. */
+  async saveMailedItemNumbers(
+    id: string,
+    numbers: Record<string, number>,
+  ): Promise<void> {
+    await this.db.receipt.update({
+      where: { id },
+      data: { mailedItemNumbers: numbers },
+    });
+  }
+
   /** Lo mismo, por id: el envío por correo viaja con el id, no con el folio. */
   async findByIdWithLots(id: string) {
     return this.findWithLots({ id });

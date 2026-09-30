@@ -573,6 +573,16 @@ model Receipt {
   notes         String?
   extras        Json?
 
+  /// Item number of each row of the Excel that goes out by email, keyed by
+  /// the row (fabric|unit|shade|owner): { "m1|METER|T3|Ternium": 54 }.
+  ///
+  /// Kept here so a RESEND carries the same numbers as the first send: the
+  /// numbering is a running count across receipts, and taking new ones every
+  /// time the same paper goes out again would skip numbers and give one row
+  /// two items. A row that appears later (a roll added by editing) gets the
+  /// next free number.
+  mailedItemNumbers Json?
+
   recordedById String?
   recordedBy   User?   @relation("ReceiptRecordedBy", fields: [recordedById], references: [id])
 

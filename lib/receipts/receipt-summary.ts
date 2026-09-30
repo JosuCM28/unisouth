@@ -1,6 +1,7 @@
 import type { Unit } from "@prisma/client";
 import { UNIT_LABELS, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { toXlsx, type XlsxColumn } from "@/lib/export/xlsx";
+import { APP_TIMEZONE } from "@/lib/utils";
 
 /**
  * LO QUE LLEGÓ EN UNA RECEPCIÓN, como se le cuenta a alguien de fuera.
@@ -22,54 +23,73 @@ import { toXlsx, type XlsxColumn } from "@/lib/export/xlsx";
 export const MISSING_INFO =
   "Favor de contactarnos para ayudarnos a trazar esta información";
 
+/**
+ * La serie del número de ítem y dónde arranca.
+ *
+ * Arranca en 54 porque se venía numerando a mano y el sistema continúa donde
+ * se quedó el papel. Corre de corrido entre recepciones y entre años.
+ */
+export const ITEM_SERIES = "RECEIPT_EMAIL_ITEM";
+export const FIRST_ITEM_NUMBER = 54;
+
 /** Lo mínimo de la recepción que el resumen necesita. */
 export interface ReceiptForSummary {
   code: string;
-  date: Date;
   guideNumber: string | null;
   carrier: { name: string } | null;
   lots: {
     unit: Unit;
     initialQuantity: unknown;
     shade: string | null;
-    material: { id: string; name: string; code: string };
+    material: { id: string; name: string };
     client: { name: string } | null;
   }[];
 }
 
 export interface ReceiptSummaryRow {
+  /** Identifica el renglón entre envíos, para conservar su número de ítem. */
+  key: string;
+  item: number;
   fabric: string;
-  fabricCode: string;
   shade: string;
   rolls: number;
   quantity: number;
   unit: string;
   /** "m", "kg": para el cuerpo del correo, donde "89.5 Metro" se lee mal. */
   unitShort: string;
-  guide: string;
-  carrier: string;
   owner: string;
 }
 
 export interface ReceiptSummary {
   code: string;
-  date: Date;
-  guide: string;
-  carrier: string;
+  /** La fecha del envío, ya como día/mes/año. */
+  sentOn: string;
+  /** Paquetería y guía en un solo dato, como se rastrea el envío. */
+  shipping: string;
   rows: ReceiptSummaryRow[];
   totalRolls: number;
 }
 
-export function summarizeReceipt(receipt: ReceiptForSummary): ReceiptSummary {
-  const guide = receipt.guideNumber || MISSING_INFO;
-  const carrier = receipt.carrier?.name || MISSING_INFO;
+type GroupedRow = Omit<ReceiptSummaryRow, "item">;
 
+/** Las llaves de los renglones, en orden: a éstas se les aparta número. */
+export function receiptRowKeys(receipt: ReceiptForSummary): string[] {
+  return groupLots(receipt.lots).map((row) => row.key);
+}
+
+export function summarizeReceipt(
+  receipt: ReceiptForSummary,
+  itemNumbers: Record<string, number>,
+  sentAt: Date,
+): ReceiptSummary {
   return {
     code: receipt.code,
-    date: receipt.date,
-    guide,
-    carrier,
-    rows: groupLots(receipt.lots, guide, carrier),
+    sentOn: dayMonthYear(sentAt),
+    shipping: shippingOf(receipt.carrier?.name, receipt.guideNumber),
+    rows: groupLots(receipt.lots).map((row) => ({
+      ...row,
+      item: itemNumbers[row.key] ?? 0,
+    })),
     totalRolls: receipt.lots.length,
   };
 }
@@ -82,12 +102,8 @@ export function summarizeReceipt(receipt: ReceiptForSummary): ReceiptSummary {
  * guía puede traer tela de dos clientes, y juntarla en un renglón le diría a
  * uno que recibió lo del otro.
  */
-function groupLots(
-  lots: ReceiptForSummary["lots"],
-  guide: string,
-  carrier: string,
-): ReceiptSummaryRow[] {
-  const groups = new Map<string, ReceiptSummaryRow>();
+function groupLots(lots: ReceiptForSummary["lots"]): GroupedRow[] {
+  const groups = new Map<string, GroupedRow>();
 
   for (const lot of lots) {
     const shade = lot.shade || MISSING_INFO;
@@ -95,15 +111,13 @@ function groupLots(
     const key = [lot.material.id, lot.unit, shade, owner].join("|");
 
     const row = groups.get(key) ?? {
+      key,
       fabric: lot.material.name,
-      fabricCode: lot.material.code,
       shade,
       rolls: 0,
       quantity: 0,
       unit: UNIT_LABELS[lot.unit],
       unitShort: UNIT_SHORT_LABELS[lot.unit],
-      guide,
-      carrier,
       owner,
     };
 
@@ -115,27 +129,57 @@ function groupLots(
   return [...groups.values()];
 }
 
-const COLUMNS: XlsxColumn<ReceiptSummaryRow>[] = [
-  { header: "Tela", value: (row) => row.fabric, width: 30 },
-  { header: "Código", value: (row) => row.fabricCode, width: 14 },
-  { header: "Tono", value: (row) => row.shade, width: 24 },
-  { header: "Rollos", value: (row) => row.rolls, kind: "number" },
-  { header: "Cantidad", value: (row) => row.quantity, kind: "number" },
-  { header: "Unidad", value: (row) => row.unit, width: 12 },
-  { header: "Guía", value: (row) => row.guide, width: 20 },
-  { header: "Paquetería", value: (row) => row.carrier, width: 20 },
-  { header: "Cliente dueño", value: (row) => row.owner, width: 26 },
-];
+/**
+ * "DHL · Guía 4471-8820". Si falta una de las dos se dice cuál; si faltan
+ * las dos, sólo la leyenda.
+ */
+function shippingOf(
+  carrier: string | null | undefined,
+  guide: string | null,
+): string {
+  if (carrier && guide) return `${carrier} · Guía ${guide}`;
+  if (carrier) return `${carrier} · Guía: ${MISSING_INFO}`;
+  if (guide) return `Guía ${guide} · Paquetería: ${MISSING_INFO}`;
+  return MISSING_INFO;
+}
 
 /**
- * El Excel adjunto: una tabla con filtro, fila por fila.
+ * Día/mes/año en la zona de la fábrica, como TEXTO.
  *
- * Guía y paquetería se repiten en cada renglón a propósito: quien recibe el
- * archivo suele pegarlo en su propio control, y un renglón que no dice de
- * qué guía vino pierde el dato en cuanto se separa de los demás.
+ * Texto y no celda de fecha: el formato de una fecha en Excel lo decide la
+ * configuración de quien abre, y en una máquina en inglés saldría mes/día.
+ * Aquí se pidió día/mes/año y así tiene que leerse en cualquier equipo.
  */
+function dayMonthYear(date: Date): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: APP_TIMEZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+const COLUMNS: XlsxColumn<ReceiptSummaryRow & { sentOn: string; shipping: string }>[] = [
+  { header: "No. de ítem", value: (row) => row.item, kind: "number", width: 12 },
+  { header: "Fecha", value: (row) => row.sentOn, width: 12 },
+  { header: "Tela", value: (row) => row.fabric, width: 30 },
+  { header: "Tono", value: (row) => row.shade, width: 24 },
+  { header: "Rollos", value: (row) => row.rolls, kind: "number" },
+  { header: "Metraje / cantidad", value: (row) => row.quantity, kind: "number", width: 18 },
+  { header: "Unidad", value: (row) => row.unit, width: 12 },
+  { header: "Cliente dueño", value: (row) => row.owner, width: 26 },
+  { header: "Paquetería y guía", value: (row) => row.shipping, width: 30 },
+];
+
+/** El Excel adjunto: una tabla con filtro, fila por fila. */
 export function receiptSummaryXlsx(summary: ReceiptSummary): Buffer {
-  return toXlsx(summary.rows, COLUMNS, "Recepción");
+  const rows = summary.rows.map((row) => ({
+    ...row,
+    sentOn: summary.sentOn,
+    shipping: summary.shipping,
+  }));
+
+  return toXlsx(rows, COLUMNS, "Recepción");
 }
 
 export function receiptSummaryFileName(summary: ReceiptSummary): string {

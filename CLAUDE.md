@@ -509,7 +509,11 @@ guardado en la tabla `Setting`; el servidor lo vuelve a revisar al enviar.
 La **recepción** usa el mismo canal y la misma lista de correos: al guardarla
 se pregunta si se manda, y la ficha tiene "Enviar recepción". Asunto
 `RECEPCIÓN DE TELA {folio}`, Excel adjunto con un renglón por tela + tono +
-dueño. Donde falta guía, paquetería, tono o dueño se escribe la leyenda de
+dueño y estas columnas: No. de ítem · Fecha (día/mes/año) · Tela · Tono ·
+Rollos · Metraje/cantidad · Unidad · Cliente dueño · Paquetería y guía. El
+número de ítem es una serie corrida que arrancó en 54 (`RECEIPT_EMAIL_ITEM`);
+cada renglón guarda el suyo en `Receipt.mailedItemNumbers` para que un
+reenvío salga con los mismos números. Donde falta guía, paquetería, tono o dueño se escribe la leyenda de
 `MISSING_INFO` en vez de dejar el hueco. Ambos envíos pasan por
 `EmailDispatchService`, que es quien revisa el interruptor, lee las
 direcciones de la tabla y deja el rastro en la bitácora.
