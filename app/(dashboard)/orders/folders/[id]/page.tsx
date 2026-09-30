@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ExportButton } from "@/components/shared/export-button";
 import { Button } from "@/components/ui/button";
 import { FolderArchiveButton } from "@/components/orders/folder-archive-button";
+import { FolderCutDialog } from "@/components/orders/folder-cut-dialog";
 import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
 import { FolderSendToIssueDialog } from "@/components/orders/folder-send-to-issue-dialog";
 import { FolderWorkshopDialog } from "@/components/orders/folder-workshop-dialog";
@@ -137,6 +138,17 @@ export default async function OrderFolderPage({ params }: PageProps) {
 
           {send && !isArchived && (
             <>
+              {/* Con una sola orden no hay nada que repartir: el corte de esa
+                  orden ya se captura dentro de ella. */}
+              {send.cuttable.length > 1 && (
+                <FolderCutDialog
+                  folderId={folder.id}
+                  folderCode={folder.code}
+                  orders={send.cuttable}
+                  tags={send.tags}
+                />
+              )}
+
               <FolderSendToIssueDialog
                 folderId={folder.id}
                 folderCode={folder.code}
@@ -271,7 +283,7 @@ async function buildSendContext(
   repository: OrderFolderRepository,
   folderId: string,
 ) {
-  const [orders, workshops, stages] = await Promise.all([
+  const [orders, workshops, stages, cuttable, tags] = await Promise.all([
     repository.findSendableCuts(folderId),
     prisma.workshop.findMany({
       where: { deletedAt: null, active: true },
@@ -283,12 +295,35 @@ async function buildSendContext(
       select: { id: true, name: true },
       orderBy: [{ position: "asc" }, { name: "asc" }],
     }),
+    repository.findCuttableOrders(folderId),
+    // Sólo los foleos vigentes: un color dado de baja no se ofrece para nuevos bultos.
+    prisma.cutTagOption.findMany({
+      where: { deletedAt: null, active: true },
+      select: { id: true, name: true, color: true },
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+    }),
   ]);
 
   return {
     preview: buildFolderSendPreview(orders, cutBatchLabel),
     workshops,
     stages,
+    tags,
+    cuttable: cuttable.map((order) => ({
+      id: order.id,
+      code: order.code,
+      hint: order.description ?? order.reference,
+      sizes: order.lines.map((line) => ({
+        lineId: line.id,
+        code: line.size.code,
+        name: line.size.name,
+        ordered: line.orderedQuantity,
+        cut: line.cutQuantity,
+        note: line.notes,
+        tag: line.cutTag,
+        tagId: line.tagId,
+      })),
+    })),
   };
 }
 

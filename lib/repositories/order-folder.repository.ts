@@ -191,6 +191,31 @@ export class OrderFolderRepository extends BaseRepository<
    * OUT-2026-0912" en vez de callárselos. Quién se salta y quién no lo decide
    * el servicio, que es donde vive la regla.
    */
+  async findCuttableOrders(folderId: string) {
+    return this.db.cuttingOrder.findMany({
+      where: { folderId, status: { not: "CANCELLED" } },
+      orderBy: [{ orderedAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        reference: true,
+        lines: {
+          orderBy: [{ size: { order: "asc" } }, { position: "asc" }],
+          select: {
+            id: true,
+            orderedQuantity: true,
+            cutQuantity: true,
+            notes: true,
+            tagId: true,
+            size: { select: { code: true, name: true } },
+            cutTag: { select: { name: true, color: true } },
+          },
+        },
+      },
+    });
+  }
+
   async findSendableCuts(folderId: string) {
     return this.db.cuttingOrder.findMany({
       where: { folderId, status: { not: "CANCELLED" } },

@@ -5,11 +5,13 @@ import { toCutLines, type CutLineDraft } from "@/lib/cut-lines";
 import { cutBatchLabel } from "@/lib/constants/labels";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import type {
+  FolderCutInput,
   FolderWorkshopInput,
   OrderFolderInput,
 } from "@/lib/validations/order-folder.schema";
 import { BaseService } from "./base.service";
 import { DocumentService } from "./document.service";
+import { CuttingOrderService } from "./cutting-order.service";
 import { GarmentShipmentService } from "./garment-shipment.service";
 
 /** Un corte que no viajó, y por qué. Se avisa; nunca se calla. */
@@ -44,6 +46,95 @@ export interface FolderShipmentResult {
  * exactamente el problema que se quiere resolver.
  */
 export class OrderFolderService extends BaseService {
+  /**
+   * Captura un corte que sirvió a varias órdenes del pedido a la vez.
+   *
+   * Pasa cuando dos órdenes se tienden juntas y los bultos se amarran pensando
+   * en ambas: capturarlo dos veces obliga a repartir a mano y a abrir dos
+   * diálogos de pie en la mesa. Aquí se teclea una vez y se abre UN corte
+   * nuevo en cada orden, con el mismo nombre, por el mismo camino que la
+   * captura normal (`saveBatchProgress`), así que el acumulado, el estado y
+   * la auditoría de cada orden siguen sus reglas de siempre.
+   *
+   * Todo en una transacción: si una orden rechaza su captura, ninguna queda a
+   * medias, porque un corte guardado en una sola dejaría el conjunto cojo.
+   */
+  async saveGlobalCut(input: FolderCutInput) {
+    return this.transaction(async (tx) => {
+      const folder = await tx.orderFolder.findUnique({
+        where: { id: input.folderId },
+        select: { id: true, code: true, archivedAt: true },
+      });
+
+      if (!folder) throw new NotFoundError("el pedido", input.folderId);
+
+      if (folder.archivedAt) {
+        throw new BusinessRuleError(
+          `El pedido ${folder.code} está archivado y no admite capturas.`,
+        );
+      }
+
+      const orderIds = input.orders.map((entry) => entry.orderId);
+      const orders = await tx.cuttingOrder.findMany({
+        where: { id: { in: orderIds }, folderId: folder.id },
+        select: { id: true, code: true },
+      });
+
+      // Una orden de otro pedido no se cuela: el corte es de ESTE pedido.
+      if (orders.length !== new Set(orderIds).size) {
+        throw new BusinessRuleError(
+          "Alguna orden de la captura no es de este pedido. Vuelve a abrirlo y captura otra vez.",
+        );
+      }
+
+      const codeOf = new Map(orders.map((order) => [order.id, order.code]));
+      const label = input.label ?? "Corte conjunto";
+      const service = new CuttingOrderService(this.context, tx);
+
+      const results = [];
+      for (const entry of input.orders) {
+        const code = codeOf.get(entry.orderId)!;
+        // Cada corte deja dicho con quién se tendió: es la liga entre ellos.
+        const others = orders
+          .filter((order) => order.id !== entry.orderId)
+          .map((order) => order.code);
+        const together = others.length
+          ? `Corte conjunto con ${others.join(", ")}`
+          : undefined;
+
+        const result = await service.saveBatchProgress({
+          orderId: entry.orderId,
+          batchId: undefined,
+          newBatchLabel: label,
+          notes:
+            [input.notes, together].filter(Boolean).join(" · ") || undefined,
+          lines: entry.lines,
+        });
+
+        results.push({ orderCode: code, ...result });
+      }
+
+      await this.auditWith(tx).record({
+        entity: "OrderFolder",
+        entityId: folder.id,
+        action: "UPDATE",
+        reference: folder.code,
+        newValue: {
+          corteGlobal: label,
+          ordenes: results.map((result) => result.orderCode),
+          piezas: results.reduce((sum, result) => sum + result.pieces, 0),
+        },
+        sensitivity: "LOW",
+      });
+
+      return {
+        orders: results.length,
+        pieces: results.reduce((s, r) => s + r.pieces, 0),
+        bundles: results.reduce((s, r) => s + r.bundles, 0),
+      };
+    });
+  }
+
   async create(input: OrderFolderInput): Promise<OrderFolder> {
     return this.transaction(async (tx) => {
       const code = await this.sequencesWith(tx).next("ORDER_FOLDER", "PED", 4);
@@ -116,7 +207,9 @@ export class OrderFolderService extends BaseService {
       if (!current) throw new NotFoundError("la carpeta", id);
 
       if (current.archivedAt) {
-        throw new BusinessRuleError(`El pedido ${current.code} ya está archivado.`);
+        throw new BusinessRuleError(
+          `El pedido ${current.code} ya está archivado.`,
+        );
       }
 
       const pending = await tx.cuttingOrder.count({
@@ -373,7 +466,8 @@ export class OrderFolderService extends BaseService {
         /* Del encabezado sólo viaja lo que TODAS comparten. Heredar el molde
            de una de cinco órdenes pondría en el papel un dato que es falso
            para las otras cuatro, y ese papel se corta. */
-        cutDescription: sharedValue(orders, (o) => o.description) ?? folder.name,
+        cutDescription:
+          sharedValue(orders, (o) => o.description) ?? folder.name,
         cutFabricId: sharedValue(orders, (o) => o.materialId),
         cutFabricText: sharedValue(orders, (o) => o.cutFabricText),
         cutPattern: sharedValue(orders, (o) => o.cutPattern),

@@ -6,6 +6,7 @@ import {
   optionalText,
   requiredText,
 } from "./common";
+import { batchProgressSchema } from "./cutting-order.schema";
 
 /**
  * Una carpeta de pedido.
@@ -54,3 +55,29 @@ export const folderWorkshopSchema = z.object({
 });
 
 export type FolderWorkshopInput = z.infer<typeof folderWorkshopSchema>;
+
+/**
+ * El corte GLOBAL del pedido: una sola captura que reparte bultos entre varias
+ * órdenes.
+ *
+ * Reusa el esquema de las líneas del corte de una orden para que las reglas de
+ * cantidad, bultos y foleo sean LAS MISMAS en las dos pantallas. Sólo viajan
+ * las órdenes que de verdad llevan piezas: una orden en blanco no dice nada.
+ */
+export const folderCutSchema = z.object({
+  folderId: cuidSchema,
+  /* El nombre que llevará el corte en CADA orden. Es lo que permite reconocer
+     después que dos cortes salieron de la misma mesa. */
+  label: optionalText,
+  notes: optionalText,
+  orders: z
+    .array(
+      z.object({
+        orderId: cuidSchema,
+        lines: batchProgressSchema.shape.lines,
+      }),
+    )
+    .min(1, "Captura piezas de al menos una orden"),
+});
+
+export type FolderCutInput = z.infer<typeof folderCutSchema>;

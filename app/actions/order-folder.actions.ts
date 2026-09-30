@@ -4,6 +4,7 @@ import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, optionalCuid } from "@/lib/validations/common";
 import {
+  folderCutSchema,
   folderIssueSchema,
   folderWorkshopSchema,
   orderFolderSchema,
@@ -132,5 +133,21 @@ export async function sendFolderToWorkshopAction(input: unknown) {
     successMessage: "Pedido enviado al taller",
     handler: ({ input, auditContext }) =>
       new OrderFolderService(auditContext).sendToWorkshop(input.id, input),
+  });
+}
+
+/**
+ * El corte global: una captura que reparte bultos entre varias órdenes.
+ *
+ * Mismo permiso que capturar el corte de una orden.
+ */
+export async function saveFolderCutAction(input: unknown) {
+  return executeAction(input, {
+    schema: folderCutSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Corte global capturado",
+    handler: ({ input, auditContext }) =>
+      new OrderFolderService(auditContext).saveGlobalCut(input),
   });
 }
