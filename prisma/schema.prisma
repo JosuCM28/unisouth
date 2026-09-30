@@ -1738,6 +1738,14 @@ model CuttingBatch {
   label  String?
   notes  String?
 
+  /// Links the cuts that came off ONE table shared by several orders of the
+  /// same folder ("global cut"). Null for an ordinary cut.
+  ///
+  /// A real column and not "same label": two orders can both call a cut
+  /// "muestra" without having been laid together, and editing the global cut
+  /// must touch exactly the batches that were captured as one.
+  groupId String?
+
   openedAt DateTime @default(now())
 
   createdById String?
@@ -1756,6 +1764,7 @@ model CuttingBatch {
 
   @@unique([orderId, number])
   @@index([orderId])
+  @@index([groupId])
   @@map("cutting_batches")
 }
 

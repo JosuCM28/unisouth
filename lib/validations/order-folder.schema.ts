@@ -6,7 +6,7 @@ import {
   optionalText,
   requiredText,
 } from "./common";
-import { batchProgressSchema } from "./cutting-order.schema";
+import { batchLineSchema } from "./cutting-order.schema";
 
 /**
  * Una carpeta de pedido.
@@ -66,16 +66,31 @@ export type FolderWorkshopInput = z.infer<typeof folderWorkshopSchema>;
  */
 export const folderCutSchema = z.object({
   folderId: cuidSchema,
+  /* El corte global que se está corrigiendo. Vacío = se abre uno nuevo. Es lo
+     que identifica QUÉ cortes de cada orden se capturaron juntos. */
+  groupId: z.string().min(1).optional(),
   /* El nombre que llevará el corte en CADA orden. Es lo que permite reconocer
      después que dos cortes salieron de la misma mesa. */
   label: optionalText,
   notes: optionalText,
   orders: z
     .array(
-      z.object({
-        orderId: cuidSchema,
-        lines: batchProgressSchema.shape.lines,
-      }),
+      z
+        .object({
+          orderId: cuidSchema,
+          /* El corte que esa orden ya tiene dentro del grupo, al corregir. */
+          batchId: optionalCuid,
+          lines: z
+            .array(batchLineSchema)
+            .transform((lines) => lines.filter((line) => line.quantity !== 0)),
+        })
+        /* Sin corte previo, una orden sin piezas no dice nada. Con él sí: es
+           una orden que dejó de recibir piezas al corregir el reparto y su
+           corte tiene que quedar vacío. */
+        .refine(
+          (entry) => Boolean(entry.batchId) || entry.lines.length > 0,
+          "Captura piezas de al menos una talla",
+        ),
     )
     .min(1, "Captura piezas de al menos una orden"),
 });

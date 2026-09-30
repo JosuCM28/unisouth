@@ -200,6 +200,31 @@ export class OrderFolderRepository extends BaseRepository<
         code: true,
         description: true,
         reference: true,
+        /* Sólo los cortes de un corte GLOBAL: son los que se corrigen desde
+           aquí. Los ordinarios se corrigen dentro de su orden. */
+        batches: {
+          where: { groupId: { not: null } },
+          orderBy: { number: "asc" },
+          select: {
+            id: true,
+            groupId: true,
+            label: true,
+            openedAt: true,
+            entries: {
+              select: { lineId: true, quantity: true, bundles: true, tagId: true },
+            },
+            /* Los dos caminos por los que un corte ya pudo salir en un vale
+               vivo: el propio y el global del pedido. */
+            issues: {
+              where: { status: { not: "CANCELLED" } },
+              select: { code: true, status: true },
+            },
+            folderIssues: {
+              where: { status: { not: "CANCELLED" } },
+              select: { code: true, status: true },
+            },
+          },
+        },
         lines: {
           orderBy: [{ size: { order: "asc" } }, { position: "asc" }],
           select: {

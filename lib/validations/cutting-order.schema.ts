@@ -186,6 +186,31 @@ export type CuttingBatchInput = z.infer<typeof cuttingBatchSchema>;
  * Los renglones en cero se descartan ANTES de validar: se capturan a mano y un
  * renglón que se agregó y se dejó vacío no dice nada.
  */
+export const batchLineSchema = z.object({
+  /* El RENGLÓN de la orden, no la talla: sólo se captura contra lo que
+     la orden pidió. Y es el renglón y no la talla porque una orden puede
+     llevar la misma talla en dos renglones —con foleos o anotaciones
+     distintas—, y resolver por talla mandaría a uno lo capturado en el
+     otro. */
+  lineId: cuidSchema,
+  /* Puede ser NEGATIVA: así se corrige un conteo de más sin borrar lo
+     capturado antes, igual que un ajuste del kárdex. */
+  quantity: z.coerce
+    .number({ message: "Escribe cuántas piezas se cortaron" })
+    .int("Las piezas se cuentan enteras"),
+  bundles: z.coerce
+    .number({ message: "Escribe cuántos bultos son" })
+    .int("Los bultos se cuentan enteros")
+    .positive("Al menos un bulto")
+    .default(1),
+  /* El foleo QUE SE LE AMARRÓ A ESTE BULTO. Opcional: el color se sabe
+     en la mesa y hay cortes que salen sin papelito. Va por renglón y no
+     por corte porque de un mismo tendido pueden salir bultos de dos
+     colores, y un solo campo arriba obligaría a abrir dos cortes para
+     algo que en la mesa fue uno. */
+  tagId: optionalCuid,
+});
+
 export const batchProgressSchema = z.object({
   orderId: cuidSchema,
   /* El corte al que va la tanda. Si viene vacío se abre uno nuevo EN LA MISMA
@@ -195,32 +220,7 @@ export const batchProgressSchema = z.object({
   newBatchLabel: optionalText,
   notes: optionalText,
   lines: z
-    .array(
-      z.object({
-        /* El RENGLÓN de la orden, no la talla: sólo se captura contra lo que
-           la orden pidió. Y es el renglón y no la talla porque una orden puede
-           llevar la misma talla en dos renglones —con foleos o anotaciones
-           distintas—, y resolver por talla mandaría a uno lo capturado en el
-           otro. */
-        lineId: cuidSchema,
-        /* Puede ser NEGATIVA: así se corrige un conteo de más sin borrar lo
-           capturado antes, igual que un ajuste del kárdex. */
-        quantity: z.coerce
-          .number({ message: "Escribe cuántas piezas se cortaron" })
-          .int("Las piezas se cuentan enteras"),
-        bundles: z.coerce
-          .number({ message: "Escribe cuántos bultos son" })
-          .int("Los bultos se cuentan enteros")
-          .positive("Al menos un bulto")
-          .default(1),
-        /* El foleo QUE SE LE AMARRÓ A ESTE BULTO. Opcional: el color se sabe
-           en la mesa y hay cortes que salen sin papelito. Va por renglón y no
-           por corte porque de un mismo tendido pueden salir bultos de dos
-           colores, y un solo campo arriba obligaría a abrir dos cortes para
-           algo que en la mesa fue uno. */
-        tagId: optionalCuid,
-      }),
-    )
+    .array(batchLineSchema)
     .transform((lines) => lines.filter((line) => line.quantity !== 0))
     .refine(
       (lines) => lines.length > 0,

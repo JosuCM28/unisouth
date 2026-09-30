@@ -313,6 +313,20 @@ async function buildSendContext(
       id: order.id,
       code: order.code,
       hint: order.description ?? order.reference,
+      batches: order.batches.map((batch) => {
+        const live = [...batch.issues, ...batch.folderIssues][0];
+
+        return {
+          id: batch.id,
+          groupId: batch.groupId!,
+          label: batch.label,
+          openedAt: batch.openedAt,
+          entries: batch.entries,
+          issue: live
+            ? { code: live.code, isDraft: live.status === "DRAFT" }
+            : null,
+        };
+      }),
       sizes: order.lines.map((line) => ({
         lineId: line.id,
         code: line.size.code,

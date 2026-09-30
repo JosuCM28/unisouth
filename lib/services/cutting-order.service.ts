@@ -574,7 +574,10 @@ export class CuttingOrderService extends BaseService {
    * mismo cálculo sobre los mismos renglones, y repetirlo por cada una sólo
    * gastaría viajes a la base.
    */
-  async saveBatchProgress(input: BatchProgressInput) {
+  async saveBatchProgress(
+    input: BatchProgressInput,
+    options: { groupId?: string } = {},
+  ) {
     return this.transaction(async (tx) => {
       const orderId = input.orderId;
 
@@ -615,7 +618,13 @@ export class CuttingOrderService extends BaseService {
          un corte vacío si la captura falla. */
       const batch = input.batchId
         ? await this.requireEditableBatch(tx, input.batchId, orderId)
-        : await this.createBatch(tx, orderId, input.newBatchLabel);
+        : await this.createBatch(
+            tx,
+            orderId,
+            input.newBatchLabel,
+            undefined,
+            options.groupId,
+          );
 
       /* Los renglones que el corte tenía ANTES. Se guardan porque hay que
          recalcularlos aunque ya no vengan en la captura: si alguien quitó de
@@ -722,6 +731,7 @@ export class CuttingOrderService extends BaseService {
     orderId: string,
     label?: string,
     notes?: string,
+    groupId?: string,
   ) {
     const last = await tx.cuttingBatch.findFirst({
       where: { orderId },
@@ -735,6 +745,7 @@ export class CuttingOrderService extends BaseService {
         number: (last?.number ?? 0) + 1,
         label,
         notes,
+        groupId,
         createdById: this.context.userId,
       },
     });

@@ -89,6 +89,23 @@ export class OrderFolderService extends BaseService {
 
       const codeOf = new Map(orders.map((order) => [order.id, order.code]));
       const label = input.label ?? "Corte conjunto";
+      const groupId = input.groupId ?? crypto.randomUUID();
+
+      /* Al corregir, cada corte que se toca tiene que ser DE ESTE grupo: si no,
+         una captura armada a mano podría reescribir el corte de otra mesa. */
+      const claimed = input.orders.flatMap((entry) =>
+        entry.batchId ? [entry.batchId] : [],
+      );
+      if (claimed.length > 0) {
+        const owned = await tx.cuttingBatch.count({
+          where: { id: { in: claimed }, groupId },
+        });
+        if (owned !== claimed.length) {
+          throw new BusinessRuleError(
+            "Alguno de los cortes no pertenece a este corte global. Vuelve a abrir el pedido y captura otra vez.",
+          );
+        }
+      }
       const service = new CuttingOrderService(this.context, tx);
 
       const results = [];
@@ -102,14 +119,18 @@ export class OrderFolderService extends BaseService {
           ? `Corte conjunto con ${others.join(", ")}`
           : undefined;
 
-        const result = await service.saveBatchProgress({
-          orderId: entry.orderId,
-          batchId: undefined,
-          newBatchLabel: label,
-          notes:
-            [input.notes, together].filter(Boolean).join(" · ") || undefined,
-          lines: entry.lines,
-        });
+        const result = await service.saveBatchProgress(
+          {
+            orderId: entry.orderId,
+            batchId: entry.batchId,
+            newBatchLabel: entry.batchId ? undefined : label,
+            notes:
+              [input.notes, together].filter(Boolean).join(" · ") ||
+              undefined,
+            lines: entry.lines,
+          },
+          { groupId },
+        );
 
         results.push({ orderCode: code, ...result });
       }
@@ -131,6 +152,7 @@ export class OrderFolderService extends BaseService {
         orders: results.length,
         pieces: results.reduce((s, r) => s + r.pieces, 0),
         bundles: results.reduce((s, r) => s + r.bundles, 0),
+        replaced: results.some((result) => result.replaced),
       };
     });
   }
