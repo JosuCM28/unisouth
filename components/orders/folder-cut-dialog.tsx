@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Scissors } from "lucide-react";
+import { AlertTriangle, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { saveFolderCutAction } from "@/app/actions/order-folder.actions";
 import { runAction } from "@/lib/offline/run-action";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
+import {
+  allocateBySize,
+  type AllocationTarget,
+} from "@/lib/folder-cut-allocation";
 import { cutProgress } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
@@ -39,44 +43,76 @@ interface Props {
   tags: CutTagChoice[];
 }
 
+/** Lo que el pedido lleva de una talla, sumando todas sus órdenes. */
+interface SizeTotal {
+  code: string;
+  name: string;
+  ordered: number;
+  cut: number;
+  orders: number;
+  defaultTagId: string | null;
+}
+
 /**
  * Captura un corte que sirvió a varias órdenes del pedido a la vez.
  *
- * Existe porque a veces dos órdenes se tienden juntas y los bultos se amarran
- * pensando en ambas. Con la captura por orden había que abrir dos diálogos y
- * repartir a mano lo que salió de una sola mesa. Aquí se ve cada orden con sus
- * tallas y se anotan los bultos de cada una en el mismo paso.
+ * Se anota UNA vez por talla, sumando todas las órdenes: si dos piden talla S
+ * —50 y 100— se capturan los bultos de la S y el sistema los reparte entre las
+ * dos hasta completar a cada una. Es como se corta de verdad: los bultos se
+ * amarran pensando en el conjunto y nadie sabe de qué orden es cada uno hasta
+ * que se reparten.
  *
- * Siempre abre un corte NUEVO en cada orden que lleve piezas; para sumarle a
- * un corte que ya existe se usa "Capturar corte" dentro de la orden.
+ * Abre un corte NUEVO en cada orden que reciba piezas; para sumarle a un corte
+ * que ya existe se usa "Capturar corte" dentro de la orden.
  */
 export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
-  const [rowsByOrder, setRowsByOrder] = useState<
-    Record<string, SizeBundleRow[]>
-  >(() => initialRows(orders));
   const [isSaving, setIsSaving] = useState(false);
 
-  /* Sólo las órdenes que llevan algo: una en blanco no se manda, y así el
-     auxiliar puede dejar intacta la que no entró en este tendido. */
-  const captured = orders
-    .map((order) => ({
-      order,
-      rows: usableRows(rowsByOrder[order.id] ?? []),
-    }))
-    .filter((entry) => entry.rows.length > 0);
+  const totals = sizeTotals(orders);
+  const [rows, setRows] = useState<SizeBundleRow[]>(() => initialRows(totals));
 
-  const allRows = captured.flatMap((entry) => entry.rows);
-  const pieces = sumBundlePieces(allRows);
-  const bundles = sumBundles(allRows);
+  const targets = allocationTargets(orders);
+  const captured = usableRows(rows).filter((row) => row.quantity > 0);
+
+  const result = allocateBySize(
+    targets,
+    captured.map((row) => ({
+      sizeKey: row.value,
+      quantity: row.quantity,
+      bundles: row.bundles,
+      tagId: row.tagId,
+    })),
+  );
+
+  const pieces = sumBundlePieces(captured);
+  const bundles = sumBundles(captured);
+  const byCode = new Map(totals.map((total) => [total.code, total]));
+
+  function hintFor(code: string) {
+    const total = byCode.get(code);
+    if (!total) return null;
+
+    const typed = sumBundlePieces(captured.filter((row) => row.value === code));
+    const where = `${total.orders} ${total.orders === 1 ? "orden" : "órdenes"}`;
+
+    if (typed !== 0) {
+      return `${total.cut} de ${total.ordered} en ${where} · quedaría en ${total.cut + typed}`;
+    }
+
+    const { pending, surplus } = cutProgress(total.ordered, total.cut);
+    const rest = surplus > 0 ? `sobran ${surplus}` : `faltan ${pending}`;
+
+    return `${total.cut} de ${total.ordered} en ${where} · ${rest}`;
+  }
 
   function reset() {
     setLabel("");
     setNotes("");
-    setRowsByOrder(initialRows(orders));
+    setRows(initialRows(totals));
   }
 
   function handleOpenChange(next: boolean) {
@@ -85,38 +121,30 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
   }
 
   async function handleSave() {
-    if (captured.length === 0) {
-      toast.error("Anota al menos un bulto en alguna de las órdenes.");
+    if (result.allocations.length === 0) {
+      toast.error("Anota al menos un bulto de alguna talla.");
       return;
     }
 
     setIsSaving(true);
-    const result = await runAction(() =>
+    const response = await runAction(() =>
       saveFolderCutAction({
         folderId,
         label: label || undefined,
         notes: notes || undefined,
-        orders: captured.map(({ order, rows }) => ({
-          orderId: order.id,
-          lines: rows.map((row) => ({
-            lineId: row.value,
-            quantity: row.quantity,
-            bundles: row.bundles,
-            tagId: row.tagId,
-          })),
-        })),
+        orders: ordersOf(result.allocations),
       }),
     );
     setIsSaving(false);
 
-    if (!result.success) {
-      toast.error(result.error);
+    if (!response.success) {
+      toast.error(response.error);
       return;
     }
 
     toast.success(
-      `Corte global: ${result.data.pieces} piezas en ${result.data.orders} ${
-        result.data.orders === 1 ? "orden" : "órdenes"
+      `Corte global: ${response.data.pieces} piezas repartidas en ${response.data.orders} ${
+        response.data.orders === 1 ? "orden" : "órdenes"
       }`,
     );
     setOpen(false);
@@ -124,12 +152,19 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
     router.refresh();
   }
 
+  const perOrder = orders
+    .map((order) => ({
+      order,
+      items: result.allocations.filter((item) => item.orderId === order.id),
+    }))
+    .filter((entry) => entry.items.length > 0);
+
   return (
     <ResponsiveFormDialog
       open={open}
       onOpenChange={handleOpenChange}
       title={`Corte global de ${folderCode}`}
-      description="Para cuando varias órdenes se cortaron juntas. Anota los bultos de cada orden; se abre un corte nuevo en cada una."
+      description="Anota los bultos por talla, sumando todas las órdenes. El sistema los reparte hasta completar a cada una."
       trigger={
         <Button className="touch-target">
           <Scissors className="size-4" aria-hidden />
@@ -149,17 +184,76 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
           />
         </div>
 
-        {orders.map((order) => (
-          <OrderSection
-            key={order.id}
-            order={order}
-            tags={tags}
-            rows={rowsByOrder[order.id] ?? []}
-            onChange={(rows) =>
-              setRowsByOrder((current) => ({ ...current, [order.id]: rows }))
-            }
-          />
-        ))}
+        <SizeBundleRows
+          tags={tags}
+          label="Bultos del corte"
+          options={totals.map((total) => ({
+            value: total.code,
+            code: total.code,
+            hint: total.name,
+            keywords: total.name,
+            note: null,
+            tag: null,
+          }))}
+          rows={rows}
+          onChange={setRows}
+          renderHint={hintFor}
+          footnote="Las tallas en 0 no se guardan. Un bulto que no cabe entero en lo que falta a una orden se parte entre ésta y la siguiente."
+        />
+
+        {/* Lo que va a pasar, ANTES de guardar: el reparto es automático y
+            quien captura tiene que poder verlo y corregir el número si no es
+            el que esperaba. */}
+        {perOrder.length > 0 && (
+          <div className="flat-surface flex flex-col gap-3 p-3">
+            <h3 className="text-sm font-semibold">Así se reparte</h3>
+            {perOrder.map(({ order, items }) => (
+              <div key={order.id}>
+                <p className="tabular text-sm font-medium">
+                  {order.code}
+                  {order.hint && (
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      · {order.hint}
+                    </span>
+                  )}
+                </p>
+                <ul className="tabular text-xs text-muted-foreground">
+                  {items.map((item) => (
+                    <li key={`${item.lineId}-${item.quantity}-${item.tagId}`}>
+                      Talla {item.sizeKey}: {item.bundles}{" "}
+                      {item.bundles === 1 ? "bulto" : "bultos"} de{" "}
+                      {item.quantity} = {item.bundles * item.quantity}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {result.surplus.length > 0 && (
+          <div className="flex items-start gap-2 border border-state-reserved bg-card p-3 text-sm">
+            <AlertTriangle
+              className="size-4 shrink-0 text-state-reserved"
+              aria-hidden
+            />
+            <div className="flex flex-col gap-1">
+              <span>
+                Con esto se rebasa lo pedido. Revisa que la cantidad sea la de
+                CADA bulto y no el total de la talla.
+              </span>
+              <ul className="tabular flex flex-col">
+                {result.surplus.map((row) => (
+                  <li key={row.sizeKey}>
+                    Talla {row.sizeKey}: sobran {row.pieces} después de
+                    completar todas las órdenes
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="folder-cut-notes">Notas del corte</Label>
@@ -175,14 +269,14 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
         {captured.length > 0 && (
           <p className="tabular border border-border bg-muted p-2 text-sm">
             {pieces} piezas · {bundles} {bundles === 1 ? "bulto" : "bultos"} ·{" "}
-            {captured.length} {captured.length === 1 ? "orden" : "órdenes"}
+            {perOrder.length} {perOrder.length === 1 ? "orden" : "órdenes"}
           </p>
         )}
 
         <SubmitButton
           isSubmitting={isSaving}
           onClick={handleSave}
-          disabled={captured.length === 0}
+          disabled={result.allocations.length === 0}
           className="h-12 w-full"
         >
           Guardar corte global
@@ -192,84 +286,79 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
   );
 }
 
-function OrderSection({
-  order,
-  tags,
-  rows,
-  onChange,
-}: {
-  order: FolderCutOrder;
-  tags: CutTagChoice[];
-  rows: SizeBundleRow[];
-  onChange: (rows: SizeBundleRow[]) => void;
-}) {
-  const byLine = new Map(order.sizes.map((size) => [size.lineId, size]));
+/** Una talla por código, con lo pedido y cortado de todas las órdenes. */
+function sizeTotals(orders: FolderCutOrder[]): SizeTotal[] {
+  const byCode = new Map<string, SizeTotal>();
 
-  /* Lo que lleva la talla y cuánto falta, con lo tecleado ya sumado: igual que
-     en la captura de una orden, para que el bulto se reparta viendo cuánto
-     necesita cada una. */
-  function hintFor(lineId: string) {
-    const size = byLine.get(lineId);
-    if (!size) return null;
+  for (const order of orders) {
+    for (const size of order.sizes) {
+      const current = byCode.get(size.code) ?? {
+        code: size.code,
+        name: size.name,
+        ordered: 0,
+        cut: 0,
+        orders: 0,
+        defaultTagId: size.tagId,
+      };
 
-    const typed = sumBundlePieces(
-      usableRows(rows).filter((row) => row.value === lineId),
-    );
-
-    if (typed !== 0) {
-      return `${size.cut} de ${size.ordered} · quedaría en ${size.cut + typed}`;
+      current.ordered += size.ordered;
+      current.cut += size.cut;
+      current.orders += 1;
+      current.defaultTagId ??= size.tagId;
+      byCode.set(size.code, current);
     }
-
-    const { pending, surplus } = cutProgress(size.ordered, size.cut);
-    const rest = surplus > 0 ? `sobran ${surplus}` : `faltan ${pending}`;
-
-    return `${size.cut} de ${size.ordered} · ${rest}`;
   }
 
-  return (
-    <section className="flat-surface flex flex-col gap-3 p-3">
-      <div>
-        <h3 className="tabular text-sm font-semibold">{order.code}</h3>
-        {order.hint && (
-          <p className="text-xs text-muted-foreground">{order.hint}</p>
-        )}
-      </div>
+  return [...byCode.values()];
+}
 
-      <SizeBundleRows
-        tags={tags}
-        label="Bultos de esta orden"
-        options={order.sizes.map((size) => ({
-          value: size.lineId,
-          code: size.code,
-          hint: size.note ?? size.name,
-          keywords: size.name,
-          note: size.note,
-          tag: size.tag,
-        }))}
-        rows={rows}
-        onChange={onChange}
-        renderHint={hintFor}
-      />
-    </section>
+/** Los renglones de todas las órdenes, con lo que a cada uno le falta. */
+function allocationTargets(orders: FolderCutOrder[]): AllocationTarget[] {
+  return orders.flatMap((order) =>
+    order.sizes.map((size) => ({
+      orderId: order.id,
+      orderCode: order.code,
+      lineId: size.lineId,
+      sizeKey: size.code,
+      pending: Math.max(0, size.ordered - size.cut),
+    })),
   );
 }
 
+/** Lo repartido, agrupado por orden en la forma que espera la acción. */
+function ordersOf(
+  allocations: ReturnType<typeof allocateBySize>["allocations"],
+) {
+  const byOrder = new Map<
+    string,
+    { lineId: string; quantity: number; bundles: number; tagId?: string }[]
+  >();
+
+  for (const item of allocations) {
+    byOrder.set(item.orderId, [
+      ...(byOrder.get(item.orderId) ?? []),
+      {
+        lineId: item.lineId,
+        quantity: item.quantity,
+        bundles: item.bundles,
+        tagId: item.tagId,
+      },
+    ]);
+  }
+
+  return [...byOrder].map(([orderId, lines]) => ({ orderId, lines }));
+}
+
 /**
- * Todas las tallas de cada orden puestas en 0, con el foleo que la orden
- * sugiere. El 0 no se guarda, así que dejar la lista completa no mete tallas
- * vacías; lo que sí hace es que se vea qué falta capturar.
+ * Todas las tallas del pedido en 0, con el foleo que alguna orden sugiere. El
+ * 0 no se guarda; dejar la lista completa hace que se vea qué falta capturar.
  */
-function initialRows(orders: FolderCutOrder[]) {
-  return Object.fromEntries(
-    orders.map((order) => [
-      order.id,
-      order.sizes.length > 0
-        ? order.sizes.map((size) => ({
-            ...emptyRow(size.tagId ?? ""),
-            value: size.lineId,
-            quantity: "0",
-          }))
-        : [emptyRow()],
-    ]),
-  );
+function initialRows(totals: SizeTotal[]): SizeBundleRow[] {
+  if (totals.length === 0) return [emptyRow()];
+
+  return totals.map((total) => ({
+    ...emptyRow(total.defaultTagId ?? ""),
+    value: total.code,
+    quantity: "0",
+  }));
 }
