@@ -64,6 +64,14 @@ import {
 } from "@/components/orders/order-comments";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { Button } from "@/components/ui/button";
+import { OrderFabric } from "@/components/orders/order-fabric";
+import {
+  OrderFabricReturnDialog,
+  type ReturnableRoll,
+} from "@/components/orders/order-fabric-return-dialog";
+import { OrderFabricRepository } from "@/lib/repositories/order-fabric.repository";
+import { summarizeFabric } from "@/lib/order-fabric";
+import { Scissors } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -177,6 +185,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     issues,
     files,
     storageReady,
+    fabricDocuments,
   ] = await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
@@ -227,7 +236,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
          en "En talleres", con su folio y su liga al vale, y listarlos también
          arriba pintaba la misma entrega dos veces en la misma pantalla. Su
          lugar es el registro de salidas, junto a todas las demás. */
-      where: { cuttingOrderId: id },
+      /* Sólo las de PRENDAS: la salida de tela —puros rollos, sin desglose— y
+         su devolución viven en su propio bloque "Tela", con su consumo. */
+      where: {
+        cuttingOrderId: id,
+        type: "ISSUE",
+        cutLines: { some: {} },
+      },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
@@ -266,6 +281,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
        que alguien intente subir, en vez de dejarlo fallar con la foto ya
        tomada. */
     storageIsWritable(),
+    // La tela que se le sacó a la orden y la que regresó.
+    new OrderFabricRepository().documentsOfOrder(id),
   ]);
 
   /* Se reparten por tipo. Sin esto, un PDF caía en la galería de fotos y se
@@ -425,6 +442,18 @@ export default async function OrderDetailPage({ params }: PageProps) {
   /* Las salidas que siguen en pie. Es el indicador que contesta "¿esta orden
      ya salió?": una cancelada no cuenta porque cancelar es justo cómo se
      deshace un envío equivocado. */
+  const fabricSummary = summarizeFabric(fabricDocuments);
+  const returnableRolls: ReturnableRoll[] = fabricSummary.rolls
+    .filter((roll) => roll.net > 0.0001)
+    .map((roll) => ({
+      lotId: roll.lotId,
+      lotCode: roll.lotCode,
+      materialName: roll.materialName,
+      shade: roll.shade,
+      unit: roll.unit,
+      pending: roll.net,
+    }));
+
   const liveIssues = issues.filter((issue) => issue.status !== "CANCELLED");
 
   const issueViews: IssueView[] = issues.map((issue) => ({
@@ -569,6 +598,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
               {/* Va antes de Mover y Cancelar: es la acción que sigue cuando
                   el taller termina, y estaba costando recapturar el desglose
                   entero en Salidas. */}
+              {/* La tela va aparte de las prendas: es el control de cuánto
+                  consume la orden. Lleva a la salida ya ligada a ella. */}
+              {canEdit && (
+                <Button asChild variant="outline" className="touch-target">
+                  <Link href={`/issues/new?order=${order.id}`}>
+                    <Scissors className="size-4" aria-hidden />
+                    Salida de tela
+                  </Link>
+                </Button>
+              )}
+              {canEdit && returnableRolls.length > 0 && (
+                <OrderFabricReturnDialog
+                  orderId={order.id}
+                  orderCode={order.code}
+                  rolls={returnableRolls}
+                />
+              )}
               {canEdit && canSendToIssue && (
                 <OrderSendToIssueDialog
                   orderId={order.id}
@@ -728,6 +774,19 @@ export default async function OrderDetailPage({ params }: PageProps) {
             )}
           </h2>
           <OrderIssues issues={issueViews} canOpen={canOpenDocuments} />
+        </section>
+      )}
+
+      {/* El consumo de tela de la orden. Sólo aparece cuando ya hay algún
+          vale: una orden sin tela sacada no necesita un bloque vacío. */}
+      {fabricDocuments.length > 0 && (
+        <section className="flat-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold">Tela</h2>
+          <OrderFabric
+            documents={fabricDocuments}
+            summary={fabricSummary}
+            canOpen={canOpenDocuments}
+          />
         </section>
       )}
 

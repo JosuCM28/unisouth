@@ -105,6 +105,14 @@ interface ClientOption {
 /** Centinela del material propio: en la base es `clientId = null`. */
 const FACTORY_OWNER = "__factory__";
 
+/** La orden a la que se le está sacando tela. */
+export interface OrderLink {
+  id: string;
+  code: string;
+  clientId: string | null;
+  materialId: string | null;
+}
+
 interface Props {
   materials: MaterialOption[];
   products: IssueProductOption[];
@@ -119,6 +127,12 @@ interface Props {
   locations: NewLotLocationOption[];
   /** Presente = se está corrigiendo un borrador, no creando uno nuevo. */
   document?: EditableIssue;
+  /**
+   * La orden de corte de la que sale la tela, cuando se llega desde su
+   * botón "Salida de tela". El vale nace LIGADO a ella —es lo que suma los
+   * rollos y metros a su consumo— y arranca con su cliente y su folio.
+   */
+  order?: OrderLink;
   /**
    * Si quien tiene la pantalla abierta puede ajustar saldos.
    *
@@ -174,19 +188,23 @@ export function IssueForm({
   productionRuns,
   locations,
   document,
+  order,
   canAdjust = false,
 }: Props) {
   const router = useRouter();
   const isEditing = Boolean(document);
 
   const [clientId, setClientId] = useState(
-    document?.clientId ?? (document ? FACTORY_OWNER : ""),
+    document?.clientId ??
+      (document ? FACTORY_OWNER : (order?.clientId ?? "")),
   );
   const [productionRunId, setProductionRunId] = useState(
     document?.productionRunId ?? "",
   );
   const [concept, setConcept] = useState(document?.concept ?? "");
-  const [reference, setReference] = useState(document?.reference ?? "");
+  const [reference, setReference] = useState(
+    document?.reference ?? order?.code ?? "",
+  );
   const [receivedBy, setReceivedBy] = useState(document?.receivedBy ?? "");
   const [notes, setNotes] = useState(document?.notes ?? "");
 
@@ -200,7 +218,10 @@ export function IssueForm({
     document?.cutLines ?? [],
   );
   const [cutHeader, setCutHeader] = useState<CutHeaderDraft>(
-    document?.cutHeader ?? EMPTY_CUT_HEADER,
+    document?.cutHeader ?? {
+      ...EMPTY_CUT_HEADER,
+      cutFabricId: order?.materialId ?? "",
+    },
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMaterialId, setPickerMaterialId] = useState("");
@@ -446,6 +467,8 @@ export function IssueForm({
 
     const payload = {
       type: "ISSUE" as const,
+      /* La liga con la orden se sella sólo al crear; `update` no la toca. */
+      cuttingOrderId: order?.id,
       clientId: realClientId,
       productionRunId: productionRunId || undefined,
       concept: concept || undefined,
@@ -543,7 +566,13 @@ export function IssueForm({
     (isEditing
       ? snapshot(lines, cutLines, cutHeader, concept, reference, receivedBy, notes) !==
         originalSnapshot
-      : hasSomething || Boolean(concept || reference || receivedBy || notes));
+      : hasSomething ||
+        Boolean(
+          concept ||
+            (reference && reference !== order?.code) ||
+            receivedBy ||
+            notes,
+        ));
 
   /* Para el SELECTOR DE ROLLOS sólo se ofrecen materiales con existencia, y
      con dueño elegido sólo los suyos. Antes se listaba el catálogo entero y la
