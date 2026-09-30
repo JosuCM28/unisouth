@@ -506,6 +506,14 @@ Qué canales se ofrecen al aplicar —WhatsApp, correo, ambos o ninguno— lo
 decide ADMIN en **Administración → Notificaciones** (`notifications:write`),
 guardado en la tabla `Setting`; el servidor lo vuelve a revisar al enviar.
 
+La **recepción** usa el mismo canal y la misma lista de correos: al guardarla
+se pregunta si se manda, y la ficha tiene "Enviar recepción". Asunto
+`RECEPCIÓN DE TELA {folio}`, Excel adjunto con un renglón por tela + tono +
+dueño. Donde falta guía, paquetería, tono o dueño se escribe la leyenda de
+`MISSING_INFO` en vez de dejar el hueco. Ambos envíos pasan por
+`EmailDispatchService`, que es quien revisa el interruptor, lee las
+direcciones de la tabla y deja el rastro en la bitácora.
+
 **Las dos cadenas son la misma hoy** porque el Postgres del VPS se conecta
 directo, sin pooler. `DIRECT_URL` existe aparte de todos modos: un pooler
 (PgBouncer y compañía) no soporta migraciones, así que el día que se meta uno,

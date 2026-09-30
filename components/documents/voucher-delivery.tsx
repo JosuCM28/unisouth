@@ -174,7 +174,7 @@ export function DeliveryRecipients({
   );
 }
 
-function ChannelBody({
+export function ChannelBody({
   channel,
   options,
   items,
@@ -243,13 +243,13 @@ export async function deliverVoucher(
   await Promise.all(sends);
 }
 
-type DeliveryResponse = Awaited<ReturnType<typeof sendVoucherEmailAction>>;
+export type DeliveryResponse = Awaited<ReturnType<typeof sendVoucherEmailAction>>;
 
 /**
  * Tres desenlaces y tres avisos distintos: a todos, a algunos —con los
  * nombres que faltaron, para reenviarles sólo a ellos— y a nadie.
  */
-async function reportDelivery(
+export async function reportDelivery(
   via: string,
   send: () => Promise<DeliveryResponse>,
 ): Promise<void> {

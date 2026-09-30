@@ -11,6 +11,8 @@ import { ExportButton } from "@/components/shared/export-button";
 import { ReceiptLots } from "@/components/receipts/receipt-lots";
 import { ReceiptMaterialTotals } from "@/components/receipts/receipt-material-totals";
 import { ReceiptEditSheet } from "@/components/receipts/receipt-edit-sheet";
+import { SendReceiptButton } from "@/components/receipts/send-receipt-button";
+import { loadEmailDeliveryOptions } from "@/lib/vouchers/voucher-delivery-options";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -56,6 +58,9 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
     ? roleHasPermission(user.role, "inventory:write")
     : false;
   const options = canEdit ? await repository.findEditOptions() : null;
+  /* Enviar pide la misma llave que capturar. Con el correo apagado por
+     ADMIN el botón ni se pinta: no hay nada que ofrecer. */
+  const email = canEdit ? await loadEmailDeliveryOptions() : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -98,6 +103,13 @@ export default async function ReceiptDetailPage({ params }: PageProps) {
                     Editar
                   </Button>
                 }
+              />
+            )}
+            {email?.enabled && (
+              <SendReceiptButton
+                receiptId={receipt.id}
+                receiptCode={receipt.code}
+                email={email}
               />
             )}
             <ExportButton

@@ -5,9 +5,11 @@ import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, removeSchema } from "@/lib/validations/common";
 import {
   emailContactSchema,
+  sendReceiptEmailSchema,
   sendVoucherEmailSchema,
 } from "@/lib/validations/email.schema";
 import { EmailContactService } from "@/lib/services/email-contact.service";
+import { ReceiptEmailService } from "@/lib/services/receipt-email.service";
 import { VoucherEmailService } from "@/lib/services/voucher-email.service";
 
 const NOTIFICATIONS_PATH = "/notifications";
@@ -63,5 +65,20 @@ export async function sendVoucherEmailAction(input: unknown) {
     permission: "inventory:write",
     handler: ({ input, auditContext }) =>
       new VoucherEmailService(auditContext).send(input),
+  });
+}
+
+/**
+ * Manda por correo el resumen de una recepción ya guardada.
+ *
+ * `inventory:write`, la llave con la que se captura la recepción: quien la
+ * registra es quien avisa que llegó.
+ */
+export async function sendReceiptEmailAction(input: unknown) {
+  return executeAction(input, {
+    schema: sendReceiptEmailSchema,
+    permission: "inventory:write",
+    handler: ({ input, auditContext }) =>
+      new ReceiptEmailService(auditContext).send(input),
   });
 }

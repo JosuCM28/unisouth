@@ -7,6 +7,7 @@ import { MaterialRepository } from "@/lib/repositories/material.repository";
 import { HelperRepository } from "@/lib/repositories/helper.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { ReceiptWizard } from "@/components/receipts/receipt-wizard";
+import { loadEmailDeliveryOptions } from "@/lib/vouchers/voucher-delivery-options";
 
 export const metadata: Metadata = { title: "Nueva recepción" };
 
@@ -17,7 +18,7 @@ export default async function NewReceiptPage() {
   // alcanza esta ruta.
   await requirePermission("inventory:write");
 
-  const [materials, helpers, locations, clients, suppliers, carriers] = await Promise.all([
+  const [materials, helpers, locations, clients, suppliers, carriers, email] = await Promise.all([
     new MaterialRepository().findOptions(),
     new HelperRepository().findOptions(),
     new LocationRepository().findOptions(),
@@ -32,6 +33,8 @@ export default async function NewReceiptPage() {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    // Para preguntar al guardar si la recepción se manda por correo.
+    loadEmailDeliveryOptions(),
   ]);
 
   return (
@@ -47,6 +50,7 @@ export default async function NewReceiptPage() {
         clients={clients}
         suppliers={suppliers}
         carriers={carriers}
+        email={email}
       />
     </div>
   );

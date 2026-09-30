@@ -16,6 +16,10 @@ import {
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
 import { HelperFormDialog } from "@/components/helpers/helper-form-dialog";
 import { ReceiptTotals } from "./receipt-totals";
+import {
+  ReceiptEmailDialog,
+  type ReceiptEmailOptions,
+} from "./receipt-email-dialog";
 import { toast } from "sonner";
 import type { Unit } from "@prisma/client";
 import { createReceiptAction } from "@/app/actions/receipt.actions";
@@ -86,6 +90,11 @@ interface ReceiptWizardProps {
   clients: { id: string; name: string }[];
   suppliers: { id: string; name: string }[];
   carriers: { id: string; name: string }[];
+  /**
+   * El canal de correo, para ofrecer mandar la recepción al guardarla. Si
+   * ADMIN lo tiene apagado, guardar lleva directo al inventario como antes.
+   */
+  email: ReceiptEmailOptions;
 }
 
 /**
@@ -102,8 +111,14 @@ export function ReceiptWizard({
   clients,
   suppliers,
   carriers,
+  email,
 }: ReceiptWizardProps) {
   const router = useRouter();
+  /* La recepción recién guardada, mientras se pregunta si se manda por
+     correo. Con ella puesta la captura ya está a salvo en la base. */
+  const [saved, setSaved] = useState<{ id: string; code: string } | null>(
+    null,
+  );
   const [step, setStep] = useState<1 | 2>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -146,7 +161,8 @@ export function ReceiptWizard({
 
   /* Mientras se guarda ya no se avisa: el `router.push` del final es una
      salida legítima y el diálogo se atravesaría justo al terminar. */
-  const hasUnsaved = !isSubmitting && (capturedRows > 0 || headerTouched);
+  const hasUnsaved =
+    !isSubmitting && !saved && (capturedRows > 0 || headerTouched);
 
   /* Las opciones se derivan una vez y no por renglón: con veinte rollos en
      pantalla, rearmar la lista de 200 materiales veinte veces por tecla
@@ -301,10 +317,25 @@ export function ReceiptWizard({
       return;
     }
 
-    const data = result.data as { lotCodes: string[] };
+    const data = result.data as {
+      receipt: { id: string; code: string };
+      lotCodes: string[];
+    };
     toast.success(
       `Recepción registrada con ${data.lotCodes.length} ${data.lotCodes.length === 1 ? "rollo" : "rollos"}`,
     );
+
+    /* Con el correo prendido se pregunta ANTES de irse: la pregunta es sobre
+       esta carga, y en el inventario ya no habría a qué contestarla. */
+    if (email.enabled) {
+      setSaved({ id: data.receipt.id, code: data.receipt.code });
+      return;
+    }
+
+    goToInventory();
+  }
+
+  function goToInventory() {
     router.push("/lots");
     router.refresh();
   }
@@ -321,6 +352,18 @@ export function ReceiptWizard({
             : "Perderás los datos de la guía que capturaste."
         }
       />
+
+      {saved && (
+        <ReceiptEmailDialog
+          receiptId={saved.id}
+          receiptCode={saved.code}
+          email={email}
+          mode="after-save"
+          open
+          onOpenChange={() => undefined}
+          onDone={goToInventory}
+        />
+      )}
 
       <StepIndicator step={step} />
 

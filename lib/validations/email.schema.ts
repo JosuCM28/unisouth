@@ -38,3 +38,14 @@ export const sendVoucherEmailSchema = z.object({
 });
 
 export type SendVoucherEmailInput = z.infer<typeof sendVoucherEmailSchema>;
+
+/** Mandar el resumen de una recepción ya guardada a los correos elegidos. */
+export const sendReceiptEmailSchema = z.object({
+  receiptId: cuidSchema,
+  contactIds: z
+    .array(cuidSchema)
+    .min(1, "Elige al menos un correo")
+    .max(20, "Son demasiados correos para un solo envío"),
+});
+
+export type SendReceiptEmailInput = z.infer<typeof sendReceiptEmailSchema>;

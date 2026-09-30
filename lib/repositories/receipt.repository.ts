@@ -583,8 +583,17 @@ export class ReceiptRepository extends BaseRepository<
    * capturaron y en el que vienen apilados en la tarima.
    */
   async findByCodeWithLots(code: string) {
+    return this.findWithLots({ code });
+  }
+
+  /** Lo mismo, por id: el envío por correo viaja con el id, no con el folio. */
+  async findByIdWithLots(id: string) {
+    return this.findWithLots({ id });
+  }
+
+  private async findWithLots(where: Prisma.ReceiptWhereInput) {
     return this.db.receipt.findFirst({
-      where: { code },
+      where,
       include: {
         client: { select: { id: true, name: true } },
         supplier: { select: { id: true, name: true } },

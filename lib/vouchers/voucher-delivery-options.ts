@@ -32,3 +32,20 @@ export async function loadVoucherDeliveryOptions() {
     },
   };
 }
+
+/**
+ * Sólo el canal de correo: la recepción no se manda por WhatsApp, y cargar
+ * los números para no ofrecerlos sería una consulta de balde.
+ */
+export async function loadEmailDeliveryOptions() {
+  const [channels, contacts] = await Promise.all([
+    new NotificationSettingsService().getChannels(),
+    new EmailContactRepository().findAll(),
+  ]);
+
+  return {
+    enabled: channels.email,
+    configured: ResendClient.isConfigured(),
+    contacts,
+  };
+}
