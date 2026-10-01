@@ -77,68 +77,222 @@ export interface SplitResult {
 }
 
 /**
- * Tope de celdas de la tabla de programación dinámica. Con bultos de decenas
- * de piezas nunca se acerca; existe para que un corte absurdo no congele el
- * navegador, y por encima de él se cae a un reparto goloso.
+ * Topes de las tablas de programación dinámica. Con bultos de decenas de
+ * piezas nunca se acercan; existen para que un corte absurdo no congele el
+ * navegador, y por encima de ellos se cae a un reparto aproximado.
  */
 const MAX_DP_CELLS = 4_000_000;
+const MAX_COMBINE_STEPS = 40_000_000;
 
 /**
  * Reparte los bultos: `firstPercent` % al primer lado, el resto al segundo.
  *
- * Se resuelve talla por talla —cada taller debe recibir de todas las tallas en
- * la proporción pedida— y el error de cada talla se ARRASTRA a la siguiente.
- * Sin ese arrastre, cinco tallas con +10 piezas cada una sumarían +50 en el
- * total; con él el total se mantiene cerca del objetivo aunque ninguna talla
- * cuadre sola.
+ * Dos criterios, en este orden:
+ *
+ * 1. **El total lo más cerca posible del porcentaje.** Es lo que se pidió y lo
+ *    que se revisa al cargar el camión. Se buscan TODAS las combinaciones de
+ *    bultos enteros y no se decide talla por talla: con un bulto por talla
+ *    —76, 129, 122 y 32— decidir talla por talla mandaba 205 al lado del 40%
+ *    cuando 122 + 32 = 154 quedaba a 10 piezas.
+ * 2. **Parejo entre tallas.** Entre combinaciones igual de cercanas gana la
+ *    que da a cada taller, de cada talla, lo más parecido a su porcentaje, y
+ *    luego la que mueve menos bultos.
  */
 export function splitBundles(
   bundles: SplitBundle[],
   firstPercent: number,
 ): SplitResult {
   const ratio = Math.min(Math.max(firstPercent, 0), 100) / 100;
-  const bySize = groupBySize(bundles);
+  const groups = [...groupBySize(bundles)].map(([sizeCode, units]) => ({
+    sizeCode,
+    units,
+    table: subsetTable(units.map((unit) => unit.pieces)),
+  }));
+  const tables = groups.map((group) => group.table);
 
-  let carry = 0;
-  const sizes: SplitSize[] = [];
+  const grandTotal = tables.reduce((sum, table) => sum + table.total, 0);
+  const sums =
+    chooseSums(tables, ratio, grandTotal) ?? carrySums(tables, ratio);
 
-  for (const [sizeCode, units] of bySize) {
-    const pieces = units.map((unit) => unit.pieces);
-    const total = pieces.reduce((sum, value) => sum + value, 0);
-    const exact = total * ratio;
+  const sizes = groups.map((group, index): SplitSize => {
+    const chosen = new Set(group.table.reconstruct(sums[index] ?? 0));
+    const firstUnits = group.units.filter((_, i) => chosen.has(i));
+    const secondUnits = group.units.filter((_, i) => !chosen.has(i));
+    const firstPieces = firstUnits.reduce((sum, unit) => sum + unit.pieces, 0);
 
-    const chosen = pickSubset(pieces, exact - carry);
-    const firstPieces = chosen.reduce((sum, i) => sum + (pieces[i] ?? 0), 0);
-    carry += firstPieces - exact;
-
-    const taken = new Set(chosen);
-    const firstUnits = units.filter((_, i) => taken.has(i));
-    const secondUnits = units.filter((_, i) => !taken.has(i));
-
-    sizes.push({
-      sizeCode,
-      total,
+    return {
+      sizeCode: group.sizeCode,
+      total: group.table.total,
       first: collapse(firstUnits.map((unit) => unit.pieces)),
       second: collapse(secondUnits.map((unit) => unit.pieces)),
       firstBundles: toBundles(firstUnits),
       secondBundles: toBundles(secondUnits),
       firstPieces,
-      secondPieces: total - firstPieces,
-    });
-  }
+      secondPieces: group.table.total - firstPieces,
+    };
+  });
 
-  const total = sizes.reduce((sum, size) => sum + size.total, 0);
   const firstPieces = sizes.reduce((sum, size) => sum + size.firstPieces, 0);
-  const firstTarget = Math.round(total * ratio);
+  const firstTarget = Math.round(grandTotal * ratio);
 
   return {
     sizes,
-    total,
+    total: grandTotal,
     firstPieces,
-    secondPieces: total - firstPieces,
+    secondPieces: grandTotal - firstPieces,
     firstTarget,
     deviation: firstPieces - firstTarget,
   };
+}
+
+/** Las sumas que pueden dar los bultos de una talla. */
+interface SubsetTable {
+  total: number;
+  /** Cada suma alcanzable y con cuántos bultos, como mínimo. */
+  options: { sum: number; bundles: number }[];
+  /** Los índices de los bultos que dan esa suma. */
+  reconstruct: (sum: number) => number[];
+}
+
+/** Lo mejor encontrado para que el primer lado sume cierto total. */
+interface Reach {
+  /** Desbalance entre tallas: Σ |lo de la talla − su porcentaje|. */
+  cost: Float64Array;
+  /** Bultos movidos al primer lado. */
+  moved: Float64Array;
+}
+
+/**
+ * Cuánto de cada talla va al primer lado, buscando entre todas las
+ * combinaciones (programación dinámica sobre el total del primer lado).
+ *
+ * Devuelve null si el problema es demasiado grande para el navegador.
+ */
+function chooseSums(
+  tables: SubsetTable[],
+  ratio: number,
+  grandTotal: number,
+): number[] | null {
+  const steps = tables.reduce(
+    (acc, table) => acc + table.options.length * (grandTotal + 1),
+    0,
+  );
+  if (steps > MAX_COMBINE_STEPS) return null;
+
+  let reach: Reach = {
+    cost: new Float64Array(grandTotal + 1).fill(Infinity),
+    moved: new Float64Array(grandTotal + 1).fill(Infinity),
+  };
+  reach.cost[0] = 0;
+  reach.moved[0] = 0;
+
+  // picks[k][s]: cuánto puso la talla k para llegar a s.
+  const picks: Int32Array[] = [];
+  for (const table of tables) {
+    const step = addSize(reach, table, ratio, grandTotal);
+    reach = step.reach;
+    picks.push(step.pick);
+  }
+
+  const winner = closestTotal(reach, grandTotal * ratio);
+
+  // Se recorre de la última talla a la primera, descontando lo que puso cada una.
+  const sums = new Array<number>(tables.length).fill(0);
+  let rest = winner;
+  for (let k = tables.length - 1; k >= 0; k--) {
+    const sum = Math.max(picks[k]![rest]!, 0);
+    sums[k] = sum;
+    rest -= sum;
+  }
+
+  return sums;
+}
+
+/** Agrega una talla a la tabla de totales alcanzables. */
+function addSize(
+  reach: Reach,
+  table: SubsetTable,
+  ratio: number,
+  grandTotal: number,
+): { reach: Reach; pick: Int32Array } {
+  const exact = table.total * ratio;
+  const next: Reach = {
+    cost: new Float64Array(grandTotal + 1).fill(Infinity),
+    moved: new Float64Array(grandTotal + 1).fill(Infinity),
+  };
+  const pick = new Int32Array(grandTotal + 1).fill(-1);
+
+  for (let s = 0; s <= grandTotal; s++) {
+    if (reach.cost[s] === Infinity) continue;
+
+    for (const option of table.options) {
+      const to = s + option.sum;
+      const cost = reach.cost[s]! + Math.abs(option.sum - exact);
+      const moved = reach.moved[s]! + option.bundles;
+
+      if (isBetter(cost, moved, next.cost[to]!, next.moved[to]!)) {
+        next.cost[to] = cost;
+        next.moved[to] = moved;
+        pick[to] = option.sum;
+      }
+    }
+  }
+
+  return { reach: next, pick };
+}
+
+/**
+ * El total alcanzable más cercano al objetivo. A igual distancia, el más
+ * parejo entre tallas y luego el que mueve menos bultos.
+ */
+function closestTotal(reach: Reach, target: number): number {
+  let winner = -1;
+
+  for (let s = 0; s < reach.cost.length; s++) {
+    if (reach.cost[s] === Infinity) continue;
+    if (winner < 0) {
+      winner = s;
+      continue;
+    }
+
+    const gap = Math.abs(s - target);
+    const winnerGap = Math.abs(winner - target);
+    if (gap < winnerGap) {
+      winner = s;
+    } else if (
+      gap === winnerGap &&
+      isBetter(reach.cost[s]!, reach.moved[s]!, reach.cost[winner]!, reach.moved[winner]!)
+    ) {
+      winner = s;
+    }
+  }
+
+  return Math.max(winner, 0);
+}
+
+function isBetter(cost: number, moved: number, bestCost: number, bestMoved: number) {
+  return cost < bestCost || (cost === bestCost && moved < bestMoved);
+}
+
+/**
+ * Respaldo para cortes enormes: talla por talla, arrastrando el error a la
+ * siguiente. Es aproximado, pero nunca deja la pantalla congelada.
+ */
+function carrySums(tables: SubsetTable[], ratio: number): number[] {
+  let carry = 0;
+
+  return tables.map((table) => {
+    const exact = table.total * ratio;
+    const target = exact - carry;
+    let best = 0;
+    for (const option of table.options) {
+      if (Math.abs(option.sum - target) < Math.abs(best - target)) {
+        best = option.sum;
+      }
+    }
+    carry += best - exact;
+    return best;
+  });
 }
 
 /** Un bulto físico y el renglón capturado del que viene. */
@@ -190,27 +344,23 @@ function collapse(units: number[]): SplitGroup[] {
 }
 
 /**
- * Los índices de los bultos cuya suma queda más cerca de `target`.
- *
- * A igualdad de cercanía gana la combinación con MENOS bultos: son menos
- * bultos que mover, y es lo que se pidió ("lo mínimo para que sea exacto").
+ * Todas las sumas que pueden dar los bultos de una talla, con el mínimo de
+ * bultos para cada una, y cómo volver a los bultos de una suma.
  */
-function pickSubset(units: number[], target: number): number[] {
-  const sum = units.reduce((total, pieces) => total + pieces, 0);
-  if (units.length === 0 || target <= 0) return [];
-  if (target >= sum) return units.map((_, i) => i);
+function subsetTable(units: number[]): SubsetTable {
+  const total = units.reduce((sum, pieces) => sum + pieces, 0);
 
-  if (units.length * (sum + 1) > MAX_DP_CELLS) return greedy(units, target);
+  if (units.length * (total + 1) > MAX_DP_CELLS) return greedyTable(units, total);
 
   // best[s] = menos bultos para sumar exactamente s (Infinity si no se puede).
-  const best = new Array<number>(sum + 1).fill(Infinity);
+  const best = new Array<number>(total + 1).fill(Infinity);
   best[0] = 0;
   // took[i][s]: el bulto i fue el que mejoró best[s] en su pasada.
-  const took = units.map(() => new Uint8Array(sum + 1));
+  const took = units.map(() => new Uint8Array(total + 1));
 
   units.forEach((pieces, i) => {
     const row = took[i]!;
-    for (let s = sum; s >= pieces; s--) {
+    for (let s = total; s >= pieces; s--) {
       const candidate = best[s - pieces]! + 1;
       if (candidate < best[s]!) {
         best[s] = candidate;
@@ -219,43 +369,50 @@ function pickSubset(units: number[], target: number): number[] {
     }
   });
 
-  let winner = 0;
-  for (let s = 0; s <= sum; s++) {
-    if (best[s] === Infinity) continue;
-    const gap = Math.abs(s - target);
-    const winnerGap = Math.abs(winner - target);
-    if (gap < winnerGap || (gap === winnerGap && best[s]! < best[winner]!)) {
-      winner = s;
-    }
-  }
+  const options: SubsetTable["options"] = [];
+  best.forEach((bundles, sum) => {
+    if (bundles !== Infinity) options.push({ sum, bundles });
+  });
 
   // Se reconstruye hacia atrás: el último bulto que tocó la celda es el suyo.
-  const chosen: number[] = [];
-  let s = winner;
-  for (let i = units.length - 1; i >= 0 && s > 0; i--) {
-    if (took[i]![s]) {
-      chosen.push(i);
-      s -= units[i]!;
+  function reconstruct(sum: number): number[] {
+    const chosen: number[] = [];
+    let s = sum;
+    for (let i = units.length - 1; i >= 0 && s > 0; i--) {
+      if (took[i]![s]) {
+        chosen.push(i);
+        s -= units[i]!;
+      }
     }
+    return chosen;
   }
 
-  return chosen;
+  return { total, options, reconstruct };
 }
 
-/** Reparto de respaldo: los bultos grandes primero, mientras no se pase. */
-function greedy(units: number[], target: number): number[] {
+/** Respaldo: sólo las sumas de ir tomando los bultos de mayor a menor. */
+function greedyTable(units: number[], total: number): SubsetTable {
   const order = units
     .map((pieces, i) => ({ pieces, i }))
     .sort((a, b) => b.pieces - a.pieces);
 
-  const chosen: number[] = [];
+  const options = [{ sum: 0, bundles: 0 }];
   let acc = 0;
-  for (const { pieces, i } of order) {
-    if (acc + pieces <= target) {
+  order.forEach(({ pieces }, k) => {
+    acc += pieces;
+    options.push({ sum: acc, bundles: k + 1 });
+  });
+
+  function reconstruct(sum: number): number[] {
+    const chosen: number[] = [];
+    let taken = 0;
+    for (const { pieces, i } of order) {
+      if (taken >= sum) break;
       chosen.push(i);
-      acc += pieces;
+      taken += pieces;
     }
+    return chosen;
   }
 
-  return chosen;
+  return { total, options, reconstruct };
 }
