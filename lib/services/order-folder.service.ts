@@ -6,6 +6,7 @@ import { cutBatchLabel } from "@/lib/constants/labels";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import type {
   FolderCutInput,
+  FolderSplitShipmentInput,
   FolderWorkshopInput,
   OrderFolderInput,
 } from "@/lib/validations/order-folder.schema";
@@ -630,6 +631,96 @@ export class OrderFolderService extends BaseService {
       });
 
       return { shipments, skipped };
+    });
+  }
+
+  /**
+   * Manda a un taller SÓLO los bultos elegidos del pedido.
+   *
+   * Es la mitad de un reparto 40/60: la pantalla calcula qué bultos le tocan
+   * a cada taller y aquí se materializa uno de los dos lados. Nace un envío por
+   * orden, por la misma razón que en el envío global: los retornos se cuentan
+   * contra la orden.
+   *
+   * Se rechaza cualquier renglón de una orden que no sea del pedido: el
+   * identificador viaja desde el navegador y sin esta revisión se podría
+   * mandar material de otro cliente colgándolo de este pedido.
+   */
+  async sendSplitToWorkshop(
+    folderId: string,
+    input: FolderSplitShipmentInput,
+  ): Promise<FolderShipmentResult> {
+    return this.transaction(async (tx) => {
+      const folder = await tx.orderFolder.findUnique({
+        where: { id: folderId },
+        select: { id: true, code: true },
+      });
+      if (!folder) throw new NotFoundError("el pedido", folderId);
+
+      const orders = await tx.cuttingOrder.findMany({
+        where: { folderId, status: { not: "CANCELLED" } },
+        select: { id: true, code: true },
+      });
+      const codeById = new Map(orders.map((order) => [order.id, order.code]));
+
+      const byOrder = new Map<string, FolderSplitShipmentInput["lines"]>();
+      for (const line of input.lines) {
+        if (!codeById.has(line.orderId)) {
+          throw new BusinessRuleError(
+            `Una de las órdenes del reparto no pertenece al pedido ${folder.code}.`,
+          );
+        }
+        byOrder.set(line.orderId, [...(byOrder.get(line.orderId) ?? []), line]);
+      }
+
+      const service = new GarmentShipmentService(this.context, tx);
+      const shipments: FolderShipmentResult["shipments"] = [];
+
+      for (const [orderId, lines] of byOrder) {
+        const shipment = await service.create({
+          orderId,
+          workshopId: input.workshopId,
+          stageId: input.stageId,
+          sentAt: input.sentAt,
+          parts: input.parts,
+          reference: input.reference,
+          notes: undefined,
+          lines: lines.map((line) => ({
+            sizeId: line.sizeId,
+            sentQuantity: line.sentQuantity,
+            bundles: line.bundles,
+            tagId: line.tagId,
+            notes: line.notes,
+          })),
+        });
+
+        shipments.push({
+          code: shipment.code,
+          orderCode: codeById.get(orderId) ?? orderId,
+          pieces: sumBundlePieces(
+            lines.map((line) => ({
+              quantity: line.sentQuantity,
+              bundles: line.bundles,
+            })),
+          ),
+        });
+      }
+
+      await this.auditWith(tx).record({
+        entity: "OrderFolder",
+        entityId: folder.id,
+        action: "UPDATE",
+        reference: folder.code,
+        newValue: {
+          envios: shipments.map((s) => s.code),
+          ordenes: shipments.length,
+          piezas: shipments.reduce((sum, s) => sum + s.pieces, 0),
+          reparto: "parcial",
+        },
+        sensitivity: "LOW",
+      });
+
+      return { shipments, skipped: [] };
     });
   }
 

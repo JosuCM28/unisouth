@@ -17,6 +17,17 @@ export interface SplitBundle {
   /** Piezas POR BULTO. */
   pieces: number;
   count: number;
+  /**
+   * Lo que el bulto trae de su captura, para poder armar el envío a taller
+   * sin volver a la base: la talla por id, la orden de la que salió, su foleo
+   * y la anotación de su renglón. Opcionales porque el reparto en sí sólo
+   * necesita talla y piezas.
+   */
+  sizeId?: string;
+  orderId?: string;
+  orderCode?: string;
+  tagId?: string | null;
+  note?: string | null;
 }
 
 /** Cuántos bultos de cierto tamaño le tocan a un lado. */
@@ -32,6 +43,9 @@ export interface SplitSize {
   /** Lo que le toca al lado del porcentaje y al resto, bultos agrupados. */
   first: SplitGroup[];
   second: SplitGroup[];
+  /** Los mismos bultos de cada lado, con lo que traen de su captura. */
+  firstBundles: SplitBundle[];
+  secondBundles: SplitBundle[];
   firstPieces: number;
   secondPieces: number;
 }
@@ -74,11 +88,12 @@ export function splitBundles(
   const sizes: SplitSize[] = [];
 
   for (const [sizeCode, units] of bySize) {
-    const total = units.reduce((sum, pieces) => sum + pieces, 0);
+    const pieces = units.map((unit) => unit.pieces);
+    const total = pieces.reduce((sum, value) => sum + value, 0);
     const exact = total * ratio;
 
-    const chosen = pickSubset(units, exact - carry);
-    const firstPieces = chosen.reduce((sum, i) => sum + (units[i] ?? 0), 0);
+    const chosen = pickSubset(pieces, exact - carry);
+    const firstPieces = chosen.reduce((sum, i) => sum + (pieces[i] ?? 0), 0);
     carry += firstPieces - exact;
 
     const taken = new Set(chosen);
@@ -88,8 +103,10 @@ export function splitBundles(
     sizes.push({
       sizeCode,
       total,
-      first: collapse(firstUnits),
-      second: collapse(secondUnits),
+      first: collapse(firstUnits.map((unit) => unit.pieces)),
+      second: collapse(secondUnits.map((unit) => unit.pieces)),
+      firstBundles: toBundles(firstUnits),
+      secondBundles: toBundles(secondUnits),
       firstPieces,
       secondPieces: total - firstPieces,
     });
@@ -109,16 +126,34 @@ export function splitBundles(
   };
 }
 
-/** Una lista de piezas-por-bulto, una entrada por bulto físico, por talla. */
-function groupBySize(bundles: SplitBundle[]): Map<string, number[]> {
-  const map = new Map<string, number[]>();
+/** Un bulto físico y el renglón capturado del que viene. */
+interface Unit {
+  pieces: number;
+  source: SplitBundle;
+}
+
+/** Vuelve a juntar los bultos físicos en renglones, sin perder su origen. */
+function toBundles(units: Unit[]): SplitBundle[] {
+  const counts = new Map<SplitBundle, number>();
+  for (const unit of units) {
+    counts.set(unit.source, (counts.get(unit.source) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].map(([source, count]) => ({ ...source, count }));
+}
+
+/** Un bulto físico por entrada, agrupados por talla. */
+function groupBySize(bundles: SplitBundle[]): Map<string, Unit[]> {
+  const map = new Map<string, Unit[]>();
 
   for (const bundle of bundles) {
     // Un bulto en cero o negativo es un ajuste de conteo, no algo que se cargue.
     if (bundle.pieces <= 0 || bundle.count <= 0) continue;
 
     const units = map.get(bundle.sizeCode) ?? [];
-    for (let i = 0; i < bundle.count; i++) units.push(bundle.pieces);
+    for (let i = 0; i < bundle.count; i++) {
+      units.push({ pieces: bundle.pieces, source: bundle });
+    }
     map.set(bundle.sizeCode, units);
   }
 

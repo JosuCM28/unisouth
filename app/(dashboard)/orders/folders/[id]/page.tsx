@@ -206,7 +206,16 @@ export default async function OrderFolderPage({ params }: PageProps) {
       </div>
 
       {send && !isArchived && send.splitCuts.length > 0 && (
-        <WorkshopSplitPanel cuts={send.splitCuts} />
+        <WorkshopSplitPanel
+          cuts={send.splitCuts}
+          shipping={{
+            kind: "folder",
+            folderId: folder.id,
+            folderCode: folder.code,
+            workshops: send.workshops,
+            stages: send.stages,
+          }}
+        />
       )}
 
       {(folder.reference || folder.dueDate || folder.notes) && (
@@ -363,9 +372,7 @@ function buildSplitCuts(
   const cuts = new Map<string, SplitCut>();
 
   for (const order of orders) {
-    const sizeByLine = new Map(
-      order.lines.map((line) => [line.id, line.size.code]),
-    );
+    const lineById = new Map(order.lines.map((line) => [line.id, line]));
 
     for (const batch of order.batches) {
       const key = batch.groupId ?? batch.id;
@@ -377,12 +384,18 @@ function buildSplitCuts(
       };
 
       for (const entry of batch.entries) {
-        const sizeCode = sizeByLine.get(entry.lineId);
-        if (!sizeCode) continue;
+        const line = lineById.get(entry.lineId);
+        if (!line) continue;
         cut.bundles.push({
-          sizeCode,
+          sizeCode: line.size.code,
           pieces: entry.quantity,
           count: entry.bundles,
+          sizeId: line.sizeId,
+          orderId: order.id,
+          orderCode: order.code,
+          // Igual que en el vale: el foleo del bulto manda sobre el del renglón.
+          tagId: entry.tagId ?? line.tagId,
+          note: line.notes,
         });
       }
 

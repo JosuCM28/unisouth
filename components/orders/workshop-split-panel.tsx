@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Percent } from "lucide-react";
+import { Copy, Percent, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   splitBundles,
@@ -9,6 +9,12 @@ import {
   type SplitGroup,
   type SplitResult,
 } from "@/lib/workshop-split";
+import { FolderSplitShipmentDialog } from "./folder-split-shipment-dialog";
+import {
+  OrderShipmentDialog,
+  type ShippableSize,
+} from "./order-shipment-dialog";
+import type { CutTagChoice } from "./size-bundle-rows";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -20,6 +26,29 @@ export interface SplitCut {
   label: string;
   bundles: SplitBundle[];
 }
+
+/**
+ * A dónde se manda cada lado del reparto. Cada pantalla trae su propio camino:
+ * una orden suelta manda con su diálogo de envío (un solo papel), y un pedido
+ * crea un envío por cada orden que aporta bultos.
+ */
+export type SplitShipping =
+  | {
+      kind: "order";
+      orderId: string;
+      orderCode: string;
+      sizes: ShippableSize[];
+      tags: CutTagChoice[];
+      workshops: { id: string; name: string }[];
+      stages: { id: string; name: string }[];
+    }
+  | {
+      kind: "folder";
+      folderId: string;
+      folderCode: string;
+      workshops: { id: string; name: string }[];
+      stages: { id: string; name: string }[];
+    };
 
 /** Hasta cuántas piezas se tolera que el reparto se aparte del porcentaje. */
 const TOLERANCE_PIECES = 40;
@@ -36,7 +65,14 @@ const DEFAULT_PERCENT = 40;
  * Los cortes se marcan uno por uno porque la salida a taller se hace por
  * tendido: lo que se reparte es lo que se va a cargar ahora, no el historial.
  */
-export function WorkshopSplitPanel({ cuts }: { cuts: SplitCut[] }) {
+export function WorkshopSplitPanel({
+  cuts,
+  shipping,
+}: {
+  cuts: SplitCut[];
+  /** Sin esto el panel sólo calcula; no ofrece mandar nada. */
+  shipping?: SplitShipping;
+}) {
   const [percent, setPercent] = useState(DEFAULT_PERCENT);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(cuts.map((cut) => cut.id)),
@@ -134,7 +170,12 @@ export function WorkshopSplitPanel({ cuts }: { cuts: SplitCut[] }) {
             Sin piezas capturadas en los cortes elegidos.
           </p>
         ) : (
-          <SplitSummary result={result} percent={percent} onCopy={handleCopy} />
+          <SplitSummary
+            result={result}
+            percent={percent}
+            onCopy={handleCopy}
+            shipping={shipping}
+          />
         )}
       </div>
     </details>
@@ -145,11 +186,15 @@ function SplitSummary({
   result,
   percent,
   onCopy,
+  shipping,
 }: {
   result: SplitResult;
   percent: number;
   onCopy: () => void;
+  shipping?: SplitShipping;
 }) {
+  const firstBundles = result.sizes.flatMap((size) => size.firstBundles);
+  const secondBundles = result.sizes.flatMap((size) => size.secondBundles);
   const withinTolerance = Math.abs(result.deviation) <= TOLERANCE_PIECES;
 
   return (
@@ -159,11 +204,25 @@ function SplitSummary({
           title={`${percent}%`}
           pieces={result.firstPieces}
           target={result.firstTarget}
+          action={
+            <SendSide
+              shipping={shipping}
+              sideLabel={`${percent}%`}
+              bundles={firstBundles}
+            />
+          }
         />
         <Side
           title={`${100 - percent}%`}
           pieces={result.secondPieces}
           target={result.total - result.firstTarget}
+          action={
+            <SendSide
+              shipping={shipping}
+              sideLabel={`${100 - percent}%`}
+              bundles={secondBundles}
+            />
+          }
         />
       </div>
 
@@ -215,10 +274,12 @@ function Side({
   title,
   pieces,
   target,
+  action,
 }: {
   title: string;
   pieces: number;
   target: number;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="rounded border border-border bg-muted p-2">
@@ -227,7 +288,71 @@ function Side({
       <p className="tabular text-xs text-muted-foreground">
         exacto: {target}
       </p>
+      {action && <div className="mt-2">{action}</div>}
     </div>
+  );
+}
+
+/** El botón de mandar UN lado del reparto, según la pantalla en que se está. */
+function SendSide({
+  shipping,
+  sideLabel,
+  bundles,
+}: {
+  shipping?: SplitShipping;
+  sideLabel: string;
+  bundles: SplitBundle[];
+}) {
+  if (!shipping || bundles.length === 0) return null;
+
+  if (shipping.kind === "folder") {
+    return (
+      <FolderSplitShipmentDialog
+        folderId={shipping.folderId}
+        folderCode={shipping.folderCode}
+        sideLabel={sideLabel}
+        bundles={bundles}
+        workshops={shipping.workshops}
+        stages={shipping.stages}
+      />
+    );
+  }
+
+  // Sólo bultos con talla conocida: sin ella el renglón no se puede cargar.
+  const rows = bundles.flatMap((bundle) =>
+    bundle.sizeId
+      ? [
+          {
+            sizeId: bundle.sizeId,
+            quantity: bundle.pieces,
+            bundles: bundle.count,
+            tagId: bundle.tagId ?? null,
+            note: bundle.note ?? null,
+          },
+        ]
+      : [],
+  );
+
+  return (
+    <OrderShipmentDialog
+      orderId={shipping.orderId}
+      orderCode={shipping.orderCode}
+      sizes={shipping.sizes}
+      tags={shipping.tags}
+      workshops={shipping.workshops}
+      stages={shipping.stages}
+      batch={{
+        label: `reparto ${sideLabel}`,
+        rows,
+        netPieces: rows.reduce((sum, row) => sum + row.quantity * row.bundles, 0),
+      }}
+      trigger={
+        <Button variant="outline" className="touch-target w-full">
+          <Send className="size-4" aria-hidden />
+          Mandar {sideLabel}
+        </Button>
+      }
+    />
   );
 }
 

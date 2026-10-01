@@ -1023,6 +1023,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
         {canEdit && batchViews.length > 0 && (
           <div className="mb-3">
             <WorkshopSplitPanel
+              shipping={{
+                kind: "order",
+                orderId: order.id,
+                orderCode: order.code,
+                sizes: shippableSizes,
+                tags: cutTags,
+                workshops,
+                stages,
+              }}
               cuts={batchViews.map((batch) => ({
                 id: batch.id,
                 label: cutBatchLabel(batch.number, batch.label),
@@ -1030,6 +1039,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   sizeCode: entry.sizeCode,
                   pieces: entry.quantity,
                   count: entry.bundles,
+                  sizeId: entry.sizeId,
+                  tagId: entry.tagId,
+                  note: entry.note ?? null,
                 })),
               }))}
             />

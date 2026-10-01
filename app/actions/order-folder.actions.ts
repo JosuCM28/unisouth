@@ -6,6 +6,7 @@ import { cuidSchema, optionalCuid } from "@/lib/validations/common";
 import {
   folderCutSchema,
   folderIssueSchema,
+  folderSplitShipmentSchema,
   folderWorkshopSchema,
   orderFolderSchema,
 } from "@/lib/validations/order-folder.schema";
@@ -133,6 +134,22 @@ export async function sendFolderToWorkshopAction(input: unknown) {
     successMessage: "Pedido enviado al taller",
     handler: ({ input, auditContext }) =>
       new OrderFolderService(auditContext).sendToWorkshop(input.id, input),
+  });
+}
+
+/**
+ * El envío a taller de una parte del pedido: los bultos de un lado del reparto.
+ *
+ * Mismo permiso que el envío de una orden suelta.
+ */
+export async function sendFolderSplitToWorkshopAction(input: unknown) {
+  return executeAction(input, {
+    schema: folderSplitShipmentSchema,
+    permission: "inventory:write",
+    revalidate: SEND_REVALIDATE,
+    successMessage: "Bultos enviados al taller",
+    handler: ({ input, auditContext }) =>
+      new OrderFolderService(auditContext).sendSplitToWorkshop(input.id, input),
   });
 }
 

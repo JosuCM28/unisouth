@@ -7,6 +7,7 @@ import {
   requiredText,
 } from "./common";
 import { batchLineSchema } from "./cutting-order.schema";
+import { garmentShipmentLineSchema } from "./garment-shipment.schema";
 
 /**
  * Una carpeta de pedido.
@@ -55,6 +56,28 @@ export const folderWorkshopSchema = z.object({
 });
 
 export type FolderWorkshopInput = z.infer<typeof folderWorkshopSchema>;
+
+/**
+ * El envío a taller de UNA PARTE del pedido: los bultos que le tocan a uno de
+ * los dos talleres en un reparto 40/60.
+ *
+ * A diferencia del envío global, aquí SÍ viajan los renglones: lo que sale es
+ * una selección de bultos y el servidor no tiene de dónde adivinarla. Cada
+ * renglón dice de qué orden salió, porque el envío nace por orden.
+ */
+export const folderSplitShipmentSchema = z.object({
+  id: cuidSchema,
+  workshopId: cuidSchema,
+  stageId: cuidSchema,
+  sentAt: localDate.optional(),
+  parts: optionalText,
+  reference: optionalText,
+  lines: z
+    .array(garmentShipmentLineSchema.extend({ orderId: cuidSchema }))
+    .min(1, "Agrega al menos un bulto"),
+});
+
+export type FolderSplitShipmentInput = z.infer<typeof folderSplitShipmentSchema>;
 
 /**
  * El corte GLOBAL del pedido: una sola captura que reparte bultos entre varias
