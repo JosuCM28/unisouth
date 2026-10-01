@@ -7,6 +7,12 @@ export interface SplitCut {
   id: string;
   /** "PO-2026-0109 · 1er corte", o "Corte global · Corte conjunto". */
   label: string;
+  /**
+   * El nombre del corte SIN la orden ("2º corte"). Junta los cortes del mismo
+   * número de todas las órdenes del pedido: lo normal es repartir "el segundo
+   * corte de cada orden", no ir palomeando orden por orden.
+   */
+  round?: string;
   bundles: SplitBundle[];
   /**
    * Corte global capturado antes de guardarse sus bultos reales: sus bultos
@@ -81,6 +87,7 @@ export function buildFolderSplitCuts(
         cuts.push({
           id: batch.id,
           label: `${order.code} · ${label}`,
+          round: label,
           bundles: fragments(order, batch.entries, lineById),
         });
         continue;
@@ -89,6 +96,7 @@ export function buildFolderSplitCuts(
       const global: GlobalCut = globals.get(batch.groupId) ?? {
         id: batch.groupId,
         label: `Corte global · ${label}`,
+        round: label,
         targets: [],
         fragments: [],
         lines: new Map(),
@@ -131,6 +139,7 @@ export function buildFolderSplitCuts(
 interface GlobalCut {
   id: string;
   label: string;
+  round: string;
   /** Lo que CADA renglón recibió de este corte: contra eso se reparte. */
   targets: AllocationTarget[];
   /** Los pedazos tal como quedaron por orden: el respaldo sin captura. */
@@ -148,6 +157,7 @@ function toGlobalCut(global: GlobalCut, rows: CapturedRow[]): SplitCut {
   const fallback = {
     id: global.id,
     label: global.label,
+    round: global.round,
     bundles: global.fragments,
     partial: true,
   };
@@ -186,7 +196,7 @@ function toGlobalCut(global: GlobalCut, rows: CapturedRow[]): SplitCut {
     };
   });
 
-  return { id: global.id, label: global.label, bundles };
+  return { id: global.id, label: global.label, round: global.round, bundles };
 }
 
 /** Si la captura suma, talla por talla, lo mismo que recibieron las órdenes. */

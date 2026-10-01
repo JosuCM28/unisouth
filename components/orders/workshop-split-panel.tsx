@@ -93,6 +93,20 @@ export function WorkshopSplitPanel({
     });
   }
 
+  /* Los números de corte que se repiten entre órdenes. Sólo de esos tiene
+     sentido un atajo: con un corte por número, palomearlo es lo mismo. */
+  const rounds = sharedRounds(cuts);
+
+  function selectRound(round: string | null) {
+    setSelected(
+      new Set(
+        cuts
+          .filter((cut) => round === null || cut.round === round)
+          .map((cut) => cut.id),
+      ),
+    );
+  }
+
   function handlePercent(raw: string) {
     const value = Number(raw);
     if (Number.isNaN(value)) return;
@@ -143,6 +157,23 @@ export function WorkshopSplitPanel({
             <legend className="mb-1 text-xs text-muted-foreground">
               Cortes incluidos
             </legend>
+            {rounds.length > 0 && (
+              <div className="mb-1 flex flex-wrap gap-2">
+                <RoundButton
+                  label="Todos"
+                  active={selected.size === cuts.length}
+                  onClick={() => selectRound(null)}
+                />
+                {rounds.map((round) => (
+                  <RoundButton
+                    key={round}
+                    label={`Sólo ${round}`}
+                    active={isOnlyRound(cuts, selected, round)}
+                    onClick={() => selectRound(round)}
+                  />
+                ))}
+              </div>
+            )}
             {cuts.map((cut) => (
               <label
                 key={cut.id}
@@ -408,4 +439,48 @@ function buildMessage(result: SplitResult, percent: number): string {
   }
 
   return lines.join("\n");
+}
+
+/** Los nombres de corte que comparten dos o más órdenes, en orden de aparición. */
+function sharedRounds(cuts: SplitCut[]): string[] {
+  const counts = new Map<string, number>();
+  for (const cut of cuts) {
+    if (cut.round) counts.set(cut.round, (counts.get(cut.round) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([round]) => round)
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+}
+
+/** Si lo palomeado es exactamente ese número de corte de todas las órdenes. */
+function isOnlyRound(
+  cuts: SplitCut[],
+  selected: Set<string>,
+  round: string,
+): boolean {
+  return cuts.every((cut) => selected.has(cut.id) === (cut.round === round));
+}
+
+function RoundButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? "default" : "outline"}
+      onClick={onClick}
+      className="touch-target"
+    >
+      {label}
+    </Button>
+  );
 }
