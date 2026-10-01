@@ -14,15 +14,16 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ExportButton } from "@/components/shared/export-button";
 import { Button } from "@/components/ui/button";
 import { FolderArchiveButton } from "@/components/orders/folder-archive-button";
-import { FolderCutDialog } from "@/components/orders/folder-cut-dialog";
+import {
+  FolderCutDialog,
+  type CapturedCutRow,
+} from "@/components/orders/folder-cut-dialog";
 import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
 import { FolderSendToIssueDialog } from "@/components/orders/folder-send-to-issue-dialog";
 import { FolderWorkshopDialog } from "@/components/orders/folder-workshop-dialog";
 import { OrderTable } from "@/components/orders/order-table";
-import {
-  WorkshopSplitPanel,
-  type SplitCut,
-} from "@/components/orders/workshop-split-panel";
+import { WorkshopSplitPanel } from "@/components/orders/workshop-split-panel";
+import { buildFolderSplitCuts } from "@/lib/folder-split-cuts";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -150,6 +151,7 @@ export default async function OrderFolderPage({ params }: PageProps) {
                   folderCode={folder.code}
                   orders={send.cuttable}
                   tags={send.tags}
+                  captures={send.captures}
                 />
               )}
 
@@ -300,7 +302,7 @@ async function buildSendContext(
   repository: OrderFolderRepository,
   folderId: string,
 ) {
-  const [orders, workshops, stages, cuttable, tags] = await Promise.all([
+  const [orders, workshops, stages, cuttable, tags, captured] = await Promise.all([
     repository.findSendableCuts(folderId),
     prisma.workshop.findMany({
       where: { deletedAt: null, active: true },
@@ -319,11 +321,13 @@ async function buildSendContext(
       select: { id: true, name: true, color: true },
       orderBy: [{ order: "asc" }, { name: "asc" }],
     }),
+    repository.findGlobalCutBundles(folderId),
   ]);
 
   return {
     preview: buildFolderSendPreview(orders, cutBatchLabel),
-    splitCuts: buildSplitCuts(orders),
+    splitCuts: buildFolderSplitCuts(orders, captured, cutBatchLabel),
+    captures: capturesByGroup(captured),
     workshops,
     stages,
     tags,
@@ -359,51 +363,15 @@ async function buildSendContext(
   };
 }
 
-/**
- * Los cortes de todas las órdenes del pedido, listos para el reparto a talleres.
- *
- * Un corte global (varias órdenes en una misma mesa) se junta en UN renglón:
- * a taller se manda el tendido, y repartirlo orden por orden dejaría el 40% de
- * una mesa partido en pedazos de cada papel.
- */
-function buildSplitCuts(
-  orders: Awaited<ReturnType<OrderFolderRepository["findSendableCuts"]>>,
-): SplitCut[] {
-  const cuts = new Map<string, SplitCut>();
-
-  for (const order of orders) {
-    const lineById = new Map(order.lines.map((line) => [line.id, line]));
-
-    for (const batch of order.batches) {
-      const key = batch.groupId ?? batch.id;
-      const label = cutBatchLabel(batch.number, batch.label);
-      const cut = cuts.get(key) ?? {
-        id: key,
-        label: batch.groupId ? `Corte global · ${label}` : `${order.code} · ${label}`,
-        bundles: [],
-      };
-
-      for (const entry of batch.entries) {
-        const line = lineById.get(entry.lineId);
-        if (!line) continue;
-        cut.bundles.push({
-          sizeCode: line.size.code,
-          pieces: entry.quantity,
-          count: entry.bundles,
-          sizeId: line.sizeId,
-          orderId: order.id,
-          orderCode: order.code,
-          // Igual que en el vale: el foleo del bulto manda sobre el del renglón.
-          tagId: entry.tagId ?? line.tagId,
-          note: line.notes,
-        });
-      }
-
-      cuts.set(key, cut);
-    }
+/** La captura física de cada corte global, por `groupId`, para el diálogo. */
+function capturesByGroup(
+  rows: Awaited<ReturnType<OrderFolderRepository["findGlobalCutBundles"]>>,
+): Record<string, CapturedCutRow[]> {
+  const byGroup: Record<string, CapturedCutRow[]> = {};
+  for (const { groupId, ...row } of rows) {
+    (byGroup[groupId] ??= []).push(row);
   }
-
-  return [...cuts.values()].filter((cut) => cut.bundles.length > 0);
+  return byGroup;
 }
 
 /** Un número grande con su etiqueta. Los totales del pedido de un vistazo. */

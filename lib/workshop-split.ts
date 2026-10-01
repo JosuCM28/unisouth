@@ -28,6 +28,21 @@ export interface SplitBundle {
   orderCode?: string;
   tagId?: string | null;
   note?: string | null;
+  /**
+   * Un bulto de corte global puede ser de VARIAS órdenes: el reparto partió
+   * sus piezas para completar a cada una. El bulto viaja entero al taller,
+   * pero el envío nace por orden, así que aquí va qué parte es de cuál.
+   */
+  parts?: SplitBundlePart[];
+}
+
+/** La parte de un bulto físico que le toca a una orden. */
+export interface SplitBundlePart {
+  orderId: string;
+  orderCode: string;
+  sizeId: string;
+  pieces: number;
+  note: string | null;
 }
 
 /** Cuántos bultos de cierto tamaño le tocan a un lado. */

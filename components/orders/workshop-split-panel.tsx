@@ -15,17 +15,12 @@ import {
   type ShippableSize,
 } from "./order-shipment-dialog";
 import type { CutTagChoice } from "./size-bundle-rows";
+import type { SplitCut } from "@/lib/folder-split-cuts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-/** Un corte que se puede incluir en el reparto. */
-export interface SplitCut {
-  id: string;
-  /** "1er corte", o "OC-2026-0012 · 1er corte" dentro de un pedido. */
-  label: string;
-  bundles: SplitBundle[];
-}
+export type { SplitCut };
 
 /**
  * A dónde se manda cada lado del reparto. Cada pantalla trae su propio camino:
@@ -163,6 +158,23 @@ export function WorkshopSplitPanel({
               </label>
             ))}
           </fieldset>
+        )}
+
+        {/* Un corte global de antes no guardó sus bultos reales: lo que hay
+            son los pedazos que le tocaron a cada orden. Se dice cómo
+            arreglarlo en vez de repartir callado sobre bultos que no existen. */}
+        {cuts.some((cut) => cut.partial && selected.has(cut.id)) && (
+          <p className="border border-border bg-muted p-2 text-xs">
+            <span className="font-medium">Ojo:</span>{" "}
+            {cuts
+              .filter((cut) => cut.partial && selected.has(cut.id))
+              .map((cut) => cut.label)
+              .join(", ")}{" "}
+            se capturó antes de guardar los bultos reales y algunos pueden
+            verse partidos (un “bulto de 4” que en la mesa era parte de uno de
+            28). Ábrelo en <span className="font-medium">Corte global</span>,
+            deja los bultos como se amarraron y guarda.
+          </p>
         )}
 
         {result.total === 0 ? (

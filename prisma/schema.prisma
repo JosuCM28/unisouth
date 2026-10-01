@@ -1581,6 +1581,8 @@ model OrderFolder {
   orders CuttingOrder[]
   /// The folder-wide issue vouchers born from it.
   issues InventoryDocument[] @relation("DocumentOrderFolder")
+  /// Los bultos REALES de cada corte global, tal como salieron de la mesa.
+  cutBundles GlobalCutBundle[]
 
   @@index([archivedAt, createdAt])
   @@index([clientId])
@@ -1828,6 +1830,45 @@ model CuttingOrderLine {
 /// cannot be edited at all: that paper is signed.
 ///
 /// Rows of one batch are never touched by another. Each lay-up owns its own.
+/// Un renglón de la captura de un corte GLOBAL, tal como se tecleó en la mesa.
+///
+/// El corte global reparte lo capturado entre las órdenes, y para completar a
+/// cada una a veces parte un bulto: un bulto de 28 queda como 24 para una
+/// orden y 4 para otra (o de sobrante). Esos pedazos son la verdad CONTABLE de
+/// cada orden, pero no son bultos: nadie amarró un bulto de 4. Sin guardar la
+/// captura original, cualquier pantalla que necesite los bultos físicos —el
+/// reparto 40/60 a talleres, volver a abrir el corte para corregirlo— sólo
+/// tenía los pedazos.
+///
+/// No es el kárdex del corte (ése sigue siendo `CuttingProgress`). Se
+/// reemplaza completo cada vez que se corrige el corte global, igual que sus
+/// cortes por orden.
+model GlobalCutBundle {
+  id       String      @id @default(cuid())
+  folderId String
+  folder   OrderFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  /// El corte global al que pertenece: el mismo `CuttingBatch.groupId`.
+  groupId String
+
+  /// La talla por código y no por id: el corte global captura por talla
+  /// SUMANDO órdenes, y es el código lo que junta los renglones de todas.
+  sizeCode String
+  /// Piezas POR BULTO.
+  quantity Int
+  bundles  Int     @default(1)
+  tagId    String?
+
+  /// El orden en que se capturó: es el orden en que se repartió.
+  position Int
+
+  createdAt DateTime @default(now())
+
+  @@index([groupId])
+  @@index([folderId])
+  @@map("global_cut_bundles")
+}
+
 model CuttingProgress {
   id     String           @id @default(cuid())
   lineId String

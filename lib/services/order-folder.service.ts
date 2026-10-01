@@ -1,4 +1,4 @@
-import type { OrderFolder } from "@prisma/client";
+import type { OrderFolder, Prisma } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { sumBundlePieces } from "@/lib/bundles";
 import { toCutLines, type CutLineDraft } from "@/lib/cut-lines";
@@ -135,6 +135,8 @@ export class OrderFolderService extends BaseService {
 
         results.push({ orderCode: code, ...result });
       }
+
+      await this.saveCapturedBundles(tx, folder.id, groupId, input.captured);
 
       await this.auditWith(tx).record({
         entity: "OrderFolder",
@@ -721,6 +723,39 @@ export class OrderFolderService extends BaseService {
       });
 
       return { shipments, skipped: [] };
+    });
+  }
+
+  /**
+   * Reemplaza la captura física del corte global.
+   *
+   * Se borra y se vuelve a escribir porque corregir el corte global REEMPLAZA
+   * sus cortes por orden: guardar la captura vieja junto a la nueva dejaría
+   * bultos que ya no existen. No es kárdex —ése es `CuttingProgress`—, así
+   * que reemplazar no borra historia.
+   *
+   * Una captura vacía (pantalla anterior) deja el corte sin bultos físicos y
+   * la pantalla cae a los pedazos por orden, como antes.
+   */
+  private async saveCapturedBundles(
+    tx: Prisma.TransactionClient,
+    folderId: string,
+    groupId: string,
+    captured: FolderCutInput["captured"],
+  ) {
+    await tx.globalCutBundle.deleteMany({ where: { groupId, folderId } });
+    if (captured.length === 0) return;
+
+    await tx.globalCutBundle.createMany({
+      data: captured.map((row, position) => ({
+        folderId,
+        groupId,
+        sizeCode: row.sizeCode,
+        quantity: row.quantity,
+        bundles: row.bundles,
+        tagId: row.tagId ?? null,
+        position,
+      })),
     });
   }
 

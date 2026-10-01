@@ -308,6 +308,24 @@ export class OrderFolderRepository extends BaseRepository<
     });
   }
 
+  /**
+   * Los bultos reales de los cortes globales del pedido, en el orden en que
+   * se capturaron —que es el orden en que se repartieron—.
+   */
+  async findGlobalCutBundles(folderId: string) {
+    return this.db.globalCutBundle.findMany({
+      where: { folderId },
+      orderBy: [{ groupId: "asc" }, { position: "asc" }],
+      select: {
+        groupId: true,
+        sizeCode: true,
+        quantity: true,
+        bundles: true,
+        tagId: true,
+      },
+    });
+  }
+
   /** Para el selector del formulario de orden: sólo carpetas vivas. */
   async findSelectable(): Promise<
     Array<{ id: string; code: string; name: string; clientName: string | null }>

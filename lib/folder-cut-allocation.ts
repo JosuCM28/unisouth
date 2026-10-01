@@ -50,6 +50,11 @@ export interface AllocationResult {
  * bulto que no cabe entero en lo que falta a una orden se parte: lo que
  * cubre la orden va a ella y el resto pasa a la siguiente como otro bulto.
  * Partir es lo que hace que los totales cuadren exacto con lo pedido.
+ *
+ * PERO sólo se parte entre órdenes distintas. Si lo que sobra del bulto cae en
+ * la MISMA orden —porque es la última y se queda con el excedente— el bulto
+ * sigue entero: guardar "24 + 4" donde en la mesa se amarró uno de 28 inventa
+ * un bulto de 4 que nadie puede encontrar al cargar el camión.
  */
 export function allocateBySize(
   targets: AllocationTarget[],
@@ -95,24 +100,15 @@ export function allocateBySize(
     }
 
     for (let bundle = 0; bundle < entry.bundles; bundle += 1) {
-      let left = entry.quantity;
+      const { parts, extra } = splitOneBundle(
+        sizeTargets,
+        remaining,
+        entry.quantity,
+      );
 
-      while (left > 0) {
-        const open = sizeTargets.find(
-          (target) => (remaining.get(target.lineId) ?? 0) > 0,
-        );
-
-        if (!open) {
-          const last = sizeTargets[sizeTargets.length - 1]!;
-          assign(last, left, entry.tagId);
-          surplus.set(entry.sizeKey, (surplus.get(entry.sizeKey) ?? 0) + left);
-          break;
-        }
-
-        const take = Math.min(left, remaining.get(open.lineId) ?? 0);
-        assign(open, take, entry.tagId);
-        remaining.set(open.lineId, (remaining.get(open.lineId) ?? 0) - take);
-        left -= take;
+      for (const part of parts) assign(part.target, part.pieces, entry.tagId);
+      if (extra > 0) {
+        surplus.set(entry.sizeKey, (surplus.get(entry.sizeKey) ?? 0) + extra);
       }
     }
   }
@@ -122,4 +118,96 @@ export function allocateBySize(
     surplus: [...surplus].map(([sizeKey, pieces]) => ({ sizeKey, pieces })),
     unmatched: [...unmatched],
   };
+}
+
+/**
+ * Parte UN bulto físico entre las órdenes de su talla, descontando lo que les
+ * falta. Lo que cae en la misma orden se suma en un solo pedazo.
+ */
+function splitOneBundle(
+  sizeTargets: AllocationTarget[],
+  remaining: Map<string, number>,
+  quantity: number,
+): { parts: { target: AllocationTarget; pieces: number }[]; extra: number } {
+  const byLine = new Map<string, { target: AllocationTarget; pieces: number }>();
+  let left = quantity;
+  let extra = 0;
+
+  function add(target: AllocationTarget, pieces: number) {
+    const current = byLine.get(target.lineId);
+    if (current) current.pieces += pieces;
+    else byLine.set(target.lineId, { target, pieces });
+  }
+
+  while (left > 0) {
+    const open = sizeTargets.find(
+      (target) => (remaining.get(target.lineId) ?? 0) > 0,
+    );
+
+    if (!open) {
+      add(sizeTargets[sizeTargets.length - 1]!, left);
+      extra += left;
+      break;
+    }
+
+    const take = Math.min(left, remaining.get(open.lineId) ?? 0);
+    add(open, take);
+    remaining.set(open.lineId, (remaining.get(open.lineId) ?? 0) - take);
+    left -= take;
+  }
+
+  return { parts: [...byLine.values()], extra };
+}
+
+/** Un bulto físico del corte global y qué parte de él es de cada orden. */
+export interface AttributedBundle {
+  sizeKey: string;
+  /** Piezas del bulto entero. */
+  quantity: number;
+  tagId?: string;
+  parts: { orderId: string; orderCode: string; lineId: string; pieces: number }[];
+}
+
+/**
+ * Vuelve a recorrer el reparto de un corte global, bulto por bulto, para decir
+ * de qué orden es cada pedazo de cada bulto físico.
+ *
+ * `targets` lleva en `pending` lo que CADA orden recibió de ese corte, no lo
+ * que le faltaba: así el recorrido reproduce lo guardado y la suma de los
+ * pedazos de una orden es exactamente su corte.
+ */
+export function attributeBundles(
+  targets: AllocationTarget[],
+  captured: CapturedBundles[],
+): AttributedBundle[] {
+  const remaining = new Map(targets.map((t) => [t.lineId, t.pending]));
+  const byKey = new Map<string, AllocationTarget[]>();
+  for (const target of targets) {
+    byKey.set(target.sizeKey, [...(byKey.get(target.sizeKey) ?? []), target]);
+  }
+
+  const result: AttributedBundle[] = [];
+
+  for (const entry of captured) {
+    const sizeTargets = byKey.get(entry.sizeKey);
+    if (!sizeTargets || sizeTargets.length === 0) continue;
+
+    for (let bundle = 0; bundle < entry.bundles; bundle += 1) {
+      const { parts } = splitOneBundle(sizeTargets, remaining, entry.quantity);
+
+      result.push({
+        sizeKey: entry.sizeKey,
+        quantity: entry.quantity,
+        tagId: entry.tagId,
+        parts: parts.map((part) => ({
+          orderId: part.target.orderId,
+          orderCode: part.target.orderCode,
+          lineId: part.target.lineId,
+          pieces: part.pieces,
+        })),
+      });
+    }
+  }
+
+  return result;
 }

@@ -57,11 +57,24 @@ export interface FolderCutOrder {
   batches: FolderCutBatch[];
 }
 
+/** Un renglón de la captura física de un corte global, antes de repartirse. */
+export interface CapturedCutRow {
+  sizeCode: string;
+  quantity: number;
+  bundles: number;
+  tagId: string | null;
+}
+
 interface Props {
   folderId: string;
   folderCode: string;
   orders: FolderCutOrder[];
   tags: CutTagChoice[];
+  /**
+   * Los bultos reales de cada corte global, por `groupId`. Un corte capturado
+   * antes de guardarlos no aparece aquí y se reabre con sus pedazos por orden.
+   */
+  captures: Record<string, CapturedCutRow[]>;
 }
 
 /** Lo que el pedido lleva de una talla, sumando todas sus órdenes. */
@@ -99,7 +112,13 @@ const NEW_CUT = "__new__";
  * Elegir un corte ya capturado lo abre para corregirlo: guardar lo REEMPLAZA y
  * se vuelve a repartir, igual que al corregir el corte de una orden.
  */
-export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
+export function FolderCutDialog({
+  folderId,
+  folderCode,
+  orders,
+  tags,
+  captures,
+}: Props) {
   const router = useRouter();
   const totals = sizeTotals(orders);
   const groups = cutGroups(orders);
@@ -112,7 +131,7 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
   const [notes, setNotes] = useState("");
   const [batchTagId, setBatchTagId] = useState("");
   const [rows, setRows] = useState<SizeBundleRow[]>(() =>
-    rowsOf(groups[0], orders, totals),
+    rowsOf(groups[0], orders, totals, captures),
   );
   const [isSaving, setIsSaving] = useState(false);
 
@@ -167,7 +186,12 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
 
   function handleGroupChange(next: string) {
     setGroupId(next);
-    setRows(rowsOf(groups.find((group) => group.id === next), orders, totals));
+    setRows(rowsOf(
+        groups.find((group) => group.id === next),
+        orders,
+        totals,
+        captures,
+      ),);
     setBatchTagId("");
   }
 
@@ -177,7 +201,7 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
     setNewLabel("");
     setNotes("");
     setBatchTagId("");
-    setRows(rowsOf(first, orders, totals));
+    setRows(rowsOf(first, orders, totals, captures));
   }
 
   function handleOpenChange(next: boolean) {
@@ -198,6 +222,12 @@ export function FolderCutDialog({ folderId, folderCode, orders, tags }: Props) {
         groupId: selected?.id,
         label: isNew ? newLabel || undefined : undefined,
         notes: notes || undefined,
+        captured: captured.map((row) => ({
+          sizeCode: row.value,
+          quantity: row.quantity,
+          bundles: row.bundles,
+          tagId: row.tagId,
+        })),
         orders: ordersPayload(orders, selected, result.allocations),
       }),
     );
@@ -523,8 +553,16 @@ function rowsOf(
   group: CutGroup | undefined,
   orders: FolderCutOrder[],
   totals: SizeTotal[],
+  captures: Record<string, CapturedCutRow[]>,
 ): SizeBundleRow[] {
-  const entries = entriesOf(group, orders);
+  /* Con la captura física guardada se reabre con ELLA: los pedazos por orden
+     son el reparto, no lo que se tecleó, y volver a guardarlos convertiría un
+     bulto de 28 en uno de 24 y otro de 4. */
+  const physical = group ? captures[group.id] : undefined;
+  const entries =
+    physical && physical.length > 0
+      ? physical.map((row) => ({ ...row, code: row.sizeCode }))
+      : entriesOf(group, orders);
 
   const rows = totals.flatMap((total) => {
     const here = entries.filter((entry) => entry.code === total.code);

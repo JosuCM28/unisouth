@@ -53,11 +53,15 @@ export function FolderSplitShipmentDialog({
   const [isSaving, setIsSaving] = useState(false);
 
   // Sólo lo que sabemos a qué orden y talla pertenece: el servidor lo exige.
-  const sendable = bundles.filter((bundle) => bundle.sizeId && bundle.orderId);
+  const sendable = bundles.filter(
+    (bundle) =>
+      (bundle.parts?.length ?? 0) > 0 || (bundle.sizeId && bundle.orderId),
+  );
   const rows = sendable.map((bundle) => ({
     quantity: bundle.pieces,
     bundles: bundle.count,
   }));
+  const lines = sendable.flatMap(toShipmentLines);
 
   async function handleSave() {
     if (!workshopId || !stageId) {
@@ -74,14 +78,7 @@ export function FolderSplitShipmentDialog({
         sentAt,
         parts: parts || undefined,
         reference: reference || undefined,
-        lines: sendable.map((bundle) => ({
-          orderId: bundle.orderId,
-          sizeId: bundle.sizeId,
-          sentQuantity: bundle.pieces,
-          bundles: bundle.count,
-          tagId: bundle.tagId ?? undefined,
-          notes: bundle.note ?? undefined,
-        })),
+        lines,
       }),
     );
     setIsSaving(false);
@@ -179,7 +176,11 @@ export function FolderSplitShipmentDialog({
               className="tabular flex justify-between gap-2 border-b border-border px-2 py-1 last:border-b-0"
             >
               <span>
-                {bundle.orderCode} · Talla {bundle.sizeCode}
+                Talla {bundle.sizeCode}
+                <span className="text-xs text-muted-foreground">
+                  {" "}
+                  · {describeOwners(bundle)}
+                </span>
               </span>
               <span>
                 {bundle.count}×{bundle.pieces}
@@ -203,4 +204,46 @@ export function FolderSplitShipmentDialog({
       </div>
     </ResponsiveFormDialog>
   );
+}
+
+/**
+ * Los renglones de envío de un bulto: uno por orden.
+ *
+ * Un bulto de corte global que el reparto partió entre dos órdenes viaja
+ * ENTERO en el camión, pero cada orden lleva su cuenta de lo que mandó al
+ * taller, así que en el papel va su parte en cada envío.
+ */
+function toShipmentLines(bundle: SplitBundle) {
+  const base = {
+    bundles: bundle.count,
+    tagId: bundle.tagId ?? undefined,
+  };
+
+  if (bundle.parts && bundle.parts.length > 0) {
+    return bundle.parts.map((part) => ({
+      ...base,
+      orderId: part.orderId,
+      sizeId: part.sizeId,
+      sentQuantity: part.pieces,
+      notes: part.note ?? undefined,
+    }));
+  }
+
+  return [
+    {
+      ...base,
+      orderId: bundle.orderId,
+      sizeId: bundle.sizeId,
+      sentQuantity: bundle.pieces,
+      notes: bundle.note ?? undefined,
+    },
+  ];
+}
+
+/** "PO-2026-0109" o "PO-2026-0109: 60 · PO-2026-0126: 41". */
+function describeOwners(bundle: SplitBundle): string {
+  if (!bundle.parts || bundle.parts.length === 0) return bundle.orderCode ?? "";
+  if (bundle.parts.length === 1) return bundle.parts[0]!.orderCode;
+
+  return bundle.parts.map((part) => `${part.orderCode}: ${part.pieces}`).join(" · ");
 }

@@ -96,6 +96,20 @@ export const folderCutSchema = z.object({
      después que dos cortes salieron de la misma mesa. */
   label: optionalText,
   notes: optionalText,
+  /* Los bultos tal como se teclearon, ANTES de repartirlos. Se guardan aparte
+     porque el reparto parte bultos entre órdenes y, sin esto, el bulto físico
+     se pierde: el reparto 40/60 y la corrección del corte sólo verían pedazos.
+     Opcional para no tumbar una captura hecha con la pantalla anterior. */
+  captured: z
+    .array(
+      z.object({
+        sizeCode: z.string().trim().min(1).max(40),
+        quantity: z.coerce.number().int().positive(),
+        bundles: z.coerce.number().int().positive().default(1),
+        tagId: optionalCuid,
+      }),
+    )
+    .default([]),
   orders: z
     .array(
       z
