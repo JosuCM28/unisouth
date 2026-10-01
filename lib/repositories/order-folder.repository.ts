@@ -278,6 +278,7 @@ export class OrderFolderRepository extends BaseRepository<
             id: true,
             number: true,
             label: true,
+            groupId: true,
             entries: {
               orderBy: { createdAt: "asc" },
               /* Con su foleo: el vale global del pedido arma los mismos

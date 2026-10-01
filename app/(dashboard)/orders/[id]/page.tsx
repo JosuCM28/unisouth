@@ -50,6 +50,7 @@ import {
   OrderBatches,
   type BatchView,
 } from "@/components/orders/order-batches";
+import { WorkshopSplitPanel } from "@/components/orders/workshop-split-panel";
 import {
   OrderShipments,
   type ShipmentView,
@@ -1018,6 +1019,22 @@ export default async function OrderDetailPage({ params }: PageProps) {
             ofrece mandarse a taller con sus propios bultos ya cargados: el
             diálogo es el mismo del encabezado, sólo que abierto con el
             tendido puesto. */}
+        {/* El reparto a dos talleres sale de los mismos bultos del corte. */}
+        {canEdit && batchViews.length > 0 && (
+          <div className="mb-3">
+            <WorkshopSplitPanel
+              cuts={batchViews.map((batch) => ({
+                id: batch.id,
+                label: cutBatchLabel(batch.number, batch.label),
+                bundles: batch.entries.map((entry) => ({
+                  sizeCode: entry.sizeCode,
+                  pieces: entry.quantity,
+                  count: entry.bundles,
+                })),
+              }))}
+            />
+          </div>
+        )}
         <OrderBatches
           batches={batchViews}
           orderId={order.id}

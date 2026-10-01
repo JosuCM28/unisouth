@@ -19,6 +19,10 @@ import { FolderDeleteButton } from "@/components/orders/folder-delete-button";
 import { FolderSendToIssueDialog } from "@/components/orders/folder-send-to-issue-dialog";
 import { FolderWorkshopDialog } from "@/components/orders/folder-workshop-dialog";
 import { OrderTable } from "@/components/orders/order-table";
+import {
+  WorkshopSplitPanel,
+  type SplitCut,
+} from "@/components/orders/workshop-split-panel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -201,6 +205,10 @@ export default async function OrderFolderPage({ params }: PageProps) {
         </div>
       </div>
 
+      {send && !isArchived && send.splitCuts.length > 0 && (
+        <WorkshopSplitPanel cuts={send.splitCuts} />
+      )}
+
       {(folder.reference || folder.dueDate || folder.notes) && (
         <div className="flat-surface flex flex-col gap-2 p-4 text-sm">
           {folder.reference && (
@@ -306,6 +314,7 @@ async function buildSendContext(
 
   return {
     preview: buildFolderSendPreview(orders, cutBatchLabel),
+    splitCuts: buildSplitCuts(orders),
     workshops,
     stages,
     tags,
@@ -339,6 +348,49 @@ async function buildSendContext(
       })),
     })),
   };
+}
+
+/**
+ * Los cortes de todas las órdenes del pedido, listos para el reparto a talleres.
+ *
+ * Un corte global (varias órdenes en una misma mesa) se junta en UN renglón:
+ * a taller se manda el tendido, y repartirlo orden por orden dejaría el 40% de
+ * una mesa partido en pedazos de cada papel.
+ */
+function buildSplitCuts(
+  orders: Awaited<ReturnType<OrderFolderRepository["findSendableCuts"]>>,
+): SplitCut[] {
+  const cuts = new Map<string, SplitCut>();
+
+  for (const order of orders) {
+    const sizeByLine = new Map(
+      order.lines.map((line) => [line.id, line.size.code]),
+    );
+
+    for (const batch of order.batches) {
+      const key = batch.groupId ?? batch.id;
+      const label = cutBatchLabel(batch.number, batch.label);
+      const cut = cuts.get(key) ?? {
+        id: key,
+        label: batch.groupId ? `Corte global · ${label}` : `${order.code} · ${label}`,
+        bundles: [],
+      };
+
+      for (const entry of batch.entries) {
+        const sizeCode = sizeByLine.get(entry.lineId);
+        if (!sizeCode) continue;
+        cut.bundles.push({
+          sizeCode,
+          pieces: entry.quantity,
+          count: entry.bundles,
+        });
+      }
+
+      cuts.set(key, cut);
+    }
+  }
+
+  return [...cuts.values()].filter((cut) => cut.bundles.length > 0);
 }
 
 /** Un número grande con su etiqueta. Los totales del pedido de un vistazo. */
