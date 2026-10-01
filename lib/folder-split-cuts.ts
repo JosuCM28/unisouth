@@ -1,4 +1,5 @@
 import { attributeBundles, type AllocationTarget } from "./folder-cut-allocation";
+import { mergeLegacyFragments } from "./legacy-global-cut";
 import type { SplitBundle } from "./workshop-split";
 
 /** Un corte que se puede incluir en el reparto a talleres. */
@@ -8,8 +9,8 @@ export interface SplitCut {
   label: string;
   bundles: SplitBundle[];
   /**
-   * Corte global capturado antes de guardarse sus bultos reales: lo que hay
-   * son los pedazos por orden, y alguno puede no ser un bulto de verdad.
+   * Corte global capturado antes de guardarse sus bultos reales: sus bultos
+   * se RECONSTRUYEN de los pedazos por orden y conviene confirmarlos.
    */
   partial?: boolean;
 }
@@ -109,7 +110,12 @@ export function buildFolderSplitCuts(
         global.lines.set(line.id, line);
       }
 
-      global.fragments.push(...fragments(order, batch.entries, lineById));
+      /* El respaldo sin captura: los pedazos vueltos a juntar, porque el
+         repartidor de antes partía un bulto en "lo que faltaba + lo que
+         sobró" dentro de la misma orden. */
+      global.fragments.push(
+        ...fragments(order, mergeLegacyFragments(batch.entries), lineById),
+      );
       globals.set(batch.groupId, global);
     }
   }

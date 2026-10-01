@@ -13,6 +13,7 @@ import {
   type AllocationTarget,
 } from "@/lib/folder-cut-allocation";
 import { cutBatchLabel } from "@/lib/constants/labels";
+import { mergeLegacyFragments } from "@/lib/legacy-global-cut";
 import { cutProgress, formatDate } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SearchSelect } from "@/components/shared/search-select";
@@ -527,7 +528,10 @@ function entriesOf(
 
     const codeOfLine = new Map(order.sizes.map((s) => [s.lineId, s.code]));
 
-    return batch.entries
+    /* Juntando los pedazos que el repartidor de antes guardaba sueltos ("24 +
+       4" de un bulto de 28): reabrir con ellos y guardar los volvería a
+       grabar como dos bultos. Las sumas no cambian. */
+    return mergeLegacyFragments(batch.entries)
       .filter((entry) => !code || codeOfLine.get(entry.lineId) === code)
       .map((entry) => ({
         ...entry,

@@ -170,10 +170,10 @@ export function WorkshopSplitPanel({
               .filter((cut) => cut.partial && selected.has(cut.id))
               .map((cut) => cut.label)
               .join(", ")}{" "}
-            se capturó antes de guardar los bultos reales y algunos pueden
-            verse partidos (un “bulto de 4” que en la mesa era parte de uno de
-            28). Ábrelo en <span className="font-medium">Corte global</span>,
-            deja los bultos como se amarraron y guarda.
+            se capturó antes de guardar los bultos reales: sus bultos se
+            reconstruyeron juntando los pedazos de cada talla. Para dejarlos
+            fijos abre <span className="font-medium">Corte global</span>,
+            revisa que estén como se amarraron y guarda.
           </p>
         )}
 
