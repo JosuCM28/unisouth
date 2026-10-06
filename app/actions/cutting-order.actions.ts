@@ -11,6 +11,7 @@ import {
   cuttingProgressSchema,
   orderCommentSchema,
   plantOrderSchema,
+  removeBatchSchema,
 } from "@/lib/validations/cutting-order.schema";
 import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 
@@ -168,6 +169,21 @@ export async function saveBatchProgressAction(input: unknown) {
     successMessage: "Corte capturado",
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).saveBatchProgress(input),
+  });
+}
+
+/**
+ * Borra un corte capturado por error. Misma llave que capturarlo: quien
+ * puede meter un corte puede deshacer el suyo.
+ */
+export async function removeCuttingBatchAction(input: unknown) {
+  return executeAction(input, {
+    schema: removeBatchSchema,
+    permission: "inventory:write",
+    revalidate: REVALIDATE,
+    successMessage: "Corte borrado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).removeBatch(input),
   });
 }
 

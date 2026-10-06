@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { CutTagChip, SizeNote, type SizeAnnotation } from "./size-note";
 import type { CutTagChoice } from "./size-bundle-rows";
 import { OrderSendToIssueDialog } from "./order-send-to-issue-dialog";
+import { BatchDeleteButton } from "./batch-delete-button";
 import {
   OrderShipmentDialog,
   type ShipmentPrefillRow,
@@ -57,6 +58,8 @@ export interface BatchView {
   notes: string | null;
   openedAt: Date;
   openedByName: string | null;
+  /** Liga con las demás órdenes de un corte global. Ése no se borra desde aquí. */
+  groupId: string | null;
   entries: BatchEntryView[];
   /**
    * Las salidas de ESTE corte, de la más nueva a la más vieja.
@@ -158,6 +161,10 @@ export function OrderBatches({
         const canShip =
           canSend && shipmentRows.length > 0 && shippableSizes.length > 0;
         const canSendToIssue = canSend && !live && sizes.length > 0;
+        /* Sólo se ofrece donde el servidor lo va a aceptar: con salida viva el
+           papel ya está firmado, y el de un corte global se corrige desde el
+           pedido. El servidor lo vuelve a revisar de todos modos. */
+        const canDelete = canSend && !live && !batch.groupId;
 
         return (
           <li key={batch.id} className="flat-surface flex flex-col gap-2 p-3">
@@ -300,7 +307,7 @@ export function OrderBatches({
                 sigue con el segundo. Sin estos botones había que mandar todo lo
                 cortado hasta la fecha, y el segundo vale volvía a incluir lo
                 que ya se había llevado el primero. */}
-            {(canShip || canSendToIssue) && (
+            {(canShip || canSendToIssue || canDelete) && (
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 {/* A taller, con los bultos de este corte ya cargados.
 
@@ -354,6 +361,15 @@ export function OrderBatches({
                         Mandar a salida
                       </Button>
                     }
+                  />
+                )}
+
+                {canDelete && (
+                  <BatchDeleteButton
+                    orderId={orderId}
+                    batchId={batch.id}
+                    label={cutBatchLabel(batch.number, batch.label)}
+                    pieces={total}
                   />
                 )}
               </div>

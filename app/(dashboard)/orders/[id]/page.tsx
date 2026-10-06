@@ -408,6 +408,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     notes: batch.notes,
     openedAt: batch.openedAt,
     openedByName: batch.createdBy?.name ?? null,
+    groupId: batch.groupId,
     entries: history
       .filter((entry) => entry.batchId === batch.id)
       .map((entry) => ({

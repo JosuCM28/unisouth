@@ -168,6 +168,20 @@ export const cuttingBatchSchema = z.object({
 export type CuttingBatchInput = z.infer<typeof cuttingBatchSchema>;
 
 /**
+ * Borra un corte capturado por error.
+ *
+ * El motivo es obligatorio: borrar un corte es una baja HIGH, y en la
+ * bitácora es lo único que explica por qué desaparecieron esas piezas.
+ */
+export const removeBatchSchema = z.object({
+  orderId: cuidSchema,
+  batchId: cuidSchema,
+  reason: requiredText("El motivo", 500),
+});
+
+export type RemoveBatchInput = z.infer<typeof removeBatchSchema>;
+
+/**
  * La captura de una tanda completa: un corte y varias tallas de golpe.
  *
  * Es el flujo real del piso —se tiende, se corta de cada talla y se anota todo

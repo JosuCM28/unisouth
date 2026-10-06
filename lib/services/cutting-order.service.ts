@@ -21,6 +21,7 @@ import type {
   CuttingProgressInput,
   OrderCommentInput,
   PlantOrderInput,
+  RemoveBatchInput,
 } from "@/lib/validations/cutting-order.schema";
 import { BaseService } from "./base.service";
 import { DocumentService } from "./document.service";
@@ -715,6 +716,84 @@ export class CuttingOrderService extends BaseService {
            regla de cuándo un corte estaba vacío. */
         replaced: previous.length > 0,
       };
+    });
+  }
+
+  /**
+   * Borra un corte capturado por error, con todas sus capturas.
+   *
+   * Pasa por el mismo candado que corregirlo: un corte que ya salió en un vale
+   * vivo tiene su desglose en un papel firmado, y borrarlo dejaría ese papel
+   * hablando de prendas que el sistema ya no conoce.
+   *
+   * El de un corte GLOBAL no se borra desde aquí: sus bultos físicos viven en
+   * el pedido (`GlobalCutBundle`) repartidos entre varias órdenes, y quitar la
+   * parte de una sola dejaría esa captura contando bultos que ya no están en
+   * ninguna orden. Se corrige desde el corte global.
+   *
+   * El número NO se recorre: si se borra el 2º, el 3º sigue siendo el 3º,
+   * porque así está escrito en lo que ya se imprimió o se mandó a taller.
+   */
+  async removeBatch(input: RemoveBatchInput) {
+    return this.transaction(async (tx) => {
+      const order = await tx.cuttingOrder.findUnique({
+        where: { id: input.orderId },
+        select: { id: true, code: true, status: true },
+      });
+      if (!order) throw new NotFoundError("la orden", input.orderId);
+
+      if (order.status === "CANCELLED") {
+        throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
+      }
+
+      const batch = await this.requireEditableBatch(
+        tx,
+        input.batchId,
+        order.id,
+      );
+      const label = cutBatchLabel(batch.number, batch.label);
+
+      if (batch.groupId) {
+        throw new BusinessRuleError(
+          `${label} es parte de un corte global del pedido. Corrígelo desde el corte global para que los bultos de las demás órdenes no queden descuadrados.`,
+        );
+      }
+
+      const previous = await tx.cuttingProgress.findMany({
+        where: { batchId: batch.id },
+        select: { lineId: true, quantity: true, bundles: true },
+      });
+
+      await tx.cuttingProgress.deleteMany({ where: { batchId: batch.id } });
+      await tx.cuttingBatch.delete({ where: { id: batch.id } });
+
+      /* Las tallas que este corte alimentaba bajan su acumulado. Se recalcula
+         desde la bitácora restante, igual que al capturar: el total guardado
+         nunca se resta a mano. */
+      for (const lineId of new Set(previous.map((row) => row.lineId))) {
+        const sizeCode = await this.sizeCodeOf(tx, lineId);
+        await this.recalculateLine(tx, lineId, sizeCode);
+      }
+
+      await this.syncStatus(tx, order.id);
+
+      // Lo único que queda de las cifras borradas es este registro.
+      await this.auditWith(tx).record({
+        entity: "CuttingOrder",
+        entityId: order.id,
+        action: "DELETE",
+        reference: `${order.code} · ${label}`,
+        oldValue: {
+          corte: batch.number,
+          renglones: previous.length,
+          bultos: sumBundles(previous),
+          piezas: sumBundlePieces(previous),
+        },
+        sensitivity: "HIGH",
+        reason: input.reason,
+      });
+
+      return { number: batch.number };
     });
   }
 
