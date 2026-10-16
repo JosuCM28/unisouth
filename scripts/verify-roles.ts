@@ -46,15 +46,8 @@ const ESPERADO: Record<Role, string[]> = {
     "Recepciones", "Salidas", "Órdenes", "Documentos",
   ],
 
-  PRODUCTION: [
-    "Tablero", "Inventario", "Escanear", "Cálculo",
-    "Tareas", "Reglas",
-    "Materiales", "Productos", "Prendas", "Tallas", "Foleos", "Talleres",
-    "Almacenes", "Ubicaciones", "Clientes", "Producciones", "Proveedores",
-    "Ayudantes",
-    "Recepciones", "Salidas", "Órdenes", "Movimientos", "Documentos",
-    "Reportes",
-  ],
+  // Como Sólo lectura, más captura de cortes y el catálogo de Prendas.
+  PRODUCTION: ["Órdenes", "Prendas"],
 
   PURCHASING: [
     "Tablero", "Inventario", "Escanear",

@@ -100,7 +100,7 @@ export const NAVIGATION: NavSection[] = [
         href: "/garments",
         label: "Prendas",
         icon: "garments",
-        permission: "inventory:browse",
+        permission: "garments:browse",
       },
       {
         href: "/sizes",

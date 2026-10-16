@@ -135,7 +135,7 @@ export async function updateCuttingOrderAction(input: unknown) {
 export async function addCuttingProgressAction(input: unknown) {
   return executeAction(input, {
     schema: cuttingProgressSchema,
-    permission: "inventory:write",
+    permission: "cuts:write",
     revalidate: REVALIDATE,
     successMessage: "Avance registrado",
     handler: ({ input, auditContext }) =>
@@ -147,7 +147,7 @@ export async function addCuttingProgressAction(input: unknown) {
 export async function openCuttingBatchAction(input: unknown) {
   return executeAction(input, {
     schema: cuttingBatchSchema,
-    permission: "inventory:write",
+    permission: "cuts:write",
     revalidate: REVALIDATE,
     successMessage: "Corte abierto",
     handler: ({ input, auditContext }) =>
@@ -164,7 +164,7 @@ export async function openCuttingBatchAction(input: unknown) {
 export async function saveBatchProgressAction(input: unknown) {
   return executeAction(input, {
     schema: batchProgressSchema,
-    permission: "inventory:write",
+    permission: "cuts:write",
     revalidate: REVALIDATE,
     successMessage: "Corte capturado",
     handler: ({ input, auditContext }) =>

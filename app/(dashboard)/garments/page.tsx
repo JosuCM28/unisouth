@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Prendas" };
  * reconocible una carpeta de un vistazo cuando ya hay quince.
  */
 export default async function GarmentsPage() {
-  await requirePermission("inventory:browse");
+  await requirePermission("garments:browse");
 
   const user = await getCurrentUser();
   const canWrite = user ? roleHasPermission(user.role, "catalog:write") : false;

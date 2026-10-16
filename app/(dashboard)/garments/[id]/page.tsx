@@ -38,7 +38,7 @@ export async function generateMetadata({
  * que la foto grande va arriba y la lista debajo, sin nada en medio.
  */
 export default async function GarmentPage({ params }: PageProps) {
-  await requirePermission("inventory:browse");
+  await requirePermission("garments:browse");
 
   const { id } = await params;
 

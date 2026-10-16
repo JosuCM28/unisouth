@@ -32,7 +32,7 @@ export async function generateMetadata({
 
 /** Las prendas de una carpeta, como tablero de fotos. */
 export default async function GarmentFolderPage({ params }: PageProps) {
-  await requirePermission("inventory:browse");
+  await requirePermission("garments:browse");
 
   const { id } = await params;
 

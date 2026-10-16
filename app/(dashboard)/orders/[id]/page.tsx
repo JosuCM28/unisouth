@@ -358,8 +358,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
   /* Una orden cancelada no se toca, y quien sólo consulta tampoco la toca:
      las dos condiciones gobiernan los mismos botones, así que viven juntas. */
   const canEdit = canWrite && !isCancelled;
+  /* Capturar cortes es de quien corta (`cuts:write`), no sólo de quien
+     administra la orden: Producción captura sin poder editar ni cancelar. */
+  const canCapture =
+    !isCancelled && !!user && roleHasPermission(user.role, "cuts:write");
   // Sin un solo botón que ofrecer, el encabezado no pinta el hueco.
-  const hasActions = canWrite || !isCancelled;
+  const hasActions = canWrite || canCapture || !isCancelled;
 
   /* Lo que viajaría a un vale de salida: sólo las tallas con corte, porque
      lo que sale por la puerta son las prendas que ya existen. Se calcula
@@ -539,7 +543,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               {/* Va PRIMERO y es el único botón sólido: capturar el corte es
                   lo que se viene a hacer a esta pantalla; imprimir y editar
                   son lo de después. */}
-              {canEdit && (
+              {canCapture && (
                 <OrderBatchDialog
                   orderId={order.id}
                   batches={batchOptions}
@@ -905,7 +909,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 {/* Sin ningún corte abierto no hay a qué cargar las piezas:
                     el botón llevaría a un diálogo que no puede guardar. La
                     primera captura se hace con "Capturar corte". */}
-                {canEdit && batchOptions.length > 0 && (
+                {canCapture && batchOptions.length > 0 && (
                   <OrderProgressDialog
                     lineId={line.id}
                     sizeCode={line.size.code}

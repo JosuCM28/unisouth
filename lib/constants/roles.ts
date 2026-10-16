@@ -70,6 +70,16 @@ export const PERMISSIONS = [
      la misma llave con la que capturan, se meterían solos al concentrado. */
   "plant-orders:adopt",
   "inventory:write",
+  /* Capturar cortes en una orden: abrir el corte, meter sus tallas y
+     registrar avance por talla. Se separó de `inventory:write` porque
+     Producción cuenta lo que se corta en la mesa pero no mueve el almacén:
+     con `inventory:write` también podría editar, cancelar o mandar la orden
+     a Salidas. */
+  "cuts:write",
+  /* Consultar el catálogo de Prendas. Va aparte de `inventory:browse` por la
+     misma razón que `orders:browse`: esa llave abre de golpe rollos,
+     catálogos y documentos, y Producción sólo necesita mirar las prendas. */
+  "garments:browse",
   "inventory:adjust",
   "catalog:write",
   /* El marco de CÓMO se produce: ficha técnica, escalado de tallas, foleo del
@@ -146,27 +156,27 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory:browse",
     "orders:browse",
     "inventory:write",
+    "cuts:write",
+    "garments:browse",
     "inventory:adjust",
     "catalog:write",
   ],
 
-  /* Consulta inventario, mantiene fichas técnicas y corre cálculos. Ve el
-     lado de producción y los reportes, pero no los edita: dar de alta un
-     taller o una corrida sigue siendo de quien administra. */
-  PRODUCTION: [
-    "inventory:read",
-    "inventory:browse",
-    "orders:browse",
-    "production:browse",
-    "reporting:read",
-    "staff:browse",
-    "bom:write",
-    "calculation:run",
-  ],
+  /* Igual que Sólo lectura —mira las órdenes de corte completas y nada
+     más— con dos añadidos: captura cortes en cada orden (`cuts:write`) y
+     consulta el catálogo de Prendas (`garments:browse`, sólo lectura: editarlo
+     exige `catalog:write`, que no lleva).
+
+     Antes veía casi todo el almacén y los reportes. Se recortó porque quien
+     corta en la mesa no necesita recorrer rollos ni kárdex, y `cuts:write`
+     existe aparte de `inventory:write` justo para que capture el corte sin
+     poder editar, cancelar ni mandar la orden a Salidas. */
+  PRODUCTION: ["orders:browse", "cuts:write", "garments:browse"],
 
   PURCHASING: [
     "inventory:read",
     "inventory:browse",
+    "garments:browse",
     "orders:browse",
     "production:browse",
     "reporting:read",
