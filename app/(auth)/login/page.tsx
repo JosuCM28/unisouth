@@ -19,7 +19,7 @@ export default function LoginPage() {
     <main className="keyboard-safe-only flex flex-1 items-center justify-center px-4 pt-[calc(1rem+env(safe-area-inset-top,0px))]">
       <div className="flat-surface w-full max-w-sm p-6">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold tracking-tight">CESAR CARA DE PERRO, EL FER ME LA PELA</h1>
+          <h1 className="text-xl font-semibold tracking-tight">UNISOUTH</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Control de almacén textil
           </p>
