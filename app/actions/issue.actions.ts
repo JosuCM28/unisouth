@@ -35,6 +35,13 @@ export interface IssueLotOption {
   unit: string;
   locationCode: string | null;
   materialName: string;
+  /**
+   * De quién es el rollo. El selector abre SIN filtro de dueño —hay rollos
+   * que se dieron de alta sin asignarlo y no salían—, así que cada renglón
+   * tiene que decir de quién es para no surtirle a uno la tela de otro a
+   * ciegas.
+   */
+  ownerName: string | null;
 }
 
 /** Rollos que se pueden surtir de un material: retazos primero, luego FIFO. */
@@ -59,6 +66,7 @@ export async function availableLotsAction(input: unknown) {
           unit: lot.unit,
           locationCode: lot.location?.code ?? null,
           materialName: lot.material.name,
+          ownerName: lot.client?.name ?? null,
         }))
         // Un rollo íntegramente reservado ocupa lugar pero no se puede tomar:
         // ofrecerlo sólo llevaría a un error al aplicar el vale.
@@ -109,6 +117,7 @@ export async function createLotForIssueAction(input: unknown) {
         unit: lot.unit,
         locationCode: lot.location?.code ?? null,
         materialName: lot.material.name,
+        ownerName: lot.client?.name ?? null,
       };
     },
   });

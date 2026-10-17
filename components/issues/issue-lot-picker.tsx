@@ -230,6 +230,13 @@ export function IssueLotPicker({
                     {lot.shade && `Tono ${lot.shade} · `}
                     {lot.locationCode ?? "Sin ubicación"}
                   </span>
+                  {/* Sin filtro de dueño la lista mezcla clientes: el dueño
+                      va a la vista para que nadie surta tela ajena sin darse
+                      cuenta. "Sin dueño" es justo el rollo que el filtro
+                      escondía. */}
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {lot.ownerName ?? "Sin dueño asignado"}
+                  </span>
                 </span>
 
                 <span className="tabular shrink-0 text-sm font-medium">

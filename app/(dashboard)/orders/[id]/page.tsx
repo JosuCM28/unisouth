@@ -65,17 +65,16 @@ import {
 } from "@/components/orders/order-comments";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { Button } from "@/components/ui/button";
-import { OrderFabric } from "@/components/orders/order-fabric";
-import {
-  OrderFabricReturnDialog,
-  type ReturnableRoll,
-} from "@/components/orders/order-fabric-return-dialog";
+import type { ReturnableRoll } from "@/components/orders/order-fabric-return-dialog";
+import { OrderFabricPanel } from "@/components/orders/order-fabric-panel";
+import { OrderDetailTabs } from "@/components/orders/order-detail-tabs";
 import { OrderFabricRepository } from "@/lib/repositories/order-fabric.repository";
 import { summarizeFabric } from "@/lib/order-fabric";
-import { Scissors } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  /** `tab=fabric` abre la pestaña de tela: así se vuelve de una salida. */
+  searchParams: Promise<{ tab?: string }>;
 }
 
 export async function generateMetadata({
@@ -95,10 +94,14 @@ export async function generateMetadata({
  * Es la pantalla del día a día: se abre para registrar cuánto se cortó y para
  * saber qué queda pendiente sin tener que sumar a mano.
  */
-export default async function OrderDetailPage({ params }: PageProps) {
+export default async function OrderDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   await requirePermission("orders:browse");
 
   const { id } = await params;
+  const { tab } = await searchParams;
 
   const user = await getCurrentUser();
   /* Ésta es la pantalla que Sólo lectura sí puede abrir, y la abre ENTERA:
@@ -603,24 +606,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
               )}
               {/* Va antes de Mover y Cancelar: es la acción que sigue cuando
                   el taller termina, y estaba costando recapturar el desglose
-                  entero en Salidas. */}
-              {/* La tela va aparte de las prendas: es el control de cuánto
-                  consume la orden. Lleva a la salida ya ligada a ella. */}
-              {canEdit && (
-                <Button asChild variant="outline" className="touch-target">
-                  <Link href={`/issues/new?order=${order.id}`}>
-                    <Scissors className="size-4" aria-hidden />
-                    Salida de tela
-                  </Link>
-                </Button>
-              )}
-              {canEdit && returnableRolls.length > 0 && (
-                <OrderFabricReturnDialog
-                  orderId={order.id}
-                  orderCode={order.code}
-                  rolls={returnableRolls}
-                />
-              )}
+                  entero en Salidas. La salida de TELA no está aquí: vive en
+                  su pestaña, junto a su consumo. */}
               {canEdit && canSendToIssue && (
                 <OrderSendToIssueDialog
                   orderId={order.id}
@@ -716,6 +703,22 @@ export default async function OrderDetailPage({ params }: PageProps) {
         )}
       </div>
 
+      <OrderDetailTabs
+        defaultTab={tab === "fabric" ? "fabric" : "order"}
+        fabricCount={fabricDocuments.length}
+        fabric={
+          <OrderFabricPanel
+            orderId={order.id}
+            orderCode={order.code}
+            documents={fabricDocuments}
+            summary={fabricSummary}
+            returnableRolls={returnableRolls}
+            canEdit={canEdit}
+            canOpen={canOpenDocuments}
+          />
+        }
+        order={
+      <>
       {/* Los comentarios internos van ARRIBA de lo operativo: son la
           planeación —a qué taller va qué parte— y se leen antes de tocar
           nada, no después de recorrer la pantalla entera. */}
@@ -780,19 +783,6 @@ export default async function OrderDetailPage({ params }: PageProps) {
             )}
           </h2>
           <OrderIssues issues={issueViews} canOpen={canOpenDocuments} />
-        </section>
-      )}
-
-      {/* El consumo de tela de la orden. Sólo aparece cuando ya hay algún
-          vale: una orden sin tela sacada no necesita un bloque vacío. */}
-      {fabricDocuments.length > 0 && (
-        <section className="flat-surface p-4">
-          <h2 className="mb-3 text-sm font-semibold">Tela</h2>
-          <OrderFabric
-            documents={fabricDocuments}
-            summary={fabricSummary}
-            canOpen={canOpenDocuments}
-          />
         </section>
       )}
 
@@ -1064,6 +1054,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
           tags={cutTags}
         />
       </section>
+      </>
+        }
+      />
     </div>
   );
 }

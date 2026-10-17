@@ -41,7 +41,7 @@ export default async function NewIssuePage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-4">
       <Link
-        href={order ? `/orders/${order.id}` : "/issues"}
+        href={order ? `/orders/${order.id}?tab=fabric` : "/issues"}
         className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />

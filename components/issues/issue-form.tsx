@@ -26,6 +26,7 @@ import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchSelect } from "@/components/shared/search-select";
 import { ApplicableRules } from "@/components/rules/applicable-rules";
@@ -213,6 +214,17 @@ export function IssueForm({
   const realClientId =
     clientId && clientId !== FACTORY_OWNER ? clientId : undefined;
 
+  /* El dueño del VALE y el filtro del SELECTOR son dos cosas distintas.
+
+     El dueño se queda —sale impreso en el vale y dice de quién es el corte—,
+     pero el selector abre con TODOS los rollos: hay tela que se dio de alta
+     sin dueño asignado y, filtrando por empresa, el auxiliar no encontraba
+     el rollo que tenía en la mano. Cada rollo enseña su dueño en la lista, y
+     quien quiera acotar prende el interruptor. */
+  const [ownerOnly, setOwnerOnly] = useState(false);
+  const pickerOwner = ownerOnly ? clientId : "";
+  const pickerClientId = ownerOnly ? realClientId : undefined;
+
   const [lines, setLines] = useState<IssueLine[]>(document?.lines ?? []);
   const [cutLines, setCutLines] = useState<CutLineDraft[]>(
     document?.cutLines ?? [],
@@ -260,7 +272,9 @@ export function IssueForm({
     setPickerState({ kind: "idle" });
     setPickerMaterialId("");
 
-    if (lines.length > 0) {
+    /* Sin el filtro prendido los renglones ya eran de cualquier dueño a
+       propósito: cambiar la empresa del vale no los vuelve ajenos. */
+    if (ownerOnly && lines.length > 0) {
       setLines([]);
       toast.info("Se limpiaron los renglones: eran rollos de otro cliente.");
     }
@@ -273,13 +287,16 @@ export function IssueForm({
    * acción, y encadenarla a un efecto sólo agregaría un render intermedio en
    * el que la lista anterior sigue tocable.
    */
-  async function handleMaterialChange(materialId: string) {
+  async function handleMaterialChange(
+    materialId: string,
+    filterClientId: string | undefined = pickerClientId,
+  ) {
     setPickerMaterialId(materialId);
     setPickerState({ kind: "loading" });
 
     const result = await runAction(() => availableLotsAction({
       materialId,
-      clientId: realClientId,
+      clientId: filterClientId,
     }));
 
     if (!result.success) {
@@ -288,6 +305,26 @@ export function IssueForm({
     }
 
     setPickerState({ kind: "ready", lots: result.data });
+  }
+
+  /**
+   * Prende o apaga el filtro por dueño y vuelve a pedir la lista abierta.
+   *
+   * Si al acotar el material elegido ya no es de esa empresa, se suelta en
+   * vez de enseñar una lista vacía que parece "no hay tela".
+   */
+  function handleOwnerOnlyChange(next: boolean) {
+    setOwnerOnly(next);
+    if (!pickerMaterialId) return;
+
+    const material = materials.find((item) => item.id === pickerMaterialId);
+    if (next && clientId && !material?.clientIds.includes(clientId)) {
+      setPickerMaterialId("");
+      setPickerState({ kind: "idle" });
+      return;
+    }
+
+    void handleMaterialChange(pickerMaterialId, next ? realClientId : undefined);
   }
 
   /**
@@ -582,8 +619,8 @@ export function IssueForm({
      Esto NO aplica al encabezado del corte, que ofrece el catálogo completo:
      ahí la tela se nombra aunque no haya rollo que descontar. */
   const visibleMaterials = (
-    clientId
-      ? materials.filter((material) => material.clientIds.includes(clientId))
+    pickerOwner
+      ? materials.filter((material) => material.clientIds.includes(pickerOwner))
       : materials
   ).filter((material) => material.lotCount > 0);
 
@@ -600,7 +637,7 @@ export function IssueForm({
         <FormSelectField
           id="issue-client"
           label="Empresa dueña del corte"
-          hint="Al elegirla sólo se ofrecen sus rollos: su tela no surte la producción de otro. Se ofrecen todas, tengan rollos o no."
+          hint="Sale en el vale. Al agregar rollos se ven todos, con su dueño; para ver sólo los de esta empresa, prende el filtro dentro de Agregar rollos."
         >
           <SearchSelect
             id="issue-client"
@@ -676,6 +713,23 @@ export function IssueForm({
               />
             ) : (
             <div className="flex flex-col gap-4">
+              {/* Sólo cuando el vale tiene empresa: sin ella no hay a quién
+                  acotar. Apagado por omisión, por el rollo sin dueño. */}
+              {clientId && (
+                <div className="flex items-center justify-between gap-4 border border-border px-3 py-2">
+                  <Label htmlFor="picker-owner-only" className="cursor-pointer">
+                    Sólo rollos de{" "}
+                    {clients.find((client) => client.id === clientId)?.name ??
+                      "la fábrica"}
+                  </Label>
+                  <Switch
+                    id="picker-owner-only"
+                    checked={ownerOnly}
+                    onCheckedChange={handleOwnerOnlyChange}
+                  />
+                </div>
+              )}
+
               <FormSelectField id="picker-material" label="Material">
                 <SearchSelect
                   id="picker-material"
@@ -686,7 +740,7 @@ export function IssueForm({
                     keywords: material.code,
                   }))}
                   value={pickerMaterialId}
-                  onChange={handleMaterialChange}
+                  onChange={(materialId) => void handleMaterialChange(materialId)}
                   placeholder="Elige el material"
                   searchPlaceholder="Buscar por código o nombre…"
                   emptyMessage="Este cliente no tiene material en bodega."
@@ -701,7 +755,7 @@ export function IssueForm({
                 key={pickerMaterialId}
                 state={pickerState}
                 excludeLotIds={usedLotIds}
-                hasClientFilter={Boolean(clientId)}
+                hasClientFilter={Boolean(pickerOwner)}
                 onPick={handlePick}
               />
 

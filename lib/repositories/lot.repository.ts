@@ -313,6 +313,7 @@ export class LotRepository extends BaseRepository<
         reservedQuantity: true,
         location: { select: { code: true } },
         material: { select: { name: true } },
+        client: { select: { name: true } },
       },
     });
 
@@ -351,6 +352,7 @@ export class LotRepository extends BaseRepository<
       include: {
         material: { select: { id: true, code: true, name: true, baseUnit: true } },
         location: { select: { id: true, code: true, name: true } },
+        client: { select: { name: true } },
       },
     });
   }

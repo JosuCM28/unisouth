@@ -47,6 +47,8 @@ export default async function EditIssuePage({ params }: PageProps) {
         },
       },
       cutLines: { orderBy: { order: "asc" } },
+      // Para regresar a la orden: el borrador se abre desde su pestaña de tela.
+      cuttingOrder: { select: { id: true, code: true } },
     },
   });
 
@@ -103,16 +105,22 @@ export default async function EditIssuePage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-4">
       <Link
-        href={`/documents/${document.id}`}
+        /* Si el borrador es tela de una orden, se abrió desde su pestaña de
+           tela y es ahí a donde se regresa. */
+        href={
+          document.cuttingOrder
+            ? `/orders/${document.cuttingOrder.id}?tab=fabric`
+            : `/documents/${document.id}`
+        }
         className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        {document.code}
+        {document.cuttingOrder?.code ?? document.code}
       </Link>
 
       <PageHeader
         title={`Editar ${document.code}`}
-        description="Corrige el borrador antes de aplicarlo"
+        description="Agrega o quita rollos y corrige el borrador antes de aplicarlo"
       />
 
       <IssueForm
