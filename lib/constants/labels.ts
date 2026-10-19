@@ -3,6 +3,7 @@ import type {
   AuditAction,
   CutTag,
   CutVersion,
+  CutEditRequestStatus,
   CuttingOrderOrigin,
   CuttingOrderStatus,
   DocumentStatus,
@@ -349,6 +350,26 @@ export const CUTTING_ORDER_STATUS_STYLES: Record<CuttingOrderStatus, string> = {
   IN_PROGRESS: "bg-state-remnant text-state-remnant-foreground",
   COMPLETED: "bg-state-available text-state-available-foreground",
   CANCELLED: "bg-muted text-muted-foreground border border-border line-through",
+};
+
+export const CUT_EDIT_REQUEST_STATUS_LABELS: Record<
+  CutEditRequestStatus,
+  string
+> = {
+  PENDING: "Pendiente",
+  APPROVED: "Autorizada",
+  REJECTED: "Rechazada",
+  USED: "Usada",
+};
+
+export const CUT_EDIT_REQUEST_STATUS_STYLES: Record<
+  CutEditRequestStatus,
+  string
+> = {
+  PENDING: "bg-state-reserved text-state-reserved-foreground",
+  APPROVED: "bg-state-available text-state-available-foreground",
+  REJECTED: "bg-state-defective text-state-defective-foreground",
+  USED: "bg-muted text-muted-foreground border border-border",
 };
 
 /**

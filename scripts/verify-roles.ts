@@ -34,7 +34,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
     "Documentos",
     "Requisiciones", "Reportes", "Auditoría",
-    "Usuarios", "Notificaciones",
+    "Usuarios", "Notificaciones", "Solicitudes de edición",
   ],
 
   /* Mueve el material, y nada más. Ésta es la lista que se acordó y la razón

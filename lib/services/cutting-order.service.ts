@@ -24,6 +24,7 @@ import type {
   RemoveBatchInput,
 } from "@/lib/validations/cutting-order.schema";
 import { BaseService } from "./base.service";
+import { CutEditRequestService } from "./cut-edit-request.service";
 import { DocumentService } from "./document.service";
 
 /**
@@ -472,6 +473,8 @@ export class CuttingOrderService extends BaseService {
         throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
       }
 
+      await this.requireCapturable(tx, order);
+
       const batch = await this.createBatch(tx, input.orderId, input.label, input.notes);
 
       await this.auditWith(tx).record({
@@ -508,6 +511,8 @@ export class CuttingOrderService extends BaseService {
           `La orden ${line.order.code} está cancelada.`,
         );
       }
+
+      await this.requireCapturable(tx, line.order);
 
       /* La misma puerta que la captura por tanda: a un corte que ya salió en
          un vale no se le agregan piezas por aquí tampoco. Si no, la regla se
@@ -591,6 +596,8 @@ export class CuttingOrderService extends BaseService {
       if (order.status === "CANCELLED") {
         throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
       }
+
+      await this.requireCapturable(tx, { id: orderId, ...order });
 
       /* Renglones ÚNICOS: el mismo viene varias veces cuando de esa talla
          salieron dos bultos de cuentas distintas, y contar los renglones
@@ -746,6 +753,8 @@ export class CuttingOrderService extends BaseService {
         throw new BusinessRuleError(`La orden ${order.code} está cancelada.`);
       }
 
+      await this.requireCapturable(tx, order);
+
       const batch = await this.requireEditableBatch(
         tx,
         input.batchId,
@@ -840,6 +849,22 @@ export class CuttingOrderService extends BaseService {
    * se entere. Es la misma regla que ya impide volver a mandarlo: cancelar el
    * vale es cómo se deshace.
    */
+  /**
+   * El candado de la orden TERMINADA: abrir, capturar, corregir o borrar un
+   * corte pasa por aquí. Vive en `CutEditRequestService` porque ahí está el
+   * permiso que lo abre; aquí sólo se llama, dentro de la misma transacción,
+   * para que el permiso se gaste junto con el guardado o no se gaste.
+   */
+  private async requireCapturable(
+    tx: Tx,
+    order: { id: string; code: string; status: CuttingOrder["status"] },
+  ) {
+    await new CutEditRequestService(this.context, tx).assertCanCapture(
+      tx,
+      order,
+    );
+  }
+
   private async requireEditableBatch(tx: Tx, batchId: string, orderId: string) {
     const batch = await this.requireBatch(tx, batchId, orderId);
 

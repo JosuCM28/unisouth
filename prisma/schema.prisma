@@ -85,6 +85,8 @@ model User {
   garmentPhotos             GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
   attachments               Attachment[]          @relation("AttachmentUploadedBy")
   orderFolders              OrderFolder[]         @relation("OrderFolderCreatedBy")
+  cutEditRequests           CutEditRequest[]      @relation("CutEditRequestBy")
+  cutEditReviews            CutEditRequest[]      @relation("CutEditReviewedBy")
 
   @@index([active, role])
   @@map("user")
@@ -1701,6 +1703,8 @@ model CuttingOrder {
   batches     CuttingBatch[]
   shipments   GarmentShipment[]
   comments    CuttingOrderComment[]
+  /// Permisos pedidos para corregir los cortes de la orden ya terminada.
+  editRequests CutEditRequest[]
   /// Photos of the paper the client handed over. The order's backup.
   attachments Attachment[]
   /// The issue vouchers born from this order. Read to show whether it already
@@ -2452,6 +2456,50 @@ model CuttingOrderComment {
   /// Newest first is how they are read, and the index serves that order.
   @@index([orderId, createdAt])
   @@map("cutting_order_comments")
+}
+
+/// Permiso para corregir los cortes de una orden YA TERMINADA.
+///
+/// Quien folea captura libre mientras la orden va "En corte". Al terminarse,
+/// lo capturado es lo que se firma y se manda a taller, y cambiarlo sin que
+/// nadie se entere es justo el hueco que esto cierra: hay que pedirlo con
+/// motivo y que ADMIN lo autorice.
+///
+/// Es de UN SOLO USO: el guardado que lo aprovecha lo marca `USED` en la misma
+/// transacción. Un permiso abierto por horas es un permiso para lo que sea.
+model CutEditRequest {
+  id      String       @id @default(cuid())
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status CutEditRequestStatus @default(PENDING)
+  /// Qué quiere corregir y por qué. Obligatorio: sin él ADMIN autoriza a ciegas.
+  reason String
+
+  requestedById String
+  requestedBy   User     @relation("CutEditRequestBy", fields: [requestedById], references: [id])
+  createdAt     DateTime @default(now())
+
+  reviewedById String?
+  reviewedBy   User?     @relation("CutEditReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  reviewNote   String?
+
+  /// Un permiso autorizado que nadie usó no se queda vivo para siempre: el
+  /// motivo que se autorizó hoy no justifica una edición de dentro de un mes.
+  expiresAt DateTime?
+  usedAt    DateTime?
+
+  @@index([status, createdAt])
+  @@index([orderId, requestedById, status])
+  @@map("cut_edit_requests")
+}
+
+enum CutEditRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  USED
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

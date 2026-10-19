@@ -13,6 +13,7 @@ import {
   Inbox,
   FileText,
   LayoutDashboard,
+  LockOpen,
   MapPin,
   Package,
   Package2,
@@ -68,6 +69,7 @@ export const NAV_ICONS = {
      entran al sistema" de "las empresas que mandan a maquilar". */
   accounts: UserCog,
   notifications: Bell,
+  editRequests: LockOpen,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

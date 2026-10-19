@@ -76,6 +76,10 @@ export const PERMISSIONS = [
      con `inventory:write` también podría editar, cancelar o mandar la orden
      a Salidas. */
   "cuts:write",
+  /* Corregir los cortes de una orden YA TERMINADA sin pedir permiso, y
+     autorizar o rechazar a quien lo pide. Sólo ADMIN: si la llevara quien
+     captura, el candado de la orden terminada se lo abriría él mismo. */
+  "cuts:unlock",
   /* Consultar el catálogo de Prendas. Va aparte de `inventory:browse` por la
      misma razón que `orders:browse`: esa llave abre de golpe rollos,
      catálogos y documentos, y Producción sólo necesita mirar las prendas. */

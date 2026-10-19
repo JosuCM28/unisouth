@@ -88,6 +88,7 @@ export function OrderBatches({
   orderId,
   orderCode,
   canSend = false,
+  canDelete: canDeleteBatches = canSend,
   canOpenDocuments = false,
   shippableSizes = [],
   workshops = [],
@@ -99,6 +100,11 @@ export function OrderBatches({
   orderCode: string;
   /** Si se ofrece mandar cortes a salidas. Falso en una orden cancelada. */
   canSend?: boolean;
+  /**
+   * Si se ofrece borrar un corte. Por omisión lo mismo que `canSend`; se
+   * apaga aparte en una orden terminada, que no se toca sin autorización.
+   */
+  canDelete?: boolean;
   /**
    * Si el folio de la salida lleva al vale.
    *
@@ -164,7 +170,7 @@ export function OrderBatches({
         /* Sólo se ofrece donde el servidor lo va a aceptar: con salida viva el
            papel ya está firmado, y el de un corte global se corrige desde el
            pedido. El servidor lo vuelve a revisar de todos modos. */
-        const canDelete = canSend && !live && !batch.groupId;
+        const canDelete = canDeleteBatches && !live && !batch.groupId;
 
         return (
           <li key={batch.id} className="flat-surface flex flex-col gap-2 p-3">

@@ -255,6 +255,13 @@ export const NAVIGATION: NavSection[] = [
         icon: "notifications",
         permission: "notifications:write",
       },
+      {
+        // Quién pide corregir los cortes de una orden ya terminada.
+        href: "/cut-edit-requests",
+        label: "Solicitudes de edición",
+        icon: "editRequests",
+        permission: "cuts:unlock",
+      },
     ],
   },
 ];

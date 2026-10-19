@@ -35,6 +35,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
 import { OrderProgressDialog } from "@/components/orders/order-progress-dialog";
 import { OrderCancelDialog } from "@/components/orders/order-cancel-dialog";
+import { CutEditRequestDialog } from "@/components/orders/cut-edit-request-dialog";
+import { CutEditRequestRepository } from "@/lib/repositories/cut-edit-request.repository";
 import { OrderMoveDialog } from "@/components/orders/order-move-dialog";
 import { OrderSendToIssueDialog } from "@/components/orders/order-send-to-issue-dialog";
 import {
@@ -363,10 +365,24 @@ export default async function OrderDetailPage({
   const canEdit = canWrite && !isCancelled;
   /* Capturar cortes es de quien corta (`cuts:write`), no sólo de quien
      administra la orden: Producción captura sin poder editar ni cancelar. */
-  const canCapture =
+  const mayCapture =
     !isCancelled && !!user && roleHasPermission(user.role, "cuts:write");
+  /* Terminada = lo capturado ya es lo que se firma. Quien no es ADMIN la
+     corrige sólo con una autorización vigente; si no la tiene, en lugar de
+     capturar se le ofrece pedirla. El servidor vuelve a revisarlo al guardar. */
+  const isLocked =
+    order.status === "COMPLETED" &&
+    !!user &&
+    !roleHasPermission(user.role, "cuts:unlock");
+  const editRequest =
+    mayCapture && isLocked
+      ? await new CutEditRequestRepository().findLiveFor(order.id, user.id)
+      : null;
+  const hasGrant = editRequest?.status === "APPROVED";
+  const canCapture = mayCapture && (!isLocked || hasGrant);
+  const canAskToEdit = mayCapture && isLocked && !hasGrant;
   // Sin un solo botón que ofrecer, el encabezado no pinta el hueco.
-  const hasActions = canWrite || canCapture || !isCancelled;
+  const hasActions = canWrite || canCapture || canAskToEdit || !isCancelled;
 
   /* Lo que viajaría a un vale de salida: sólo las tallas con corte, porque
      lo que sale por la puerta son las prendas que ya existen. Se calcula
@@ -552,6 +568,13 @@ export default async function OrderDetailPage({
                   batches={batchOptions}
                   sizes={batchSizes}
                   tags={cutTags}
+                />
+              )}
+              {canAskToEdit && (
+                <CutEditRequestDialog
+                  orderId={order.id}
+                  orderCode={order.code}
+                  pending={editRequest?.status === "PENDING"}
                 />
               )}
               {/* Imprimir y Excel son lo único que alcanza quien sólo
@@ -1047,6 +1070,7 @@ export default async function OrderDetailPage({
           orderId={order.id}
           orderCode={order.code}
           canSend={canEdit}
+          canDelete={canEdit && (!isLocked || hasGrant)}
           canOpenDocuments={canOpenDocuments}
           shippableSizes={shippableSizes}
           workshops={workshops}
