@@ -3,6 +3,7 @@ import { MaterialType, Unit } from "@prisma/client";
 import {
   nonNegativeQuantity,
   optionalNumber,
+  optionalRawText,
   optionalText,
   requiredText,
 } from "./common";
@@ -32,7 +33,7 @@ export const materialSchema = z
     // ── Atributos de tela ──
     composition: optionalText,
     colorName: optionalText,
-    colorHex: optionalText,
+    colorHex: optionalRawText,
     widthMm: optionalNumber,
     /// Tela plana y técnica se especifica en milímetros…
     thicknessMm: optionalNumber,

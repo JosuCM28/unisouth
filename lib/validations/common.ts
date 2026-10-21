@@ -19,18 +19,32 @@ export const optionalCuid = z
   .transform((value) => (value ? value : undefined));
 
 /**
- * Texto opcional que NUNCA se guarda como cadena vacía.
+ * Texto opcional que NUNCA se guarda como cadena vacía, tal como se tecleó.
  *
  * Un `<input>` vacío manda `""`, no `undefined`. Sin esta conversión la base
  * se llena de cadenas vacías que no son null y arruinan los `WHERE x IS NULL`.
+ *
+ * Sólo para lo que distingue mayúsculas: correos, URLs, colores hex.
+ * Todo lo demás usa `optionalText`.
  */
-export const optionalText = z
+export const optionalRawText = z
   .string()
   .trim()
   .optional()
   .transform((value) => (value && value.length > 0 ? value : undefined));
 
-export function requiredText(label: string, max = 255) {
+/**
+ * Texto opcional en MAYÚSCULAS.
+ *
+ * Todo el sistema guarda en mayúsculas porque "Blanco" y "BLANCO" son el
+ * mismo tono para el auxiliar, pero no para un `GROUP BY` ni para el
+ * semáforo de tonos al surtir: se partían en dos pilas que eran una sola.
+ */
+export const optionalText = optionalRawText.transform((value) =>
+  value?.toUpperCase(),
+);
+
+export function requiredRawText(label: string, max = 255) {
   return z
     // El mensaje va aquí y no sólo en el .min(): si el campo llega ausente o
     // como otro tipo, Zod usaría su texto en inglés y el usuario lo vería.
@@ -38,6 +52,11 @@ export function requiredText(label: string, max = 255) {
     .trim()
     .min(1, `${label} es obligatorio`)
     .max(max, `${label} no puede pasar de ${max} caracteres`);
+}
+
+/** Texto obligatorio en MAYÚSCULAS; ver `optionalText` para el porqué. */
+export function requiredText(label: string, max = 255) {
+  return requiredRawText(label, max).transform((value) => value.toUpperCase());
 }
 
 /**

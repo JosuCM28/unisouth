@@ -68,7 +68,9 @@ export const cuttingOrderSchema = z.object({
     .array(z.string())
     .optional()
     .transform((values) =>
-      (values ?? []).map((note) => note.trim()).filter((note) => note.length > 0),
+      (values ?? [])
+        .map((note) => note.trim().toUpperCase())
+        .filter((note) => note.length > 0),
     ),
 
   /* El cierre del corte: lo que se mide cuando la mesa termina y alimenta el

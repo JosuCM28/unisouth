@@ -37,6 +37,9 @@ export function FormField({
         <Input
           id={id}
           aria-invalid={Boolean(error)}
+          // El teclado del celular arranca en mayúsculas, que es como se
+          // guarda; un campo de correo o URL lo apaga con "none".
+          autoCapitalize="characters"
           className={cn("touch-target", suffix && "pr-12", className)}
           {...props}
         />

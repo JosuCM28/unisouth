@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { optionalText, requiredText } from "./common";
+import { optionalRawText, optionalText, requiredText } from "./common";
 
 /**
  * Cliente: dueño del material.
@@ -14,7 +14,7 @@ export const clientSchema = z.object({
   taxId: optionalText,
   contact: optionalText,
   phone: optionalText,
-  email: optionalText,
+  email: optionalRawText,
   notes: optionalText,
   active: z.boolean().default(true),
 });

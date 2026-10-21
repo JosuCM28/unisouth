@@ -215,6 +215,26 @@
   .shadow-2xl {
     box-shadow: none !important;
   }
+
+  /* El servidor guarda todo en MAYÚSCULAS ("Blanco" y "BLANCO" partían un
+     mismo tono en dos pilas). Aquí sólo se muestra así mientras se teclea,
+     para que lo que se ve sea lo que queda guardado. Quedan fuera los campos
+     donde la caja sí importa: correo, contraseña, URL, y cualquiera marcado
+     con autocapitalize="none". */
+  input:is(:not([type]), [type="text"], [type="search"], [type="tel"]):not(
+      [inputmode="email"],
+      [inputmode="url"],
+      [autocapitalize="none"]
+    ),
+  textarea:not([autocapitalize="none"]) {
+    text-transform: uppercase;
+  }
+
+  /* El ejemplo gris no es un dato: se deja como está escrito. */
+  input::placeholder,
+  textarea::placeholder {
+    text-transform: none;
+  }
 }
 
 @layer components {

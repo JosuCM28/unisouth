@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { optionalNumber, optionalText, requiredText } from "./common";
+import { optionalNumber, optionalRawText, optionalText, requiredText } from "./common";
 
 /**
  * Paquetería: quién trae la carga.
@@ -10,7 +10,7 @@ import { optionalNumber, optionalText, requiredText } from "./common";
 export const carrierSchema = z.object({
   name: requiredText("El nombre", 120),
   phone: optionalText,
-  trackingUrl: optionalText,
+  trackingUrl: optionalRawText,
   active: z.boolean().default(true),
 });
 
@@ -32,7 +32,7 @@ export const supplierSchema = z.object({
   taxId: optionalText,
   contact: optionalText,
   phone: optionalText,
-  email: optionalText,
+  email: optionalRawText,
   address: optionalText,
   /** Días que tarda en entregar. Lo usa compras para planear. */
   leadTimeDays: optionalNumber,

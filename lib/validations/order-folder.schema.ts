@@ -103,7 +103,7 @@ export const folderCutSchema = z.object({
   captured: z
     .array(
       z.object({
-        sizeCode: z.string().trim().min(1).max(40),
+        sizeCode: z.string().trim().toUpperCase().min(1).max(40),
         quantity: z.coerce.number().int().positive(),
         bundles: z.coerce.number().int().positive().default(1),
         tagId: optionalCuid,
