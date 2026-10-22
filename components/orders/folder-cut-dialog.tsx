@@ -105,7 +105,7 @@ const NEW_CUT = "__new__";
  * Captura un corte que sirvió a varias órdenes del pedido a la vez.
  *
  * Es la MISMA pantalla que "Capturar corte" de una orden —selector de corte,
- * foleo de la tanda, bultos por talla, notas—, con una diferencia: las tallas
+ * folio de la tanda, bultos por talla, notas—, con una diferencia: las tallas
  * se anotan UNA vez, sumando todas las órdenes, y el sistema las reparte hasta
  * completar a cada una. Si dos piden talla S —50 y 100— se captura la S y
  * salen 150.
@@ -312,7 +312,7 @@ export function FolderCutDialog({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="folder-cut-tag">Foleo de este corte</Label>
+          <Label htmlFor="folder-cut-tag">Folio de este corte</Label>
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <SearchSelect
@@ -323,9 +323,9 @@ export function FolderCutDialog({
                 }))}
                 value={batchTagId}
                 onChange={applyTagToAll}
-                placeholder="Sin foleo"
+                placeholder="Sin folio"
                 searchPlaceholder="Buscar color…"
-                clearLabel="Sin foleo"
+                clearLabel="Sin folio"
               />
             </div>
             {tags.find((tag) => tag.id === batchTagId) && (

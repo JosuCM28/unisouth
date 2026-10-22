@@ -137,7 +137,7 @@ export default async function OrderDetailPage({
             orderBy: { createdAt: "desc" },
             include: {
               user: { select: { name: true } },
-              /* El foleo DEL BULTO, que puede no ser el del renglón: el color
+              /* El folio DEL BULTO, que puede no ser el del renglón: el color
                  se amarra en la mesa y es el que sale en el vale. */
               cutTag: { select: { name: true, color: true } },
             },
@@ -205,7 +205,7 @@ export default async function OrderDetailPage({
           orderBy: { position: "asc" },
           include: {
             size: { select: { code: true } },
-            // El foleo del bulto que salió: se coteja contra el papelito.
+            // El folio del bulto que salió: se coteja contra el papelito.
             cutTag: { select: { name: true, color: true } },
           },
         },
@@ -221,7 +221,7 @@ export default async function OrderDetailPage({
       select: { id: true, name: true },
       orderBy: [{ position: "asc" }, { name: "asc" }],
     }),
-    /* Los foleos vigentes: se eligen al capturar el corte. Sólo los activos,
+    /* Los folios vigentes: se eligen al capturar el corte. Sólo los activos,
        igual que en el alta de la orden —un color dado de baja sigue leyéndose
        en los vales viejos, pero ya no se ofrece para amarrar nada nuevo—. */
     prisma.cutTagOption.findMany({
@@ -527,7 +527,7 @@ export default async function OrderDetailPage({
   });
 
   /* Un renglón por RENGLÓN de la orden, no uno por talla: la orden puede
-     llevar la misma talla dos veces con foleos distintos, y juntarlas mandaría
+     llevar la misma talla dos veces con folios distintos, y juntarlas mandaría
      a una lo que se capturó para la otra. */
   const batchSizes: BatchSizeOption[] = order.lines.map((line) => ({
     lineId: line.id,
@@ -537,7 +537,7 @@ export default async function OrderDetailPage({
     cut: line.cutQuantity,
     note: line.notes,
     tag: line.cutTag,
-    // El foleo con el que abre el renglón en la captura, si la orden lo trae.
+    // El folio con el que abre el renglón en la captura, si la orden lo trae.
     tagId: line.tagId,
   }));
 
@@ -1178,7 +1178,7 @@ function sizeNoteOf(
 }
 
 /**
- * El foleo con el que se ofrece una talla al mandarla a taller sin corte.
+ * El folio con el que se ofrece una talla al mandarla a taller sin corte.
  *
  * El del ÚLTIMO bulto capturado de esa talla: es el papelito que trae
  * amarrado lo que está en la bodega, y el del renglón de la orden es sólo el

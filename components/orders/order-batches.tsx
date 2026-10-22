@@ -32,7 +32,7 @@ export interface BatchEntryView extends SizeAnnotation {
   quantity: number;
   bundles: number;
   /**
-   * El foleo AMARRADO a este bulto, por id.
+   * El folio AMARRADO a este bulto, por id.
    *
    * Aparte de `tag` —que es el chip ya resuelto para pintar— porque el
    * diálogo de captura vuelve a abrir con lo guardado y necesita el id para
@@ -115,7 +115,7 @@ export function OrderBatches({
   /* Lo que necesita el diálogo de taller para poder abrirse desde el corte:
      las tallas de la orden con lo ya mandado a cada etapa, y los catálogos. */
   shippableSizes?: ShippableSize[];
-  /** Los foleos vigentes: los pide el diálogo de taller que abre desde aquí. */
+  /** Los folios vigentes: los pide el diálogo de taller que abre desde aquí. */
   tags?: CutTagChoice[];
   workshops?: { id: string; name: string }[];
   stages?: { id: string; name: string }[];
@@ -157,7 +157,7 @@ export function OrderBatches({
             sizeId: entry.sizeId,
             quantity: entry.quantity,
             bundles: entry.bundles,
-            // El foleo viaja con el bulto: el vale del taller se imprime de
+            // El folio viaja con el bulto: el vale del taller se imprime de
             // estos renglones y tiene que decir el color que va en el camión.
             tagId: entry.tagId,
             // La anotación de su talla en la orden: tiene que salir en el vale.
@@ -281,7 +281,7 @@ export function OrderBatches({
                   {batch.entries.map((entry) => (
                     <li key={entry.id} className="tabular">
                       Talla {entry.sizeCode}
-                      {/* El foleo DE ESTE bulto: arriba se leen juntos y aquí
+                      {/* El folio DE ESTE bulto: arriba se leen juntos y aquí
                           es donde se ve cuál cayó en cuál. */}
                       {entry.tag && (
                         <CutTagChip tag={entry.tag} className="mx-1 inline-block" />
@@ -424,7 +424,7 @@ function IssueChip({
 }
 
 /**
- * Los foleos distintos de un puñado de capturas, sin repetir.
+ * Los folios distintos de un puñado de capturas, sin repetir.
  *
  * Por nombre y no por id: la vista ya recibe el chip resuelto, y dos capturas
  * del mismo color tienen que pintar un solo papelito.
@@ -457,7 +457,7 @@ function groupBySize(entries: BatchEntryView[]) {
          volvería ilegible justo lo que se quería leer de un vistazo: el
          desglose completo sigue en "Ver las capturas". */
       note: rows.find((row) => row.note)?.note ?? null,
-      /* Los foleos, en plural y TODOS: de una misma talla pueden salir un
+      /* Los folios, en plural y TODOS: de una misma talla pueden salir un
          bulto azul y otro verde en el mismo tendido, y enseñar sólo el
          primero haría creer que el corte entero es de un color. Es justo el
          dato que hay que ver antes de mandarlo al taller. */

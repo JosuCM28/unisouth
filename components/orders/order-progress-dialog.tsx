@@ -23,9 +23,9 @@ interface Props {
   cut: number;
   /** Los cortes abiertos de la orden, del más nuevo al más viejo. */
   batches: BatchOption[];
-  /** Los foleos vigentes del catálogo. Se administran en /cut-tags. */
+  /** Los folios vigentes del catálogo. Se administran en /cut-tags. */
   tags: CutTagChoice[];
-  /** El foleo que la orden sugiere para esta talla, si trae uno. */
+  /** El folio que la orden sugiere para esta talla, si trae uno. */
   suggestedTagId: string | null;
   trigger: ReactNode;
 }
@@ -56,9 +56,9 @@ export function OrderProgressDialog({
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState(batches[0]?.id ?? "");
   const [quantity, setQuantity] = useState("");
-  /* Abre con el foleo que la orden le puso a la talla, si le puso alguno: es
+  /* Abre con el folio que la orden le puso a la talla, si le puso alguno: es
      la sugerencia, y quien captura la cambia si en la mesa se amarró otro
-     papelito. Vacío es "sin foleo" y es un estado normal —una corrección de
+     papelito. Vacío es "sin folio" y es un estado normal —una corrección de
      conteo no trae color—, así que no se exige para guardar. */
   const [tagId, setTagId] = useState(suggestedTagId ?? "");
   const [notes, setNotes] = useState("");
@@ -166,10 +166,10 @@ export function OrderProgressDialog({
           </p>
         )}
 
-        {/* El foleo del bulto. Igual de opcional que en la captura por tanda:
+        {/* El folio del bulto. Igual de opcional que en la captura por tanda:
             si no se pone, el vale se cae al color del renglón de la orden. */}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="progress-tag">Foleo</Label>
+          <Label htmlFor="progress-tag">Folio</Label>
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <SearchSelect
@@ -180,9 +180,9 @@ export function OrderProgressDialog({
                 }))}
                 value={tagId}
                 onChange={setTagId}
-                placeholder="Sin foleo"
+                placeholder="Sin folio"
                 searchPlaceholder="Buscar color…"
-                clearLabel="Sin foleo"
+                clearLabel="Sin folio"
               />
             </div>
             {tags.find((tag) => tag.id === tagId) && (

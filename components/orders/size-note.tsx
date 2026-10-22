@@ -10,10 +10,10 @@ export interface SizeAnnotation {
 }
 
 /**
- * El papelito del foleo: el color con su nombre encima.
+ * El papelito del folio: el color con su nombre encima.
  *
  * Se saca de `SizeNote` porque ahora se pinta también suelto —un bulto puede
- * llevar su propio foleo, y una talla con bultos de dos colores enseña los
+ * llevar su propio folio, y una talla con bultos de dos colores enseña los
  * dos— y tener el chip escrito en dos lados es cómo acaban siendo dos chips
  * distintos.
  */

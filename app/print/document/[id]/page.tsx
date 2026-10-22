@@ -127,7 +127,7 @@ function CutTable({ sheet }: { sheet: VoucherSheet }) {
             <th className={`${cell} text-right`}>Cantidad</th>
             <th className={`${cell} text-right`}>Bultos</th>
             <th className={`${cell} text-right`}>Total</th>
-            <th className={cell}>Foleo</th>
+            <th className={cell}>Folio</th>
             <th className={cell}>Anotaciones</th>
           </tr>
         </thead>
@@ -150,7 +150,7 @@ function CutTable({ sheet }: { sheet: VoucherSheet }) {
                         backgroundColor: row.tag.background,
                         color: row.tag.text,
                         // Sin esto el navegador descarta los fondos al
-                        // imprimir y el foleo sale en blanco.
+                        // imprimir y el folio sale en blanco.
                         printColorAdjust: "exact",
                         WebkitPrintColorAdjust: "exact",
                       }

@@ -110,7 +110,7 @@ export const NAVIGATION: NavSection[] = [
       },
       {
         href: "/cut-tags",
-        label: "Foleos",
+        label: "Folios",
         icon: "cutTags",
         permission: "production:browse",
       },

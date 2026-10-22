@@ -146,9 +146,9 @@ export const cuttingProgressSchema = z.object({
     .number({ message: "Escribe cuántas piezas se cortaron" })
     .int("Las piezas se cuentan enteras")
     .refine((value) => value !== 0, "El avance no puede ser cero"),
-  /* El foleo del bulto, igual que en la captura por tanda. Opcional: un
+  /* El folio del bulto, igual que en la captura por tanda. Opcional: un
      avance suelto puede ser una corrección de conteo, que no trae papelito
-     ninguno. Sin él, el vale se cae al foleo del renglón de la orden. */
+     ninguno. Sin él, el vale se cae al folio del renglón de la orden. */
   tagId: optionalCuid,
   notes: optionalText,
 });
@@ -205,7 +205,7 @@ export type RemoveBatchInput = z.infer<typeof removeBatchSchema>;
 export const batchLineSchema = z.object({
   /* El RENGLÓN de la orden, no la talla: sólo se captura contra lo que
      la orden pidió. Y es el renglón y no la talla porque una orden puede
-     llevar la misma talla en dos renglones —con foleos o anotaciones
+     llevar la misma talla en dos renglones —con folios o anotaciones
      distintas—, y resolver por talla mandaría a uno lo capturado en el
      otro. */
   lineId: cuidSchema,
@@ -219,7 +219,7 @@ export const batchLineSchema = z.object({
     .int("Los bultos se cuentan enteros")
     .positive("Al menos un bulto")
     .default(1),
-  /* El foleo QUE SE LE AMARRÓ A ESTE BULTO. Opcional: el color se sabe
+  /* El folio QUE SE LE AMARRÓ A ESTE BULTO. Opcional: el color se sabe
      en la mesa y hay cortes que salen sin papelito. Va por renglón y no
      por corte porque de un mismo tendido pueden salir bultos de dos
      colores, y un solo campo arriba obligaría a abrir dos cortes para

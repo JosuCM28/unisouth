@@ -52,7 +52,7 @@ const COLUMNS: XlsxColumn<Row>[] = [
   { header: "Pedido el", value: (r) => r.orderedAt, kind: "date" },
   { header: "Entrega", value: (r) => r.dueDate, kind: "date" },
   { header: "Talla", value: (r) => r.sizeCode },
-  { header: "Foleo", value: (r) => r.tag },
+  { header: "Folio", value: (r) => r.tag },
   { header: "Pedidas", value: (r) => r.ordered, kind: "number" },
   { header: "Cortadas", value: (r) => r.cut, kind: "number" },
   {

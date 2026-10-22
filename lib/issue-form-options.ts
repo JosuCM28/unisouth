@@ -28,7 +28,7 @@ export async function getIssueFormOptions() {
   ] = await Promise.all([
       // Qué hay REALMENTE surtible hoy, por dueño y material.
       new LotRepository().findIssuableOptions(),
-      // Los foleos vigentes; se administran en /cut-tags.
+      // Los folios vigentes; se administran en /cut-tags.
       prisma.cutTagOption.findMany({
         where: { deletedAt: null, active: true },
         select: { id: true, name: true, color: true },

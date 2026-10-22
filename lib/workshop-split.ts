@@ -19,7 +19,7 @@ export interface SplitBundle {
   count: number;
   /**
    * Lo que el bulto trae de su captura, para poder armar el envío a taller
-   * sin volver a la base: la talla por id, la orden de la que salió, su foleo
+   * sin volver a la base: la talla por id, la orden de la que salió, su folio
    * y la anotación de su renglón. Opcionales porque el reparto en sí sólo
    * necesita talla y piezas.
    */

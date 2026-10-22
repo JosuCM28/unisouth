@@ -382,7 +382,7 @@ export class CuttingOrderService extends BaseService {
             where: { id: existing.id },
             data: {
               orderedQuantity: line.orderedQuantity,
-              // Mismo `?? null` que el encabezado: quitar el foleo debe quitarlo.
+              // Mismo `?? null` que el encabezado: quitar el folio debe quitarlo.
               tagId: line.tagId ?? null,
               notes: line.notes ?? null,
               position: index,
@@ -655,7 +655,7 @@ export class CuttingOrderService extends BaseService {
             quantity: entry.quantity,
             bundles: entry.bundles,
             // El color que se le amarró a este bulto. Sin él, el vale se cae
-            // al foleo del renglón de la orden, que es sólo el sugerido.
+            // al folio del renglón de la orden, que es sólo el sugerido.
             tagId: entry.tagId,
             notes: input.notes,
             userId: this.context.userId,
@@ -1256,7 +1256,7 @@ export class CuttingOrderService extends BaseService {
     const entries = await tx.cuttingProgress.findMany({
       where: { batchId },
       orderBy: { createdAt: "asc" },
-      // El foleo del bulto viaja al vale: es el papelito que va amarrado a lo
+      // El folio del bulto viaja al vale: es el papelito que va amarrado a lo
       // que el taller recibe y firma.
       select: { lineId: true, quantity: true, bundles: true, tagId: true },
     });

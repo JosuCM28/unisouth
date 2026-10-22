@@ -84,7 +84,7 @@ export type FolderSplitShipmentInput = z.infer<typeof folderSplitShipmentSchema>
  * órdenes.
  *
  * Reusa el esquema de las líneas del corte de una orden para que las reglas de
- * cantidad, bultos y foleo sean LAS MISMAS en las dos pantallas. Sólo viajan
+ * cantidad, bultos y folio sean LAS MISMAS en las dos pantallas. Sólo viajan
  * las órdenes que de verdad llevan piezas: una orden en blanco no dice nada.
  */
 export const folderCutSchema = z.object({

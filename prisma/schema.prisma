@@ -932,7 +932,7 @@ model DocumentCutLine {
   @@map("document_cut_lines")
 }
 
-/// Colour of the paper tag ("foleo") stapled to a bundle.
+/// Colour of the paper tag ("folio") stapled to a bundle.
 ///
 /// A TABLE and not an enum: the shop floor runs out of one colour and buys
 /// another, and adding it should not need a migration. The hex value lives

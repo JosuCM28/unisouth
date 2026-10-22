@@ -30,7 +30,7 @@ export interface BatchEntry {
   /** Piezas POR BULTO. */
   quantity: number;
   bundles: number;
-  /** El foleo que se le amarró. Vuelve para poder corregirlo. */
+  /** El folio que se le amarró. Vuelve para poder corregirlo. */
   tagId: string | null;
 }
 
@@ -59,7 +59,7 @@ export interface BatchOption {
  * Un renglón de la orden, tal como se ofrece en el selector.
  *
  * Se ofrece un renglón por RENGLÓN y no una entrada por talla: una orden puede
- * llevar la misma talla dos veces —con foleos o anotaciones distintas— y
+ * llevar la misma talla dos veces —con folios o anotaciones distintas— y
  * juntarlas mandaría a una lo que se capturó para la otra. La anotación viaja
  * para poder desempatarlas de un vistazo.
  *
@@ -77,11 +77,11 @@ export interface BatchSizeOption {
   /** La etiqueta de corte del renglón, si se le puso una. */
   tag: { name: string; color: string } | null;
   /**
-   * El foleo que la ORDEN sugiere para esta talla.
+   * El folio que la ORDEN sugiere para esta talla.
    *
    * Sólo es el valor con el que abre el renglón: lo que se guarda es el que
    * quede en la captura, porque el papelito que cuenta es el que se amarró en
-   * la mesa. Muchas órdenes se levantan sin foleo y lo reciben aquí.
+   * la mesa. Muchas órdenes se levantan sin folio y lo reciben aquí.
    */
   tagId: string | null;
 }
@@ -99,7 +99,7 @@ interface Props {
   orderId: string;
   batches: BatchOption[];
   sizes: BatchSizeOption[];
-  /** Los foleos vigentes del catálogo. Se administran en /cut-tags. */
+  /** Los folios vigentes del catálogo. Se administran en /cut-tags. */
   tags: CutTagChoice[];
 }
 
@@ -135,11 +135,11 @@ export function OrderBatchDialog({ orderId, batches, sizes, tags }: Props) {
   const selected = batches.find((batch) => batch.id === batchId);
 
   /**
-   * El foleo de la tanda: el que se pinta de un golpe en todos los renglones.
+   * El folio de la tanda: el que se pinta de un golpe en todos los renglones.
    *
    * Existe porque lo normal es que un tendido salga de un solo color, y sin
    * esto habría que elegirlo catorce veces —una por talla— de pie en la mesa.
-   * NO es el dato que se guarda: lo que viaja es el foleo de CADA renglón,
+   * NO es el dato que se guarda: lo que viaja es el folio de CADA renglón,
    * que después se cambia uno por uno cuando el corte llevó dos colores. Por
    * eso es un atajo de captura y no un campo del corte.
    */
@@ -362,11 +362,11 @@ export function OrderBatchDialog({ orderId, batches, sizes, tags }: Props) {
         </div>
 
         {/* El atajo del color, ANTES de los renglones: lo normal es que el
-            tendido salga de un solo foleo y elegirlo aquí lo pone en las
+            tendido salga de un solo folio y elegirlo aquí lo pone en las
             catorce tallas de un golpe. Cada renglón lo puede cambiar después,
             que es como se captura el corte que llevó dos colores. */}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="batch-tag">Foleo de este corte</Label>
+          <Label htmlFor="batch-tag">Folio de este corte</Label>
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <SearchSelect
@@ -377,9 +377,9 @@ export function OrderBatchDialog({ orderId, batches, sizes, tags }: Props) {
                 }))}
                 value={batchTagId}
                 onChange={applyTagToAll}
-                placeholder="Sin foleo"
+                placeholder="Sin folio"
                 searchPlaceholder="Buscar color…"
-                clearLabel="Sin foleo"
+                clearLabel="Sin folio"
               />
             </div>
             {tags.find((tag) => tag.id === batchTagId) && (
@@ -520,7 +520,7 @@ function rowsOf(
   const rows = sizes.flatMap((size) => {
     const captured = entries.filter((entry) => entry.lineId === size.lineId);
 
-    /* La talla sin capturar abre con el foleo que la ORDEN le puso, si le
+    /* La talla sin capturar abre con el folio que la ORDEN le puso, si le
        puso alguno: es la sugerencia, y quien captura la cambia si en la mesa
        se amarró otro papelito. */
     if (captured.length === 0) {
@@ -539,7 +539,7 @@ function rowsOf(
       quantity: String(entry.quantity),
       bundles: String(entry.bundles),
       // Lo ya capturado manda también en el color: precargar el de la orden
-      // encima cambiaría el foleo del bulto al guardar sin que nadie lo pida.
+      // encima cambiaría el folio del bulto al guardar sin que nadie lo pida.
       tagId: entry.tagId ?? "",
       // La captura no guarda anotación: la lee de la orden.
       note: "",

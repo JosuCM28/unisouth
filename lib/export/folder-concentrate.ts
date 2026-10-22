@@ -134,7 +134,7 @@ function columnName(index: number): string {
  * quien tiende la tela, y partirlas en dos renglones sería justo el error que
  * esta hoja viene a evitar.
  *
- * Una orden puede traer la misma talla en dos renglones —con foleos
+ * Una orden puede traer la misma talla en dos renglones —con folios
  * distintos— y sus cantidades se SUMAN en la celda: la columna dice cuánto
  * pide esa orden de esa talla, no cuántos renglones capturó.
  */

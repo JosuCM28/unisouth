@@ -28,7 +28,7 @@ export interface CutEntry {
   lineId: string;
   quantity: number;
   bundles: number;
-  /** El foleo que se le amarró a ESTE bulto, si se capturó uno. */
+  /** El folio que se le amarró a ESTE bulto, si se capturó uno. */
   tagId?: string | null;
 }
 
@@ -38,7 +38,7 @@ export interface CutEntry {
  * Es el tipo del esquema del documento y no uno propio, para que lo que sale
  * de aquí entre directo en `DocumentService.create` sin una traducción en
  * medio: esa traducción es donde se pierde un campo y nadie lo nota hasta que
- * el vale sale sin foleo.
+ * el vale sale sin folio.
  */
 export type CutLineDraft = DocumentCutLineInput;
 
@@ -78,7 +78,7 @@ export function toCutLines(
        anota los bultos al empacar. Sin correcciones, que es el caso normal,
        cada bulto viaja como su propio renglón.
 
-       Ese renglón único se queda con el foleo del PRIMER bulto positivo: lo
+       Ese renglón único se queda con el folio del PRIMER bulto positivo: lo
        que se corrigió salió del mismo tendido y lleva el mismo papelito. */
     const cutRows: Array<{
       quantity: number;
@@ -93,7 +93,7 @@ export function toCutLines(
       sizeId: line.sizeId,
       quantity: row.quantity,
       bundles: row.bundles,
-      /* El foleo del BULTO manda sobre el del renglón de la orden. El vale se
+      /* El folio del BULTO manda sobre el del renglón de la orden. El vale se
          firma contra los bultos que van en el camión, así que tiene que decir
          el color que traen amarrado; el del renglón queda como el sugerido
          para quien captura, y como respaldo si en la mesa no se puso ninguno. */

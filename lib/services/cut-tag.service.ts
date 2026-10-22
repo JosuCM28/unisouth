@@ -4,7 +4,7 @@ import type { CutTagInput } from "@/lib/validations/cut-tag.schema";
 import { BaseService } from "./base.service";
 
 /**
- * Catálogo de foleos: los papelitos de color que se engrapan a los bultos.
+ * Catálogo de folios: los papelitos de color que se engrapan a los bultos.
  *
  * Es un catálogo y no un enum porque en el piso se acaba un color y se compra
  * otro: agregarlo no debería requerir tocar la base de datos.
@@ -16,7 +16,7 @@ export class CutTagService extends BaseService {
 
       const exists = await tx.cutTagOption.findUnique({ where: { code } });
       if (exists) {
-        throw new DuplicateError("el foleo", "nombre", input.name, "name");
+        throw new DuplicateError("el folio", "nombre", input.name, "name");
       }
 
       const tag = await tx.cutTagOption.create({
@@ -44,7 +44,7 @@ export class CutTagService extends BaseService {
   async update(id: string, input: CutTagInput): Promise<CutTagOption> {
     return this.transaction(async (tx) => {
       const before = await tx.cutTagOption.findUnique({ where: { id } });
-      if (!before) throw new BusinessRuleError("No se encontró el foleo.");
+      if (!before) throw new BusinessRuleError("No se encontró el folio.");
 
       /* El `code` NO se reescribe al editar: es la clave estable con la que
          quedaron enlazados los vales ya impresos. Cambiar el nombre visible
@@ -75,14 +75,14 @@ export class CutTagService extends BaseService {
   /**
    * Baja lógica.
    *
-   * Nunca un DELETE físico: los vales que ya usaron ese foleo deben seguir
+   * Nunca un DELETE físico: los vales que ya usaron ese folio deben seguir
    * mostrando de qué color era el papelito años después. Al darlo de baja
    * simplemente deja de ofrecerse al capturar.
    */
   async remove(id: string, reason?: string): Promise<CutTagOption> {
     return this.transaction(async (tx) => {
       const before = await tx.cutTagOption.findUnique({ where: { id } });
-      if (!before) throw new BusinessRuleError("No se encontró el foleo.");
+      if (!before) throw new BusinessRuleError("No se encontró el folio.");
 
       const tag = await tx.cutTagOption.update({
         where: { id },

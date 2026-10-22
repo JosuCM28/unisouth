@@ -46,7 +46,7 @@ export interface ShippableSize {
    */
   note: string | null;
   /**
-   * El foleo con el que se ofrece la talla: el del último bulto capturado,
+   * El folio con el que se ofrece la talla: el del último bulto capturado,
    * o el del renglón de la orden si ninguno lo lleva. Se pone al elegirla.
    */
   tagId: string | null;
@@ -58,7 +58,7 @@ export interface ShipmentPrefillRow {
   /** Piezas POR BULTO, igual que en la captura del corte. */
   quantity: number;
   bundles: number;
-  /** El foleo con el que se amarró en la mesa, para copiarlo tal cual. */
+  /** El folio con el que se amarró en la mesa, para copiarlo tal cual. */
   tagId: string | null;
   /** La anotación del renglón de la orden del que salió el bulto. */
   note: string | null;
@@ -79,7 +79,7 @@ interface Props {
   sizes: ShippableSize[];
   workshops: { id: string; name: string }[];
   stages: { id: string; name: string }[];
-  /** Los foleos vigentes del catálogo. Se administran en /cut-tags. */
+  /** Los folios vigentes del catálogo. Se administran en /cut-tags. */
   tags: CutTagChoice[];
   /**
    * Los bultos de un corte, precargados.
@@ -200,7 +200,7 @@ export function OrderShipmentDialog({
 
   /* Los bultos se vuelven a copiar CADA vez que se abre, no sólo al montar:
      el diálogo sigue montado después de capturar o corregir el corte, y sin
-     esto abría con la copia vieja —la de antes de amarrarle el foleo— y el
+     esto abría con la copia vieja —la de antes de amarrarle el folio— y el
      vale del taller salía sin color aunque el corte ya lo tuviera. */
   function handleOpenChange(next: boolean) {
     if (next) setRows(initialRows(batch));

@@ -137,7 +137,7 @@ export default async function PrintOrderPage({ params }: PageProps) {
         <thead>
           <tr className="border-b-2 border-black text-left">
             <th className="py-1 pr-2">Talla</th>
-            <th className="py-1 pr-2">Foleo</th>
+            <th className="py-1 pr-2">Folio</th>
             <th className="py-1 pr-2 text-right">Pedidas</th>
             <th className="py-1 pr-2 text-right">Cortadas</th>
             <th className="py-1 pr-2 text-right">Faltan</th>

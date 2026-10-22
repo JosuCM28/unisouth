@@ -18,11 +18,11 @@ export interface SizeRowOption extends SizeAnnotation {
   /** Texto extra por el que también se busca sin enseñarlo. */
   keywords?: string;
   /**
-   * El foleo que se pone en el renglón al elegir esta talla.
+   * El folio que se pone en el renglón al elegir esta talla.
    *
    * Lo manda el envío a taller: ahí la talla se elige a mano y sin esto el
    * bulto salía sin el color que ya se le había amarrado en el corte.
-   * Ausente = elegir la talla no toca el foleo del renglón.
+   * Ausente = elegir la talla no toca el folio del renglón.
    */
   defaultTagId?: string | null;
 }
@@ -35,7 +35,7 @@ export interface SizeBundleRow {
   /** Texto, no número: el input vive a medio teclear. */
   quantity: string;
   bundles: string;
-  /** El foleo de ESTE bulto. Cadena vacía = sin foleo. */
+  /** El folio de ESTE bulto. Cadena vacía = sin folio. */
   tagId: string;
   /**
    * La anotación que viaja con ESTE bulto al vale.
@@ -46,7 +46,7 @@ export interface SizeBundleRow {
   note: string;
 }
 
-/** Un foleo del catálogo, como se ofrece en el renglón. */
+/** Un folio del catálogo, como se ofrece en el renglón. */
 export interface CutTagChoice {
   id: string;
   name: string;
@@ -64,7 +64,7 @@ interface Props {
   /** Nota al pie del bloque. */
   footnote?: React.ReactNode;
   /**
-   * Los foleos que se pueden amarrar a un bulto.
+   * Los folios que se pueden amarrar a un bulto.
    *
    * Ausente = el bloque no pregunta por color. Lo pide la captura de corte,
    * que es donde el papelito se amarra de verdad; el envío a taller manda lo
@@ -111,10 +111,10 @@ export function usableRows(rows: SizeBundleRow[]) {
       value: row.value,
       quantity: Number(row.quantity),
       bundles: row.bundles.trim() === "" ? 1 : Number(row.bundles),
-      // Vacío se manda como `undefined`: en la base es "sin foleo", no una
+      // Vacío se manda como `undefined`: en la base es "sin folio", no una
       // cadena vacía que después nadie sabe si es un color sin nombre.
       tagId: row.tagId === "" ? undefined : row.tagId,
-      // Igual que el foleo: vacía no se guarda como cadena vacía.
+      // Igual que el folio: vacía no se guarda como cadena vacía.
       note: row.note.trim() === "" ? undefined : row.note.trim(),
     }))
     .filter(
@@ -130,7 +130,7 @@ export function usableRows(rows: SizeBundleRow[]) {
 /**
  * Lo que cambia en el renglón al elegirle talla.
  *
- * La anotación y el foleo de la talla nueva REEMPLAZAN a los que había: son
+ * La anotación y el folio de la talla nueva REEMPLAZAN a los que había: son
  * de la talla, y dejar los de la 38 sobre un bulto que ahora es de la 42
  * mandaría al taller la instrucción y el color equivocados.
  */
@@ -274,7 +274,7 @@ export function SizeBundleRows({
                 </label>
               )}
 
-              {/* El foleo va ARRIBA de las cantidades y no al lado: en el
+              {/* El folio va ARRIBA de las cantidades y no al lado: en el
                   celular una tercera columna dejaba los tres campos
                   demasiado angostos para teclear con el pulgar, y el color
                   se elige una vez mientras los números se corrigen varias. */}
@@ -290,9 +290,9 @@ export function SizeBundleRows({
                       onChange={(value) =>
                         updateRow(row.key, { tagId: value })
                       }
-                      placeholder="Sin foleo"
+                      placeholder="Sin folio"
                       searchPlaceholder="Buscar color…"
-                      clearLabel="Sin foleo"
+                      clearLabel="Sin folio"
                     />
                   </div>
                   {/* El cuadrito del color al lado del nombre: el papelito se

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { optionalText } from "./common";
 
 /**
- * Un foleo: el papelito de color que se engrapa al bulto.
+ * Un folio: el papelito de color que se engrapa al bulto.
  *
  * El color se valida como hex porque va tal cual al `style` de la celda, en
  * pantalla y en la hoja impresa. Un valor libre ahí rompería el contraste

@@ -247,7 +247,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `MANAGEMENT` | **La OTRA PLANTA. Dos pantallas: Órdenes · Órdenes de planta.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 
-**Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, foleos,
+**Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, folios,
 talleres, corridas, reglas y bodegas son del lado de producción: el auxiliar
 recibe, acomoda y surte, pero no decide cómo se hace la prenda. El kárdex
 global y los reportes son supervisión —el historial del rollo que trae en la
@@ -308,7 +308,7 @@ Nueve capacidades separan lo anterior:
 | `orders:browse` | Las **órdenes de corte** y su avance: la lista, los pedidos, la ficha de la orden, su impresión y su Excel. Aparte de `inventory:browse` para que se pueda dar sin abrir el almacén entero |
 | `plant-orders:browse` / `plant-orders:write` | El módulo de la **otra planta**: ver y capturar sus órdenes. Aparte de `orders:browse` porque son dos pantallas de públicos opuestos — allá abajo no tienen por qué ver el pedido que se corta acá, ni al revés |
 | `plant-orders:adopt` | **Agregar** una orden de la otra planta al concentrado de la casa, y quitarla. Llave propia que la otra planta NO tiene: si colgara de `plant-orders:write` —la llave con la que capturan— se agregarían solos |
-| `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, foleos, talleres, corridas, reglas y bodegas |
+| `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, folios, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
 

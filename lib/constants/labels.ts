@@ -304,7 +304,7 @@ export const PURCHASE_STATUS_STYLES: Record<PurchaseRequestStatus, string> = {
 };
 
 /**
- * FOLEO: el color del papelito que se engrapa al bulto.
+ * FOLIO: el color del papelito que se engrapa al bulto.
  *
  * En el piso los bultos se distinguen por ese color a un metro de distancia,
  * así que en pantalla y en papel tiene que verse el color REAL —azul es azul—,
@@ -324,7 +324,7 @@ export const CUT_TAG_LABELS: Record<CutTag, string> = {
   WHITE: "Blanco",
 };
 
-/** Fondo y texto de cada foleo. El texto se elige por contraste, no por gusto. */
+/** Fondo y texto de cada folio. El texto se elige por contraste, no por gusto. */
 export const CUT_TAG_COLORS: Record<CutTag, { background: string; text: string }> = {
   BLUE: { background: "#1d4ed8", text: "#ffffff" },
   GREEN: { background: "#15803d", text: "#ffffff" },

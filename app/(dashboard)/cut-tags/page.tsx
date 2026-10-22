@@ -8,10 +8,10 @@ import { CutTagFormDialog } from "@/components/cut-tags/cut-tag-form-dialog";
 import { CutTagActions } from "@/components/cut-tags/cut-tag-actions";
 import { Button } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "Foleos" };
+export const metadata: Metadata = { title: "Folios" };
 
 /**
- * Catálogo de foleos: los papelitos de color que se engrapan a los bultos.
+ * Catálogo de folios: los papelitos de color que se engrapan a los bultos.
  *
  * Son un catálogo y no una lista fija en el código porque en el piso se acaba
  * un color y se compra otro; agregarlo no debería requerir un despliegue.
@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Foleos" };
  * No se pagina: son una docena de colores y van a seguir siendo una docena.
  */
 export default async function CutTagsPage() {
-  // El foleo es del corte, no del almacén: va con tallas y talleres.
+  // El folio es del corte, no del almacén: va con tallas y talleres.
   await requirePermission("production:browse");
 
   const tags = await prisma.cutTagOption.findMany({
@@ -31,7 +31,7 @@ export default async function CutTagsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Foleos"
+        title="Folios"
         description="Los colores con los que se marcan los bultos"
         action={
           <CutTagFormDialog
@@ -49,7 +49,7 @@ export default async function CutTagsPage() {
         <div className="flat-surface">
           <EmptyState
             icon={Tag}
-            title="Aún no hay foleos"
+            title="Aún no hay folios"
             description="Da de alta el primer color con el botón de arriba."
           />
         </div>

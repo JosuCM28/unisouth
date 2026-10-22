@@ -15,7 +15,7 @@ import { contrastText, formatQuantity } from "@/lib/utils";
  * Existe porque el vale se dibuja en dos lados —la página de impresión y el
  * PDF que se manda por WhatsApp— y cada uno con su propia tecnología (HTML y
  * react-pdf). Si cada uno decidiera por su cuenta de dónde sale la empresa,
- * qué foleo gana o cómo se suma el total, el día que se corrija una regla en
+ * qué folio gana o cómo se suma el total, el día que se corrija una regla en
  * un lado el taller recibiría por WhatsApp un papel distinto del que firmó.
  * Aquí se decide todo UNA vez; los dos dibujantes sólo copian.
  */
@@ -262,9 +262,9 @@ function rollSummaryOf(document: VoucherDocument): string | null {
 }
 
 /**
- * El foleo de un renglón: primero el catálogo, luego el enum viejo.
+ * El folio de un renglón: primero el catálogo, luego el enum viejo.
  *
- * Los vales capturados antes de que los foleos fueran administrables sólo
+ * Los vales capturados antes de que los folios fueran administrables sólo
  * tienen el enum. Se traducen aquí para que una hoja reimpresa años después
  * siga saliendo del color correcto.
  */

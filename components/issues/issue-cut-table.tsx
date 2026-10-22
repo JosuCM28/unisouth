@@ -6,7 +6,7 @@ import { SearchSelect } from "@/components/shared/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/** Un foleo del catálogo, tal como lo ofrece la pantalla de salida. */
+/** Un folio del catálogo, tal como lo ofrece la pantalla de salida. */
 export interface CutTagOption {
   id: string;
   name: string;
@@ -28,7 +28,7 @@ export interface CutLineDraft {
   /** Texto, no número: el input vive a medio teclear. */
   quantity: string;
   bundles: string;
-  /** Id del foleo elegido. Vacío = sin foleo. */
+  /** Id del folio elegido. Vacío = sin folio. */
   tag: string;
   notes: string;
 }
@@ -45,7 +45,7 @@ interface Props {
  * La tabla de corte: cuántas prendas de cada talla salen y en cuántos bultos.
  *
  * Reproduce la hoja de papel que hoy se llena a mano en el taller —talla,
- * cantidad a cortar, bultos y el color del foleo—, porque es el documento con
+ * cantidad a cortar, bultos y el color del folio—, porque es el documento con
  * el que la gente ya sabe trabajar. Cambiarles el formato sería cambiarles el
  * proceso, y volverían a la libreta.
  *
@@ -182,7 +182,7 @@ export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
                   <Th className="w-32">Cantidad a cortar</Th>
                   <Th className="w-24">Bultos</Th>
                   <Th className="w-24">Total</Th>
-                  <Th className="w-40">Foleo</Th>
+                  <Th className="w-40">Folio</Th>
                   <Th>Anotaciones</Th>
                   <Th className="w-12" />
                 </tr>
@@ -298,7 +298,7 @@ export function IssueCutTable({ sizes, tags, lines, onChange }: Props) {
 }
 
 /**
- * Selector de foleo que se pinta del color elegido.
+ * Selector de folio que se pinta del color elegido.
  *
  * El color va como estilo en línea y no como clase de Tailwind: son colores
  * físicos del papel, no tokens del tema, y deben verse igual en pantalla
@@ -322,10 +322,10 @@ function TagPicker({
           options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
           value={value}
           onChange={onChange}
-          placeholder="Foleo"
+          placeholder="Folio"
           searchPlaceholder="Buscar color…"
-          clearLabel="Sin foleo"
-          emptyMessage="No hay foleos dados de alta."
+          clearLabel="Sin folio"
+          emptyMessage="No hay folios dados de alta."
         />
       </div>
       {selected && (

@@ -191,7 +191,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                     Total
                   </th>
                   <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Foleo
+                    Folio
                   </th>
                   <th className="p-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Anotaciones
@@ -309,7 +309,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   );
 }
 
-/** El foleo de un renglón: primero el catálogo, luego el enum viejo. */
+/** El folio de un renglón: primero el catálogo, luego el enum viejo. */
 function resolveTag(
   option: { name: string; color: string } | null,
   legacy: CutTag | null,

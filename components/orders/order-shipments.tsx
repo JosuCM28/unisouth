@@ -29,7 +29,7 @@ export interface ShipmentLineView {
   /** Piezas POR BULTO: lo que salió es `sentQuantity * bundles`. */
   sentQuantity: number;
   bundles: number;
-  /** El foleo con el que salió el bulto, si llevaba uno. */
+  /** El folio con el que salió el bulto, si llevaba uno. */
   tag: { name: string; color: string } | null;
   returnedQuantity: number;
   scrapQuantity: number;

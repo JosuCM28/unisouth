@@ -55,7 +55,7 @@ const SUGGESTIONS = [
 ];
 
 /**
- * Alta y edición de un foleo.
+ * Alta y edición de un folio.
  *
  * El color se elige con el selector nativo del sistema: es el que la gente ya
  * sabe usar y en celular abre la rueda de color a pantalla completa.
@@ -93,7 +93,7 @@ export function CutTagFormDialog({
       return;
     }
 
-    toast.success(tag ? "Foleo actualizado" : "Foleo agregado");
+    toast.success(tag ? "Folio actualizado" : "Folio agregado");
     setOpen(false);
     if (!tag) form.reset(toFormValues());
     router.refresh();
@@ -110,7 +110,7 @@ export function CutTagFormDialog({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={handleOpenChange}
-      title={tag ? `Editar ${tag.name}` : "Nuevo foleo"}
+      title={tag ? `Editar ${tag.name}` : "Nuevo folio"}
       description="El color del papelito que se engrapa al bulto."
       trigger={trigger}
     >
@@ -187,7 +187,7 @@ export function CutTagFormDialog({
         />
 
         <SubmitButton isSubmitting={form.formState.isSubmitting}>
-          {tag ? "Guardar cambios" : "Agregar foleo"}
+          {tag ? "Guardar cambios" : "Agregar folio"}
         </SubmitButton>
       </form>
     </ResponsiveFormDialog>

@@ -28,7 +28,7 @@ const ESPERADO: Record<Role, string[]> = {
   ADMIN: [
     "Tablero", "Inventario", "Escanear", "Cálculo",
     "Tareas", "Reglas",
-    "Materiales", "Productos", "Prendas", "Tallas", "Foleos", "Talleres",
+    "Materiales", "Productos", "Prendas", "Tallas", "Folios", "Talleres",
     "Almacenes", "Ubicaciones", "Clientes", "Producciones", "Proveedores",
     "Ayudantes",
     "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
@@ -52,7 +52,7 @@ const ESPERADO: Record<Role, string[]> = {
   PURCHASING: [
     "Tablero", "Inventario", "Escanear",
     "Tareas", "Reglas",
-    "Materiales", "Productos", "Prendas", "Tallas", "Foleos", "Talleres",
+    "Materiales", "Productos", "Prendas", "Tallas", "Folios", "Talleres",
     "Almacenes", "Ubicaciones", "Clientes", "Producciones", "Proveedores",
     "Ayudantes",
     "Recepciones", "Salidas", "Órdenes", "Movimientos", "Documentos",

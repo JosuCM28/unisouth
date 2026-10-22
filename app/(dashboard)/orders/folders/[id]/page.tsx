@@ -315,7 +315,7 @@ async function buildSendContext(
       orderBy: [{ position: "asc" }, { name: "asc" }],
     }),
     repository.findCuttableOrders(folderId),
-    // Sólo los foleos vigentes: un color dado de baja no se ofrece para nuevos bultos.
+    // Sólo los folios vigentes: un color dado de baja no se ofrece para nuevos bultos.
     prisma.cutTagOption.findMany({
       where: { deletedAt: null, active: true },
       select: { id: true, name: true, color: true },

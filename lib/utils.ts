@@ -220,7 +220,7 @@ function timezoneOffset(isoUtc: string): string {
 /**
  * Texto legible sobre un fondo de color.
  *
- * Los foleos ahora los define el usuario, así que el color del texto no se
+ * Los folios ahora los define el usuario, así que el color del texto no se
  * puede tener escrito de antemano: se calcula por luminancia para que un
  * amarillo lleve texto negro y un azul marino lo lleve blanco. La fórmula es
  * la de luminancia relativa de WCAG.

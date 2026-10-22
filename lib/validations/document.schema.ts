@@ -31,7 +31,7 @@ export const documentCutLineSchema = z.object({
     .int("Los bultos se cuentan enteros")
     .positive("Debe ser al menos un bulto")
     .default(1),
-  /** Id del foleo del catálogo. Vacío = sin foleo. */
+  /** Id del folio del catálogo. Vacío = sin folio. */
   tagId: optionalCuid,
   notes: optionalText,
 });

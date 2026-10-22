@@ -232,7 +232,7 @@ function fragments(
         sizeId: line.sizeId,
         orderId: order.id,
         orderCode: order.code,
-        // Igual que en el vale: el foleo del bulto manda sobre el del renglón.
+        // Igual que en el vale: el folio del bulto manda sobre el del renglón.
         tagId: entry.tagId ?? line.tagId,
         note: line.notes,
       },

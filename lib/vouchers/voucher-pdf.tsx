@@ -180,7 +180,7 @@ function CutTable({ sheet }: { sheet: VoucherSheet }) {
           <Cell width={CUT_COLUMNS.quantity} bold align="right">Cantidad</Cell>
           <Cell width={CUT_COLUMNS.bundles} bold align="right">Bultos</Cell>
           <Cell width={CUT_COLUMNS.total} bold align="right">Total</Cell>
-          <Cell width={CUT_COLUMNS.tag} bold>Foleo</Cell>
+          <Cell width={CUT_COLUMNS.tag} bold>Folio</Cell>
           <Cell width={CUT_COLUMNS.notes} bold>Anotaciones</Cell>
         </View>
 
@@ -262,7 +262,7 @@ function Cell({ width, children, bold, align = "left" }: CellProps) {
   );
 }
 
-/** La celda del foleo, pintada del color del papelito, como en la hoja. */
+/** La celda del folio, pintada del color del papelito, como en la hoja. */
 function TagCell({ tag }: { tag: VoucherTag | null }) {
   if (!tag) {
     return (

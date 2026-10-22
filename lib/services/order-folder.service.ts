@@ -856,7 +856,7 @@ function sizeOrderOf(
  * por bulto" que en el camión son cinco bultos iguales: en el papel son un
  * renglón de 30 × 5 bultos, que es como se cuentan al recibirlos.
  *
- * Sólo se juntan los IDÉNTICOS —misma talla, mismo foleo, misma anotación y
+ * Sólo se juntan los IDÉNTICOS —misma talla, mismo folio, misma anotación y
  * las mismas piezas por bulto—. Dos renglones que difieren en la anotación
  * siguen separados aunque sean de la misma talla: esa anotación es una
  * instrucción de trabajo y fundirla con otra la borra.

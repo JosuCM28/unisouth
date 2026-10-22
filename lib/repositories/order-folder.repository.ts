@@ -281,7 +281,7 @@ export class OrderFolderRepository extends BaseRepository<
             groupId: true,
             entries: {
               orderBy: { createdAt: "asc" },
-              /* Con su foleo: el vale global del pedido arma los mismos
+              /* Con su folio: el vale global del pedido arma los mismos
                  renglones que el de una orden suelta, y sin el color aquí el
                  papel saldría distinto según por dónde se mandara. */
               select: {

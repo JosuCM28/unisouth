@@ -232,7 +232,7 @@ export function OrderForm({
   }
 
   /* Una talla SE PUEDE repetir entre renglones. El cliente puede pedir la
-     misma talla con distinto foleo o en dos remesas, y eso son dos renglones
+     misma talla con distinto folio o en dos remesas, y eso son dos renglones
      con la misma talla porque cada uno lleva su propio dato. Filtrar las
      tallas ya usadas obligaba a sumarlas a mano en un solo renglón, que es
      justo lo que el papel nunca exigió. */
@@ -488,7 +488,7 @@ export function OrderForm({
                 </label>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Foleo</span>
+                  <span className="text-xs text-muted-foreground">Folio</span>
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
                       <SearchSelect
@@ -500,9 +500,9 @@ export function OrderForm({
                         onChange={(value) =>
                           updateLine(line.key, { tagId: value })
                         }
-                        placeholder="Sin foleo"
+                        placeholder="Sin folio"
                         searchPlaceholder="Buscar color…"
-                        clearLabel="Sin foleo"
+                        clearLabel="Sin folio"
                       />
                     </div>
                     {line.tagId && (

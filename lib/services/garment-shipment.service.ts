@@ -214,7 +214,7 @@ export class GarmentShipmentService extends BaseService {
         sizeId: string;
         sentQuantity: number;
         bundles: number;
-        /** El foleo del bulto: se imprime en la tabla de corte del vale. */
+        /** El folio del bulto: se imprime en la tabla de corte del vale. */
         tagId?: string;
         notes?: string;
       }[];
@@ -266,7 +266,7 @@ export class GarmentShipmentService extends BaseService {
         sizeId: line.sizeId,
         quantity: line.sentQuantity,
         bundles: line.bundles,
-        /* El foleo que trae amarrado el bulto. Antes salía vacío porque el
+        /* El folio que trae amarrado el bulto. Antes salía vacío porque el
            color sólo existía en el renglón de la orden y al mandar a bordar
            todavía no se sabía; ahora se amarra al capturar el corte y viaja
            hasta aquí, así que el papel que firma el taller dice de qué color
@@ -554,7 +554,7 @@ export class GarmentShipmentService extends BaseService {
     const balances = new Map<string, SizeBalance>();
 
     /* Se ACUMULA y no se sobrescribe: una orden puede llevar la misma talla en
-       dos renglones —con foleos distintos— y quedarse con el último diría que
+       dos renglones —con folios distintos— y quedarse con el último diría que
        de la 38 sólo se cortó lo del segundo. */
     for (const line of lines) {
       const balance = balances.get(line.sizeId) ?? {

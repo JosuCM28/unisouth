@@ -1,5 +1,5 @@
 /**
- * Alta de los foleos y migración de los renglones ya capturados.
+ * Alta de los folios y migración de los renglones ya capturados.
  *
  * Es idempotente: se puede correr las veces que haga falta. Los colores que
  * ya existan se actualizan, no se duplican.
@@ -27,7 +27,7 @@ async function main() {
       create: { ...tag, order: index },
     });
   }
-  console.log(`  ${TAGS.length} foleos dados de alta`);
+  console.log(`  ${TAGS.length} folios dados de alta`);
 
   // Los renglones capturados con el enum viejo apuntan ahora al catálogo.
   const pending = await prisma.documentCutLine.findMany({

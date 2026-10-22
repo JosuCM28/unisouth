@@ -21,11 +21,11 @@ export function CutTagActions({ tag }: { tag: EditableCutTag }) {
           }
         />
       }
-      removeDescription="El foleo dejará de ofrecerse al capturar una salida. Los vales que ya lo usaron lo conservan, para que la hoja impresa siga cuadrando con el bulto."
+      removeDescription="El folio dejará de ofrecerse al capturar una salida. Los vales que ya lo usaron lo conservan, para que la hoja impresa siga cuadrando con el bulto."
       onRemove={() =>
         removeCutTagAction({
           id: tag.id,
-          reason: `Baja del foleo ${tag.name}`,
+          reason: `Baja del folio ${tag.name}`,
         })
       }
     />

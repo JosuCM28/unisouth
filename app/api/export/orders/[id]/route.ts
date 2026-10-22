@@ -31,7 +31,7 @@ import { cutProgress, cutTotals, formatDate } from "@/lib/utils";
  * mismas para todo. El ancho se elige para que sirva a las dos:
  *
  *   A            B         C        D         E       F
- *   Talla        Foleo     Pedidas  Cortadas  Faltan  Sobran
+ *   Talla        Folio     Pedidas  Cortadas  Faltan  Sobran
  *   Fecha        Talla     Piezas   Quién     Notas
  */
 /* La última es la de anotaciones: ancha porque lleva texto libre y no una
@@ -251,7 +251,7 @@ function sizeRows(lines: Line[]): SheetRow[] {
     [],
     [
       { at: A, value: "Talla", style: "tableHeader" },
-      { at: B, value: "Foleo", style: "tableHeader" },
+      { at: B, value: "Folio", style: "tableHeader" },
       { at: C, value: "Pedidas", style: "tableHeaderRight" },
       { at: D, value: "Cortadas", style: "tableHeaderRight" },
       { at: E, value: "Faltan", style: "tableHeaderRight" },

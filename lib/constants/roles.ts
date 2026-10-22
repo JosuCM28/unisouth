@@ -86,7 +86,7 @@ export const PERMISSIONS = [
   "garments:browse",
   "inventory:adjust",
   "catalog:write",
-  /* El marco de CÓMO se produce: ficha técnica, escalado de tallas, foleo del
+  /* El marco de CÓMO se produce: ficha técnica, escalado de tallas, folio del
      corte, taller que borda, corrida de producción, las reglas fijas del
      cliente y las bodegas donde se guarda.
 
@@ -140,7 +140,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
 
      Lo que NO tiene y por qué:
      · `production:browse/write` — no decide cómo se hace la prenda. Fichas
-                        técnicas, tallas, foleos, talleres, corridas, reglas y
+                        técnicas, tallas, folios, talleres, corridas, reglas y
                         bodegas son del lado de producción.
      · `reporting:read` — el kárdex global y los reportes son supervisión. El
                         historial del rollo que tiene en la mano lo sigue

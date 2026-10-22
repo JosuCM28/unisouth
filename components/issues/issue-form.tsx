@@ -120,7 +120,7 @@ interface Props {
   sizes: { id: string; code: string; name: string }[];
   /** Catálogo completo para la tabla de corte, con su grupo de escala. */
   cutSizes: SizeOption[];
-  /** Foleos disponibles, administrados en /cut-tags. */
+  /** Folios disponibles, administrados en /cut-tags. */
   cutTags: CutTagOption[];
   clients: ClientOption[];
   productionRuns: { id: string; code: string; name: string | null }[];
