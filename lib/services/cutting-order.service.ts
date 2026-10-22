@@ -382,8 +382,9 @@ export class CuttingOrderService extends BaseService {
             where: { id: existing.id },
             data: {
               orderedQuantity: line.orderedQuantity,
-              tagId: line.tagId,
-              notes: line.notes,
+              // Mismo `?? null` que el encabezado: quitar el foleo debe quitarlo.
+              tagId: line.tagId ?? null,
+              notes: line.notes ?? null,
               position: index,
             },
           });
@@ -405,20 +406,21 @@ export class CuttingOrderService extends BaseService {
       const order = await tx.cuttingOrder.update({
         where: { id },
         data: {
-          clientId: input.clientId,
-          materialId: input.materialId,
-          productionRunId: input.productionRunId,
-          /* `?? null` y no `input.folderId` a secas: si el usuario vacía el
-             selector llega `undefined`, y Prisma ignora undefined —la orden
-             se quedaría en la carpeta de la que se acaba de sacar. */
+          /* TODO campo opcional va con `?? null`: si el usuario vacía el
+             selector o el texto llega `undefined`, y Prisma ignora undefined.
+             Con el material eso era lo más visible: quitar el del catálogo
+             para escribir la tela a mano no lo quitaba, y como el material
+             manda sobre la tela a mano, la orden seguía mostrando la vieja. */
+          clientId: input.clientId ?? null,
+          materialId: input.materialId ?? null,
+          productionRunId: input.productionRunId ?? null,
           folderId: input.folderId ?? null,
-          description: input.description,
-          reference: input.reference,
+          description: input.description ?? null,
+          reference: input.reference ?? null,
           orderedAt: input.orderedAt ?? current.orderedAt,
-          dueDate: input.dueDate,
-          // Vaciar el lugar llega como undefined: `?? null` para que sí se borre.
+          dueDate: input.dueDate ?? null,
           deliveryPlace: input.deliveryPlace ?? null,
-          notes: input.notes,
+          notes: input.notes ?? null,
           /* `?? null` por la misma razón que la carpeta: vaciar el molde o la
              versión llega como undefined y Prisma lo ignoraría, dejando el
              dato viejo en una orden que el usuario acaba de limpiar. */
