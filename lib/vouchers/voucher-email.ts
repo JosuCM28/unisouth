@@ -9,10 +9,25 @@ import type { VoucherField, VoucherSheet } from "./voucher-sheet";
  * adjunto salen de las mismas decisiones, y no pueden contradecirse.
  */
 
-/** Lo que se busca en la bandeja: el número de orden, como se habla en el piso. */
+/**
+ * Lo que se busca en la bandeja: el número de orden, como se habla en el piso,
+ * seguido de empresa, prenda y tela. Con eso la bandeja sola dice de qué
+ * corte se trata sin abrir el correo. Lo que la hoja no trae se omite en vez
+ * de dejar un guion colgando.
+ */
 export function voucherEmailSubject(sheet: VoucherSheet): string {
-  return `SALIDA DE CORTE ${orderOf(sheet) ?? sheet.code}`;
+  const details = SUBJECT_DETAILS.flatMap((label) => {
+    const value = headerValue(sheet, label);
+    return value ? [value] : [];
+  });
+
+  return [`SALIDA DE CORTE ${orderOf(sheet) ?? sheet.code}`, ...details].join(
+    " - ",
+  );
 }
+
+/** Los campos del encabezado que se suman al asunto, en este orden. */
+const SUBJECT_DETAILS = ["Empresa", "Descripción", "Tela"] as const;
 
 /**
  * El cuerpo: todo el encabezado del vale, renglón por renglón.
@@ -46,7 +61,11 @@ export function voucherEmailText(sheet: VoucherSheet): string {
 }
 
 function orderOf(sheet: VoucherSheet): string | null {
-  return sheet.header.find((field) => field.label === "Orden")?.value ?? null;
+  return headerValue(sheet, "Orden");
+}
+
+function headerValue(sheet: VoucherSheet, label: string): string | null {
+  return sheet.header.find((field) => field.label === label)?.value ?? null;
 }
 
 function lines(fields: VoucherField[]): string[] {

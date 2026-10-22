@@ -501,7 +501,8 @@ el celular tenga señal.
 
 El correo sigue la misma regla: `RESEND_API_KEY` es opcional, el único archivo
 que habla con Resend es `lib/core/resend-client.ts`, y el asunto es
-`SALIDA DE CORTE {orden}` con el PDF adjunto y el encabezado en texto plano.
+`SALIDA DE CORTE {orden} - {empresa} - {descripción} - {tela}` (lo que falte
+se omite) con el PDF adjunto y el encabezado en texto plano.
 Qué canales se ofrecen al aplicar —WhatsApp, correo, ambos o ninguno— lo
 decide ADMIN en **Administración → Notificaciones** (`notifications:write`),
 guardado en la tabla `Setting`; el servidor lo vuelve a revisar al enviar.
