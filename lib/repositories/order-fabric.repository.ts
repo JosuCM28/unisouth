@@ -5,6 +5,17 @@ import {
 } from "@/lib/core/base-repository";
 import type { FabricDocument } from "@/lib/order-fabric";
 
+/** Una orden elegible para la salida múltiple, lista para el navegador. */
+export interface OrderIssueTarget {
+  id: string;
+  code: string;
+  reference: string | null;
+  description: string | null;
+  materialId: string | null;
+  clientName: string | null;
+  materialName: string | null;
+}
+
 /**
  * Lectura de la tela que una orden se llevó y la que regresó.
  *
@@ -78,6 +89,38 @@ export class OrderFabricRepository extends BaseRepository<
         unit: line.unit,
         quantity: Number(line.quantity),
       })),
+    }));
+  }
+
+  /**
+   * Las órdenes a las que se les puede sacar tela en la salida múltiple.
+   *
+   * Fuera las canceladas —ya no corren— y las de la otra planta que nadie ha
+   * agregado: todavía no se trabajan aquí, y su tela tampoco.
+   */
+  async issueTargets(): Promise<OrderIssueTarget[]> {
+    const orders = await this.db.cuttingOrder.findMany({
+      where: { status: { not: "CANCELLED" }, addedAt: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        code: true,
+        reference: true,
+        description: true,
+        materialId: true,
+        client: { select: { name: true } },
+        material: { select: { name: true } },
+      },
+    });
+
+    return orders.map((order) => ({
+      id: order.id,
+      code: order.code,
+      reference: order.reference,
+      description: order.description,
+      materialId: order.materialId,
+      clientName: order.client?.name ?? null,
+      materialName: order.material?.name ?? null,
     }));
   }
 }

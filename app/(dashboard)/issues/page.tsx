@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Layers, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getIssueSummaries } from "@/lib/issue-summary";
 import { parseIssueFilters, issueWhere } from "@/lib/repositories/issue-filters";
@@ -138,12 +138,20 @@ export default async function IssuesPage({ searchParams }: PageProps) {
         title="Salidas"
         description="Material que se entregó a producción"
         action={
-          <Button asChild className="touch-target">
-            <Link href="/issues/new">
-              <Plus className="size-4" aria-hidden />
-              Nueva
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="touch-target">
+              <Link href="/issues/multi">
+                <Layers className="size-4" aria-hidden />
+                Varias órdenes
+              </Link>
+            </Button>
+            <Button asChild className="touch-target">
+              <Link href="/issues/new">
+                <Plus className="size-4" aria-hidden />
+                Nueva
+              </Link>
+            </Button>
+          </div>
         }
       />
 
