@@ -62,7 +62,7 @@ interface ReportColumn {
   trafficLight?: boolean;
 }
 
-/** Las dieciocho columnas, en el orden y con los anchos del formato. */
+/** Las diecinueve columnas, en el orden y con los anchos del formato. */
 const COLUMNS: ReportColumn[] = [
   { header: "FECHA DE CORTE", width: 10.86, kind: "date" },
   { header: "DIAS", width: 12, kind: "plain" },
@@ -72,6 +72,9 @@ const COLUMNS: ReportColumn[] = [
   { header: "STATUS", width: 19.14, kind: "plain", cream: true, creamBody: true },
   { header: "TIPO DE TELA -COLOR", width: 24.57, kind: "plain" },
   { header: "DESCRIPCION", width: 27.43, kind: "plain" },
+  /* El nombre que se le pone al molde en la orden. Va junto a la prenda
+     porque así se lee el corte: qué se cortó y con qué molde. */
+  { header: "MOLDE", width: 18, kind: "plain" },
   { header: "CANTIDAD REQUERIDA", width: 12.57, kind: "plain" },
   { header: "CANTIDAD CORTADA", width: 10.71, kind: "plain" },
   { header: "DIFRENCIA ( CANT REQ.- CANT", width: 22.43, kind: "plain" },
@@ -100,7 +103,7 @@ const COLUMNS: ReportColumn[] = [
 /** Cuántas columnas lleva la hoja. Lo usa la ruta para armar cada fila. */
 export const CUT_REPORT_COLUMN_COUNT = COLUMNS.length;
 
-/** Una fila ya resuelta: dieciocho valores en el orden de las columnas. */
+/** Una fila ya resuelta: diecinueve valores en el orden de las columnas. */
 export type ReportCell = string | number | Date | null;
 export type ReportRow = ReportCell[];
 
