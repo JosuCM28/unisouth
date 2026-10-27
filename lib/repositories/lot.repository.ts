@@ -1,4 +1,4 @@
-import type { Lot, LotStatus, Prisma } from "@prisma/client";
+import type { Lot, LotStatus, Prisma, Unit } from "@prisma/client";
 import {
   STATUSES_ISSUABLE,
   STATUSES_PHYSICALLY_PRESENT,
@@ -73,6 +73,14 @@ export interface LotFilters extends PaginationInput {
   shade?: string;
 }
 
+/** Un renglón de existencia por material, ya sumado. */
+export interface MaterialStockRow {
+  materialCode: string;
+  materialName: string;
+  unit: Unit;
+  quantity: number;
+}
+
 export interface AvailableForIssueParams {
   materialId: string;
   /** Dueño del material. La tela de un cliente jamás surte a otro. */
@@ -130,6 +138,57 @@ export class LotRepository extends BaseRepository<
       take: EXPORT_ROW_LIMIT,
       include: LOT_LIST_INCLUDE,
     });
+  }
+
+  /**
+   * Existencia sumada por material, para cargarla a Microsip.
+   *
+   * Microsip lleva el inventario por artículo, no por pieza: no sabe de
+   * rollos, tonos ni ubicaciones. Por eso aquí se suman todos los rollos de un
+   * material en un solo renglón, respetando el MISMO filtro de la pantalla
+   * —filtrar por cliente da la existencia de ese dueño, que es lo que se carga
+   * en su almacén—.
+   *
+   * Se suma el saldo, no el disponible: lo reservado sigue físicamente en la
+   * bodega y Microsip no conoce las reservas. Se agrupa también por unidad
+   * porque un rollo puede haberse dado de alta en otra unidad que la del
+   * catálogo, y sumar metros con kilos daría un número sin sentido.
+   */
+  async sumByMaterialForExport(filters: LotFilters = {}): Promise<MaterialStockRow[]> {
+    const groups = await this.db.lot.groupBy({
+      by: ["materialId", "unit"],
+      where: {
+        AND: [
+          this.buildWhere(filters),
+          {
+            status: { in: [...STATUSES_PHYSICALLY_PRESENT] },
+            currentQuantity: { gt: 0 },
+          },
+        ],
+      },
+      _sum: { currentQuantity: true },
+    });
+
+    const materials = await this.db.material.findMany({
+      where: { id: { in: groups.map((group) => group.materialId) } },
+      select: { id: true, code: true, name: true },
+    });
+    const byId = new Map(materials.map((material) => [material.id, material]));
+
+    return groups
+      .flatMap((group) => {
+        const material = byId.get(group.materialId);
+        if (!material) return [];
+        return [
+          {
+            materialCode: material.code,
+            materialName: material.name,
+            unit: group.unit,
+            quantity: Number(group._sum.currentQuantity ?? 0),
+          },
+        ];
+      })
+      .sort((a, b) => a.materialCode.localeCompare(b.materialCode));
   }
 
   /**

@@ -15,6 +15,7 @@ import { LotFilters } from "@/components/lots/lot-filters";
 import { LotFormSheet } from "@/components/lots/lot-form-sheet";
 import { PrintLotsButton } from "@/components/lots/print-lots-button";
 import { LotList } from "@/components/lots/lot-list";
+import { MicrosipExportMenu } from "@/components/lots/microsip-export-menu";
 import type { LotCardData } from "@/components/lots/lot-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -88,6 +89,7 @@ export default async function LotsPage({ searchParams }: PageProps) {
         <SearchInput placeholder="Folio, tono, material…" className="flex-1 md:max-w-sm" />
         <PrintLotsButton />
         <ExportButton href="/api/export/lots" label="Excel" />
+        <MicrosipExportMenu />
       </div>
 
       <LotFilters

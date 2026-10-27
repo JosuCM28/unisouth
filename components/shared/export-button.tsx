@@ -51,7 +51,7 @@ export function ExportButton({
 }
 
 /** Pega los filtros de la pantalla al destino, sin pisar los que ya trae. */
-function withFilters(href: string, current: URLSearchParams): string {
+export function withFilters(href: string, current: URLSearchParams): string {
   const separator = href.indexOf("?");
   const path = separator === -1 ? href : href.slice(0, separator);
   const params = new URLSearchParams(
