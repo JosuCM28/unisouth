@@ -1,4 +1,4 @@
-import type { Unit } from "@prisma/client";
+import type { Prisma, Unit } from "@prisma/client";
 import { UNIT_LABELS, UNIT_SHORT_LABELS } from "@/lib/constants/labels";
 import { toXlsx, type XlsxColumn } from "@/lib/export/xlsx";
 import { APP_TIMEZONE } from "@/lib/utils";
@@ -70,7 +70,7 @@ export interface ReceiptSummary {
   totalRolls: number;
 }
 
-type GroupedRow = Omit<ReceiptSummaryRow, "item">;
+export type GroupedRow = Omit<ReceiptSummaryRow, "item">;
 
 /** Las llaves de los renglones, en orden: a éstas se les aparta número. */
 export function receiptRowKeys(receipt: ReceiptForSummary): string[] {
@@ -102,7 +102,7 @@ export function summarizeReceipt(
  * guía puede traer tela de dos clientes, y juntarla en un renglón le diría a
  * uno que recibió lo del otro.
  */
-function groupLots(lots: ReceiptForSummary["lots"]): GroupedRow[] {
+export function groupLots(lots: ReceiptForSummary["lots"]): GroupedRow[] {
   const groups = new Map<string, GroupedRow>();
 
   for (const lot of lots) {
@@ -133,7 +133,7 @@ function groupLots(lots: ReceiptForSummary["lots"]): GroupedRow[] {
  * "DHL · Guía 4471-8820". Si falta una de las dos se dice cuál; si faltan
  * las dos, sólo la leyenda.
  */
-function shippingOf(
+export function shippingOf(
   carrier: string | null | undefined,
   guide: string | null,
 ): string {
@@ -144,13 +144,29 @@ function shippingOf(
 }
 
 /**
+ * Los números de ítem guardados en `Receipt.mailedItemNumbers`, sólo con lo
+ * que de verdad es llave → número: la columna es JSON y no garantiza forma.
+ */
+export function itemNumbersOf(
+  value: Prisma.JsonValue | null,
+): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number",
+    ),
+  );
+}
+
+/**
  * Día/mes/año en la zona de la fábrica, como TEXTO.
  *
  * Texto y no celda de fecha: el formato de una fecha en Excel lo decide la
  * configuración de quien abre, y en una máquina en inglés saldría mes/día.
  * Aquí se pidió día/mes/año y así tiene que leerse en cualquier equipo.
  */
-function dayMonthYear(date: Date): string {
+export function dayMonthYear(date: Date): string {
   return new Intl.DateTimeFormat("es-MX", {
     timeZone: APP_TIMEZONE,
     day: "2-digit",

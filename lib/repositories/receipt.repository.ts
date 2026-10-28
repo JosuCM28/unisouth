@@ -1,4 +1,4 @@
-import type { Prisma, Receipt, Unit } from "@prisma/client";
+import { Prisma, type Receipt, type Unit } from "@prisma/client";
 import {
   BaseRepository,
   type PaginatedResult,
@@ -606,6 +606,36 @@ export class ReceiptRepository extends BaseRepository<
     await this.db.receipt.update({
       where: { id },
       data: { mailedItemNumbers: numbers },
+    });
+  }
+
+  /**
+   * Las recepciones que ya salieron por correo, con lo justo para rearmar
+   * sus renglones: es el índice global de números de ítem.
+   *
+   * Sin tope de filas a propósito: el archivo existe para encontrar un número
+   * de la serie, y uno cortado en silencio diría que ese número no existe.
+   */
+  async findMailed() {
+    return this.db.receipt.findMany({
+      where: { mailedItemNumbers: { not: Prisma.DbNull } },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      select: {
+        code: true,
+        date: true,
+        guideNumber: true,
+        mailedItemNumbers: true,
+        carrier: { select: { name: true } },
+        lots: {
+          select: {
+            unit: true,
+            initialQuantity: true,
+            shade: true,
+            material: { select: { id: true, name: true } },
+            client: { select: { name: true } },
+          },
+        },
+      },
     });
   }
 

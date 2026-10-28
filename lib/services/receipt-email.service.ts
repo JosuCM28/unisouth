@@ -1,4 +1,3 @@
-import type { Prisma } from "@prisma/client";
 import { NotFoundError } from "@/lib/core/errors";
 import { ReceiptRepository } from "@/lib/repositories/receipt.repository";
 import type { SendReceiptEmailInput } from "@/lib/validations/email.schema";
@@ -9,6 +8,7 @@ import {
 import {
   FIRST_ITEM_NUMBER,
   ITEM_SERIES,
+  itemNumbersOf,
   receiptRowKeys,
   receiptSummaryFileName,
   receiptSummaryXlsx,
@@ -73,7 +73,7 @@ export class ReceiptEmailService extends BaseService {
 
       // Se relee DESPUÉS del candado: otro envío pudo apartar mientras tanto.
       const current = await receipts.findById(receiptId);
-      const numbers = toNumberMap(current?.mailedItemNumbers ?? null);
+      const numbers = itemNumbersOf(current?.mailedItemNumbers ?? null);
 
       const missing = receiptRowKeys(receipt).filter((key) => !(key in numbers));
       if (missing.length === 0) return numbers;
@@ -92,15 +92,4 @@ export class ReceiptEmailService extends BaseService {
       return numbers;
     });
   }
-}
-
-/** El JSON guardado, sólo con lo que de verdad es llave → número. */
-function toNumberMap(value: Prisma.JsonValue): Record<string, number> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, number] => typeof entry[1] === "number",
-    ),
-  );
 }

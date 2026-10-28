@@ -65,6 +65,14 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
                 no la página en la que quedó el pulgar. */}
             <ExportButton href="/api/export/receipts" label="Excel" />
 
+            {/* Exacto: el índice de ítems es global aunque la lista esté
+                filtrada, para que ningún número parezca no existir. */}
+            <ExportButton
+              href="/api/export/receipts/items"
+              label="Ítems enviados"
+              exact
+            />
+
             {/* El reporte pide lo mismo que esta pantalla (`inventory:browse`),
                 así que quien llegó hasta aquí siempre puede abrirlo. */}
             <Button asChild variant="outline" className="touch-target">
