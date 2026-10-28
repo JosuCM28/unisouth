@@ -46,7 +46,6 @@ export default async function EditOrderPage({ params }: PageProps) {
     description: order.description,
     reference: order.reference,
     clientPo: order.clientPo,
-    internalPo: order.internalPo,
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
     deliveryPlace: order.deliveryPlace,

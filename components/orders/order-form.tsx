@@ -75,7 +75,6 @@ export interface EditableOrder {
   description: string | null;
   reference: string | null;
   clientPo: string | null;
-  internalPo: string | null;
   orderedAt: string;
   dueDate: string | null;
   deliveryPlace: string | null;
@@ -163,7 +162,6 @@ export function OrderForm({
   const [description, setDescription] = useState(order?.description ?? "");
   const [reference, setReference] = useState(order?.reference ?? "");
   const [clientPo, setClientPo] = useState(order?.clientPo ?? "");
-  const [internalPo, setInternalPo] = useState(order?.internalPo ?? "");
   const [orderedAt, setOrderedAt] = useState(
     order?.orderedAt ?? todayInputValue(),
   );
@@ -194,7 +192,6 @@ export function OrderForm({
       description: order?.description ?? "",
       reference: order?.reference ?? "",
       clientPo: order?.clientPo ?? "",
-      internalPo: order?.internalPo ?? "",
       orderedAt: order?.orderedAt ?? todayInputValue(),
       dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
       deliveryPlace: order?.deliveryPlace ?? "",
@@ -267,7 +264,6 @@ export function OrderForm({
       description,
       reference,
       clientPo,
-      internalPo,
       orderedAt,
       dueDate,
       deliveryPlace,
@@ -306,7 +302,6 @@ export function OrderForm({
       cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
       clientPo: clientPo || undefined,
-      internalPo: internalPo || undefined,
       /* Van como texto: Zod los convierte. Mandar `Number("")` desde aquí
          daría 0, y un cero capturado no es lo mismo que un campo vacío —el
          reporte sacaría un promedio real de una mesa que nadie ha medido. */
@@ -583,7 +578,7 @@ export function OrderForm({
         <FormSection title="Detalles del pedido">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="order-reference">Orden del cliente</Label>
+              <Label htmlFor="order-reference">Folio de orden</Label>
               <Input
                 id="order-reference"
                 placeholder="Número de orden que trae el papel"
@@ -593,32 +588,19 @@ export function OrderForm({
               />
             </div>
 
-            {/* Los dos PO no se pintan en modo planta, igual que el cierre:
-                son los papeles con los que la casa y su cliente le dan
-                seguimiento al pedido, y allá abajo no los tienen. */}
+            {/* El PO no se pinta en modo planta, igual que el cierre: es el
+                papel con el que el cliente le da seguimiento al pedido de la
+                casa, y allá abajo no lo tienen. */}
             {!isPlant && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="order-client-po">PO CLIENTE</Label>
-                  <Input
-                    id="order-client-po"
-                    placeholder="Opcional"
-                    value={clientPo}
-                    onChange={(event) => setClientPo(event.target.value)}
-                    className="touch-target"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="order-internal-po">PO INTERNA</Label>
-                  <Input
-                    id="order-internal-po"
-                    placeholder="Opcional"
-                    value={internalPo}
-                    onChange={(event) => setInternalPo(event.target.value)}
-                    className="touch-target"
-                  />
-                </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="order-client-po">PO CLIENTE</Label>
+                <Input
+                  id="order-client-po"
+                  placeholder="Opcional"
+                  value={clientPo}
+                  onChange={(event) => setClientPo(event.target.value)}
+                  className="touch-target"
+                />
               </div>
             )}
 
@@ -743,7 +725,6 @@ function snapshot(state: {
   description: string;
   reference: string;
   clientPo: string;
-  internalPo: string;
   orderedAt: string;
   dueDate: string;
   deliveryPlace: string;

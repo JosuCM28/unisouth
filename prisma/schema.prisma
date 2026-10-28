@@ -1663,10 +1663,6 @@ model CuttingOrder {
   /// Se captura en "Detalles del pedido" aunque viva junto al cierre: se
   /// conoce al tomar el pedido, no al levantar la mesa.
   clientPo        String?
-  /// La orden de compra interna con la que la casa le da seguimiento al
-  /// pedido. Aparte de `clientPo` porque son dos números de dos papeles
-  /// distintos, y uno solo obligaría a escoger cuál se pierde.
-  internalPo      String?
   /// Metros que el cliente mandó para este corte.
   metersDelivered Decimal? @db.Decimal(12, 2)
   /// Metros que de verdad se tendieron en la mesa.

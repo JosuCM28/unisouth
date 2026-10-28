@@ -83,9 +83,8 @@ export default async function PrintOrderPage({ params }: PageProps) {
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 border-b border-black py-3 text-sm">
         <Field label="Cliente" value={order.client?.name ?? "Fábrica"} />
         <Field label="Descripción" value={order.description} />
-        <Field label="Orden del cliente" value={order.reference} />
+        <Field label="Folio de orden" value={order.reference} />
         <Field label="PO cliente" value={order.clientPo} />
-        <Field label="PO interna" value={order.internalPo} />
         <Field
           label="Entrega"
           value={order.dueDate ? formatDate(order.dueDate) : null}

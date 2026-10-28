@@ -56,7 +56,6 @@ interface OrderSheet {
   description: string | null;
   reference: string | null;
   clientPo: string | null;
-  internalPo: string | null;
   notes: string | null;
   cutFabricText: string | null;
   cutPattern: string | null;
@@ -149,9 +148,8 @@ function headerRows(order: OrderSheet): SheetRow[] {
   const pairs: [string, string][] = [
     ["Cliente", order.client?.name ?? "Fábrica"],
     ["Descripción", order.description ?? "—"],
-    ["Orden del cliente", order.reference ?? "—"],
+    ["Folio de orden", order.reference ?? "—"],
     ["PO cliente", order.clientPo ?? "—"],
-    ["PO interna", order.internalPo ?? "—"],
     ["Entrega", order.dueDate ? formatDate(order.dueDate) : "—"],
     [
       "Material",

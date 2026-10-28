@@ -988,9 +988,8 @@ export default async function OrderDetailPage({
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">Datos del pedido</h2>
         <dl className="grid gap-x-8 sm:grid-cols-2">
-          <Row label="Orden del cliente" value={order.reference} tabular />
+          <Row label="Folio de orden" value={order.reference} tabular />
           <Row label="PO cliente" value={order.clientPo} tabular />
-          <Row label="PO interna" value={order.internalPo} tabular />
           <Row label="Pedido el" value={formatDate(order.orderedAt)} tabular />
           <Row
             label="Entrega"

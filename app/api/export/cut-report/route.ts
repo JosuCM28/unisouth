@@ -84,12 +84,12 @@ export async function GET(request: Request) {
        reordenarlas de un lado sin acordarse del otro. */
     return [
       order.orderedAt,
+      order.dueDate,
       weekdayName(order.orderedAt),
       /* El folio interno cuando no hay número del cliente: la columna nunca
          va vacía, porque es por la que se busca la fila en la hoja. */
       order.reference ?? order.code,
       order.clientPo,
-      order.internalPo,
       order.client?.name ?? "Fábrica",
       CUTTING_ORDER_STATUS_LABELS[order.status],
       fabricName(order),

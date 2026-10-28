@@ -65,12 +65,12 @@ interface ReportColumn {
 /** Las veinte columnas, en el orden y con los anchos del formato. */
 const COLUMNS: ReportColumn[] = [
   { header: "FECHA DE CORTE", width: 10.86, kind: "date" },
+  /* El compromiso junto al día del pedido: se lee de corrido cuánto margen
+     tuvo el corte sin brincar hasta el final de la fila. */
+  { header: "FECHA DE ENTREGA", width: 10.86, kind: "date" },
   { header: "DIAS", width: 12, kind: "plain" },
   { header: "NO. ORDEN", width: 14.86, kind: "plain" },
   { header: "PO DEL CLIENTE", width: 13.57, kind: "plain" },
-  /* La orden de compra interna, junto a la del cliente: las dos se buscan
-     igual, por número, y separarlas obligaría a brincar columnas. */
-  { header: "PO INTERNA", width: 13.57, kind: "plain" },
   { header: "CLIENTE", width: 19.14, kind: "plain" },
   { header: "STATUS", width: 19.14, kind: "plain", cream: true, creamBody: true },
   { header: "TIPO DE TELA -COLOR", width: 24.57, kind: "plain" },
