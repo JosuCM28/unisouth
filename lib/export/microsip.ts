@@ -44,6 +44,39 @@ export function microsipArticleRows(rows: MaterialStockRow[]): string[][] {
   ]);
 }
 
+/** Metros que tiene una yarda. Exacto por definición internacional. */
+const METERS_PER_YARD = 0.9144;
+
+/**
+ * Lleva toda medida de longitud a YARDAS y junta los renglones que quedan
+ * con la misma clave.
+ *
+ * En Microsip la tela se lleva en yardas. En unisouth conviven rollos en
+ * metros y en yardas del mismo material —cada uno se da de alta con la
+ * unidad de la etiqueta del proveedor— y sin convertirlos el mismo artículo
+ * llegaría partido en dos renglones. Se convierte aquí, al exportar, y no en
+ * los rollos: su cantidad sólo se mueve con un movimiento del kárdex.
+ */
+export function inMicrosipUnits(rows: MaterialStockRow[]): MaterialStockRow[] {
+  const merged = new Map<string, MaterialStockRow>();
+
+  for (const row of rows) {
+    const converted = toYards(row);
+    const key = `${converted.materialCode}\u0000${converted.unit}`;
+    const existing = merged.get(key);
+
+    if (existing) existing.quantity += converted.quantity;
+    else merged.set(key, { ...converted });
+  }
+
+  return [...merged.values()];
+}
+
+function toYards(row: MaterialStockRow): MaterialStockRow {
+  if (row.unit !== "METER") return row;
+  return { ...row, unit: "YARD", quantity: row.quantity / METERS_PER_YARD };
+}
+
 /**
  * Materiales con rollos en más de una unidad.
  *

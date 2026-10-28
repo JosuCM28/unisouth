@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
 import { lotFiltersFromRequest } from "@/lib/export/lot-filters";
 import {
+  inMicrosipUnits,
   materialsWithMixedUnits,
   microsipStockRows,
   mixedUnitsResponse,
@@ -16,9 +17,10 @@ export async function GET(request: Request) {
 
   await requirePermission("inventory:browse");
 
-  const rows = await new LotRepository().sumByMaterialForExport(
+  // Ya en yardas y con un renglón por clave: así lo lleva Microsip.
+  const rows = inMicrosipUnits(await new LotRepository().sumByMaterialForExport(
     lotFiltersFromRequest(request),
-  );
+  ));
 
   const mixed = materialsWithMixedUnits(rows);
   if (mixed.length > 0) return mixedUnitsResponse(mixed);
