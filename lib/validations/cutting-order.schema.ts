@@ -46,6 +46,10 @@ export const cuttingOrderSchema = z.object({
   folderId: optionalCuid,
   description: optionalText,
   reference: optionalText,
+  /* Dos órdenes de compra aparte de `reference`: la del cliente y la
+     interna. Son papeles distintos y cada uno se busca por su número. */
+  clientPo: optionalText,
+  internalPo: optionalText,
   orderedAt: localDate.optional(),
   dueDate: localDate.optional(),
   deliveryPlace: optionalText,
@@ -78,7 +82,6 @@ export const cuttingOrderSchema = z.object({
      promedio real, el porcentaje de retacería y el sobrante se calculan al
      exportar—, porque guardar un promedio junto a los metros de los que sale
      es garantizar que un día se contradigan. */
-  clientPo: optionalText,
   metersDelivered: closingMeters,
   metersSpread: closingMeters,
   smallRemnant: closingMeters,
@@ -94,7 +97,7 @@ export type CuttingOrderLineInput = z.infer<typeof cuttingOrderLineSchema>;
 /**
  * Lo que captura la OTRA PLANTA.
  *
- * Es el mismo esquema de arriba con cinco campos menos, y por eso se deriva de
+ * Es el mismo esquema de arriba con seis campos menos, y por eso se deriva de
  * él en vez de escribirse aparte: el día que se agregue una talla o un campo
  * al pedido, las dos pantallas lo reciben juntas. Copiarlo entero era
  * garantizar que dentro de tres meses dijeran cosas distintas.
@@ -105,10 +108,14 @@ export type CuttingOrderLineInput = z.infer<typeof cuttingOrderLineSchema>;
  *
  * El cierre del corte fuera: son los metros que se miden cuando SE LEVANTA LA
  * MESA, y la mesa está aquí. Allá no tienen cómo saberlos.
+ *
+ * Los dos PO fuera: son los papeles con los que la casa y su cliente le dan
+ * seguimiento al pedido, y allá abajo no los tienen.
  */
 export const plantOrderSchema = cuttingOrderSchema.omit({
   folderId: true,
   clientPo: true,
+  internalPo: true,
   metersDelivered: true,
   metersSpread: true,
   smallRemnant: true,

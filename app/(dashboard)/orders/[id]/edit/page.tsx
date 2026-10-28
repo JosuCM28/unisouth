@@ -45,6 +45,8 @@ export default async function EditOrderPage({ params }: PageProps) {
     folderId: order.folderId,
     description: order.description,
     reference: order.reference,
+    clientPo: order.clientPo,
+    internalPo: order.internalPo,
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
     deliveryPlace: order.deliveryPlace,
@@ -57,7 +59,6 @@ export default async function EditOrderPage({ params }: PageProps) {
       cutNotes: order.cutNotes,
     },
     cutClosing: {
-      clientPo: order.clientPo ?? "",
       /* Los Decimal se pasan a texto aquí: el formulario es un Client
          Component y un Decimal de Prisma no cruza esa frontera. */
       metersDelivered: order.metersDelivered?.toString() ?? "",

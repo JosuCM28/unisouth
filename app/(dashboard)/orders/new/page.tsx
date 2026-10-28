@@ -137,6 +137,9 @@ async function loadTemplate(id: string) {
        y dos órdenes distintas diciendo ser el mismo papel es exactamente el
        enredo que después nadie puede desatar. */
     reference: null,
+    // Los dos PO tampoco: son papeles de AQUEL pedido, igual que la referencia.
+    clientPo: null,
+    internalPo: null,
     // Se pide HOY, no el día de la original.
     orderedAt: todayInputValue(),
     // La fecha de entrega es de aquel compromiso, no de éste.

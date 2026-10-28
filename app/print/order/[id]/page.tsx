@@ -84,6 +84,8 @@ export default async function PrintOrderPage({ params }: PageProps) {
         <Field label="Cliente" value={order.client?.name ?? "Fábrica"} />
         <Field label="Descripción" value={order.description} />
         <Field label="Orden del cliente" value={order.reference} />
+        <Field label="PO cliente" value={order.clientPo} />
+        <Field label="PO interna" value={order.internalPo} />
         <Field
           label="Entrega"
           value={order.dueDate ? formatDate(order.dueDate) : null}

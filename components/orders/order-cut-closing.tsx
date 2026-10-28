@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 
 /** Lo que se mide cuando la mesa termina el corte. */
 export interface OrderCutClosingDraft {
-  clientPo: string;
   metersDelivered: string;
   metersSpread: string;
   smallRemnant: string;
@@ -13,7 +12,6 @@ export interface OrderCutClosingDraft {
 
 /** Cierre en blanco: el estado de una orden que todavía no se corta. */
 export const EMPTY_ORDER_CUT_CLOSING: OrderCutClosingDraft = {
-  clientPo: "",
   metersDelivered: "",
   metersSpread: "",
   smallRemnant: "",
@@ -33,7 +31,10 @@ interface Props {
  * lado: es el insumo del reporte. Mezclarlos en un solo bloque obligaría a
  * abrir la orden con cuatro campos que nadie puede contestar todavía.
  *
- * Sólo se capturan los CUATRO datos crudos. El excedente, el promedio real,
+ * El PO del cliente ya no vive aquí: se conoce al tomar el pedido, no al
+ * levantar la mesa, y se captura en "Detalles del pedido".
+ *
+ * Sólo se capturan los TRES metrajes crudos. El excedente, el promedio real,
  * el porcentaje de retacería y el sobrante salen de estos al exportar: pedir
  * un promedio a mano junto a los metros de los que sale es invitar a que un
  * día se contradigan y a que nadie sepa cuál de los dos creer.
@@ -45,17 +46,6 @@ export function OrderCutClosing({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="order-client-po">PO del cliente</Label>
-        <Input
-          id="order-client-po"
-          placeholder="Opcional"
-          value={value.clientPo}
-          onChange={(event) => patch({ clientPo: event.target.value })}
-          className="touch-target"
-        />
-      </div>
-
       {/* Los tres metrajes van juntos y en decimal: se capturan de corrido
           leyendo la misma hoja de la mesa. */}
       <div className="grid gap-4 md:grid-cols-3">

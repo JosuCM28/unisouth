@@ -237,6 +237,15 @@ function orderHeaderRows(orders: Order[]): SheetRow[] {
     [],
     labelled("Orden", (order) => order.code),
     labelled("O.C. del cliente", (order) => order.reference ?? "—"),
+    /* Los dos PO, por la misma razón que "Planta": sólo cuando alguna orden
+       del pedido lo trae. Dos renglones de guiones gastan el alto que la hoja
+       necesita para caber en una página. */
+    ...(orders.some((order) => order.clientPo)
+      ? [labelled("PO cliente", (order) => order.clientPo ?? "—")]
+      : []),
+    ...(orders.some((order) => order.internalPo)
+      ? [labelled("PO interna", (order) => order.internalPo ?? "—")]
+      : []),
     labelled("Prenda", (order) => order.description ?? "—"),
     labelled(
       "Tela",

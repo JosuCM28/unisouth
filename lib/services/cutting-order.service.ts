@@ -89,13 +89,14 @@ export class CuttingOrderService extends BaseService {
     return this.createOrder(
       {
         ...input,
-        /* Los cinco campos que el formulario de planta no captura, dichos en
+        /* Los seis campos que el formulario de planta no captura, dichos en
            voz alta. El tipo los exige presentes aunque valgan `undefined`, y
            eso resulta ser lo correcto: si mañana se agrega un campo de la
            casa, esto deja de compilar y obliga a decidir qué hace la otra
            planta con él, en vez de heredarlo en silencio. */
         folderId: undefined,
         clientPo: undefined,
+        internalPo: undefined,
         metersDelivered: undefined,
         metersSpread: undefined,
         smallRemnant: undefined,
@@ -132,6 +133,8 @@ export class CuttingOrderService extends BaseService {
           folderId: input.folderId,
           description: input.description,
           reference: input.reference,
+          clientPo: input.clientPo,
+          internalPo: input.internalPo,
           orderedAt: input.orderedAt ?? new Date(),
           dueDate: input.dueDate,
           deliveryPlace: input.deliveryPlace,
@@ -141,7 +144,6 @@ export class CuttingOrderService extends BaseService {
           cutVersion: input.cutVersion,
           cutVersionNotes: input.cutVersionNotes,
           cutNotes: input.cutNotes,
-          clientPo: input.clientPo,
           metersDelivered: input.metersDelivered,
           metersSpread: input.metersSpread,
           smallRemnant: input.smallRemnant,
@@ -195,6 +197,7 @@ export class CuttingOrderService extends BaseService {
         code: true,
         folderId: true,
         clientPo: true,
+        internalPo: true,
         metersDelivered: true,
         metersSpread: true,
         smallRemnant: true,
@@ -212,6 +215,7 @@ export class CuttingOrderService extends BaseService {
       ...input,
       folderId: current.folderId ?? undefined,
       clientPo: current.clientPo ?? undefined,
+      internalPo: current.internalPo ?? undefined,
       metersDelivered: decimalToNumber(current.metersDelivered),
       metersSpread: decimalToNumber(current.metersSpread),
       smallRemnant: decimalToNumber(current.smallRemnant),
@@ -417,6 +421,8 @@ export class CuttingOrderService extends BaseService {
           folderId: input.folderId ?? null,
           description: input.description ?? null,
           reference: input.reference ?? null,
+          clientPo: input.clientPo ?? null,
+          internalPo: input.internalPo ?? null,
           orderedAt: input.orderedAt ?? current.orderedAt,
           dueDate: input.dueDate ?? null,
           deliveryPlace: input.deliveryPlace ?? null,
@@ -429,11 +435,10 @@ export class CuttingOrderService extends BaseService {
           cutVersion: input.cutVersion ?? null,
           cutVersionNotes: input.cutVersionNotes ?? null,
           cutNotes: input.cutNotes,
-          /* El cierre del corte, con el mismo `?? null`: estos cuatro se
+          /* El cierre del corte, con el mismo `?? null`: estos tres se
              capturan en pasadas distintas —la orden se da de alta hoy y los
              metros se miden cuando la mesa termina— y borrar un metraje mal
              tecleado tiene que poder deshacerse dejando el campo vacío. */
-          clientPo: input.clientPo ?? null,
           metersDelivered: input.metersDelivered ?? null,
           metersSpread: input.metersSpread ?? null,
           smallRemnant: input.smallRemnant ?? null,

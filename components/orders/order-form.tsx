@@ -74,6 +74,8 @@ export interface EditableOrder {
   folderId: string | null;
   description: string | null;
   reference: string | null;
+  clientPo: string | null;
+  internalPo: string | null;
   orderedAt: string;
   dueDate: string | null;
   deliveryPlace: string | null;
@@ -160,6 +162,8 @@ export function OrderForm({
   );
   const [description, setDescription] = useState(order?.description ?? "");
   const [reference, setReference] = useState(order?.reference ?? "");
+  const [clientPo, setClientPo] = useState(order?.clientPo ?? "");
+  const [internalPo, setInternalPo] = useState(order?.internalPo ?? "");
   const [orderedAt, setOrderedAt] = useState(
     order?.orderedAt ?? todayInputValue(),
   );
@@ -189,6 +193,8 @@ export function OrderForm({
       productionRunId: order?.productionRunId ?? "",
       description: order?.description ?? "",
       reference: order?.reference ?? "",
+      clientPo: order?.clientPo ?? "",
+      internalPo: order?.internalPo ?? "",
       orderedAt: order?.orderedAt ?? todayInputValue(),
       dueDate: order?.dueDate ?? defaults?.dueDate ?? "",
       deliveryPlace: order?.deliveryPlace ?? "",
@@ -260,6 +266,8 @@ export function OrderForm({
       productionRunId,
       description,
       reference,
+      clientPo,
+      internalPo,
       orderedAt,
       dueDate,
       deliveryPlace,
@@ -297,7 +305,8 @@ export function OrderForm({
       cutVersion: cutHeader.cutVersion || undefined,
       cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
-      clientPo: cutClosing.clientPo || undefined,
+      clientPo: clientPo || undefined,
+      internalPo: internalPo || undefined,
       /* Van como texto: Zod los convierte. Mandar `Number("")` desde aquí
          daría 0, y un cero capturado no es lo mismo que un campo vacío —el
          reporte sacaría un promedio real de una mesa que nadie ha medido. */
@@ -584,6 +593,35 @@ export function OrderForm({
               />
             </div>
 
+            {/* Los dos PO no se pintan en modo planta, igual que el cierre:
+                son los papeles con los que la casa y su cliente le dan
+                seguimiento al pedido, y allá abajo no los tienen. */}
+            {!isPlant && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="order-client-po">PO CLIENTE</Label>
+                  <Input
+                    id="order-client-po"
+                    placeholder="Opcional"
+                    value={clientPo}
+                    onChange={(event) => setClientPo(event.target.value)}
+                    className="touch-target"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="order-internal-po">PO INTERNA</Label>
+                  <Input
+                    id="order-internal-po"
+                    placeholder="Opcional"
+                    value={internalPo}
+                    onChange={(event) => setInternalPo(event.target.value)}
+                    className="touch-target"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="order-date">Fecha del pedido</Label>
@@ -704,6 +742,8 @@ function snapshot(state: {
   productionRunId: string;
   description: string;
   reference: string;
+  clientPo: string;
+  internalPo: string;
   orderedAt: string;
   dueDate: string;
   deliveryPlace: string;

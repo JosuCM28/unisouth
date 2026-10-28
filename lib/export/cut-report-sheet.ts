@@ -62,12 +62,15 @@ interface ReportColumn {
   trafficLight?: boolean;
 }
 
-/** Las diecinueve columnas, en el orden y con los anchos del formato. */
+/** Las veinte columnas, en el orden y con los anchos del formato. */
 const COLUMNS: ReportColumn[] = [
   { header: "FECHA DE CORTE", width: 10.86, kind: "date" },
   { header: "DIAS", width: 12, kind: "plain" },
   { header: "NO. ORDEN", width: 14.86, kind: "plain" },
   { header: "PO DEL CLIENTE", width: 13.57, kind: "plain" },
+  /* La orden de compra interna, junto a la del cliente: las dos se buscan
+     igual, por número, y separarlas obligaría a brincar columnas. */
+  { header: "PO INTERNA", width: 13.57, kind: "plain" },
   { header: "CLIENTE", width: 19.14, kind: "plain" },
   { header: "STATUS", width: 19.14, kind: "plain", cream: true, creamBody: true },
   { header: "TIPO DE TELA -COLOR", width: 24.57, kind: "plain" },
@@ -103,7 +106,7 @@ const COLUMNS: ReportColumn[] = [
 /** Cuántas columnas lleva la hoja. Lo usa la ruta para armar cada fila. */
 export const CUT_REPORT_COLUMN_COUNT = COLUMNS.length;
 
-/** Una fila ya resuelta: diecinueve valores en el orden de las columnas. */
+/** Una fila ya resuelta: veinte valores en el orden de las columnas. */
 export type ReportCell = string | number | Date | null;
 export type ReportRow = ReportCell[];
 

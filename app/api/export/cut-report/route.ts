@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     });
 
     /* El orden ES el de las columnas de la hoja. Va como arreglo y no como
-       objeto porque la hoja es un formato fijo: son las mismas diecinueve
+       objeto porque la hoja es un formato fijo: son las mismas veinte
        casillas, siempre en el mismo lugar, y nombrarlas aquí invitaría a
        reordenarlas de un lado sin acordarse del otro. */
     return [
@@ -89,6 +89,7 @@ export async function GET(request: Request) {
          va vacía, porque es por la que se busca la fila en la hoja. */
       order.reference ?? order.code,
       order.clientPo,
+      order.internalPo,
       order.client?.name ?? "Fábrica",
       CUTTING_ORDER_STATUS_LABELS[order.status],
       fabricName(order),

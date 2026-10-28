@@ -30,6 +30,8 @@ interface Row {
   client: string;
   description: string;
   reference: string;
+  clientPo: string;
+  internalPo: string;
   material: string;
   orderedAt: Date;
   dueDate: Date | null;
@@ -48,6 +50,8 @@ const COLUMNS: XlsxColumn<Row>[] = [
   { header: "Cliente", value: (r) => r.client, width: 22 },
   { header: "Descripción", value: (r) => r.description, width: 28 },
   { header: "Orden del cliente", value: (r) => r.reference },
+  { header: "PO cliente", value: (r) => r.clientPo },
+  { header: "PO interna", value: (r) => r.internalPo },
   { header: "Material", value: (r) => r.material, width: 28 },
   { header: "Pedido el", value: (r) => r.orderedAt, kind: "date" },
   { header: "Entrega", value: (r) => r.dueDate, kind: "date" },
@@ -124,6 +128,8 @@ export async function GET(request: Request) {
       client: order.client?.name ?? "Fábrica",
       description: order.description ?? "",
       reference: order.reference ?? "",
+      clientPo: order.clientPo ?? "",
+      internalPo: order.internalPo ?? "",
       material: order.material
         ? `${order.material.code} · ${order.material.name}`
         : "",

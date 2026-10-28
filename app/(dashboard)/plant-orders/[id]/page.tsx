@@ -94,6 +94,9 @@ export default async function PlantOrderPage({ params }: PageProps) {
     folderId: order.folderId,
     description: order.description,
     reference: order.reference,
+    // Los PO no se pintan en esta variante; el servicio conserva los de la base.
+    clientPo: null,
+    internalPo: null,
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
     deliveryPlace: order.deliveryPlace,
