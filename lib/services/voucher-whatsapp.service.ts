@@ -137,20 +137,27 @@ function requireClient(): EvolutionClient {
 /**
  * El texto que acompaña al PDF en el chat.
  *
- * Lo que se lee sin abrir el archivo: qué es, de qué orden y cuántas prendas.
- * Con eso quien lo recibe sabe si le toca antes de descargarlo.
+ * Lo que se lee sin abrir el archivo: qué es, de qué orden, qué prenda, en
+ * qué tela y cuántas prendas. Con eso quien lo recibe sabe si le toca antes
+ * de descargarlo. Lo que la hoja no trae se omite en vez de dejar el renglón
+ * vacío.
  */
 function captionOf(sheet: VoucherSheet): string {
-  const order = sheet.header.find((field) => field.label === "Orden");
   const lines = [`*${sheet.title} ${sheet.code}*`];
 
-  if (order) lines.push(`Orden: ${order.value}`);
+  for (const label of CAPTION_DETAILS) {
+    const field = sheet.header.find((item) => item.label === label);
+    if (field) lines.push(`${field.label}: ${field.value}`);
+  }
   if (sheet.cutRows.length > 0) {
     lines.push(`Total de cortes entregados: ${sheet.cutTotals.pieces}`);
   }
 
   return lines.join("\n");
 }
+
+/** Los campos del encabezado que se suman al mensaje, en este orden. */
+const CAPTION_DETAILS = ["Orden", "Descripción", "Tela"] as const;
 
 /**
  * El motivo de un fallo, para quien envió.
