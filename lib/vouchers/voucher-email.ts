@@ -21,9 +21,19 @@ export function voucherEmailSubject(sheet: VoucherSheet): string {
     return value ? [value] : [];
   });
 
-  return [`SALIDA DE CORTE ${orderOf(sheet) ?? sheet.code}`, ...details].join(
+  return [`${subjectPrefix(sheet)} ${orderOf(sheet) ?? sheet.code}`, ...details].join(
     " - ",
   );
+}
+
+/**
+ * Un vale cancelado avisa desde el asunto: en la bandeja queda junto al
+ * correo original con la misma orden, y tiene que leerse cuál de los dos
+ * manda sin abrir ninguno.
+ */
+function subjectPrefix(sheet: VoucherSheet): string {
+  if (sheet.cancellation) return "CANCELACIÓN DE SALIDA DE CORTE";
+  return "SALIDA DE CORTE";
 }
 
 /** Los campos del encabezado que se suman al asunto, en este orden. */
@@ -39,6 +49,7 @@ const SUBJECT_DETAILS = ["Empresa", "Descripción", "Tela"] as const;
 export function voucherEmailText(sheet: VoucherSheet): string {
   const blocks = [
     [voucherEmailSubject(sheet)],
+    section("ESTE VALE QUEDÓ CANCELADO", cancellationOf(sheet)),
     lines([
       { label: "Folio", value: sheet.code },
       { label: "Fecha", value: formatDate(sheet.date) },
@@ -58,6 +69,18 @@ export function voucherEmailText(sheet: VoucherSheet): string {
     .filter((block) => block.length > 0)
     .map((block) => block.join("\n"))
     .join("\n\n");
+}
+
+/** Cuándo, quién y por qué. Vacío si el vale sigue en pie. */
+export function cancellationOf(sheet: VoucherSheet): string[] {
+  const { cancellation } = sheet;
+  if (!cancellation) return [];
+
+  return lines([
+    { label: "Fecha", value: formatDate(cancellation.at) },
+    { label: "Canceló", value: cancellation.by ?? "" },
+    { label: "Motivo", value: cancellation.reason ?? "" },
+  ].filter((field) => field.value !== ""));
 }
 
 function orderOf(sheet: VoucherSheet): string | null {

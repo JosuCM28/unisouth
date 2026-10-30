@@ -6,7 +6,9 @@ import {
   View,
   renderToBuffer,
 } from "@react-pdf/renderer";
+import { formatDate } from "@/lib/utils";
 import type {
+  VoucherCancellation,
   VoucherField,
   VoucherSheet,
   VoucherTag,
@@ -31,6 +33,7 @@ export async function renderVoucherPdf(sheet: VoucherSheet): Promise<Buffer> {
 const BORDER = "#000000";
 const HEADER_FILL = "#e5e5e5";
 const TOTAL_FILL = "#f5f5f5";
+const CANCEL_RED = "#dc2626";
 
 const styles = StyleSheet.create({
   page: {
@@ -86,6 +89,28 @@ const styles = StyleSheet.create({
   signatures: { marginTop: 40, flexDirection: "row", justifyContent: "space-between" },
   signature: { width: "45%", alignItems: "center", fontSize: 9 },
   line: { width: "100%", borderBottomWidth: 1, borderBottomColor: BORDER },
+  cancelBox: {
+    marginTop: 8,
+    borderWidth: 2,
+    borderColor: CANCEL_RED,
+    padding: 6,
+    color: CANCEL_RED,
+  },
+  /* Cruzado sobre la hoja y semitransparente: tapa lo bastante para que
+     nadie lo surta por error, pero las tallas se siguen leyendo para
+     saber QUÉ se canceló. */
+  stamp: {
+    position: "absolute",
+    top: 330,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 96,
+    fontFamily: "Helvetica-Bold",
+    color: CANCEL_RED,
+    opacity: 0.25,
+    transform: "rotate(-30deg)",
+  },
 });
 
 /**
@@ -127,6 +152,10 @@ function VoucherPdf({ sheet }: { sheet: VoucherSheet }) {
           </View>
         </View>
 
+        {sheet.cancellation && (
+          <CancellationNotice cancellation={sheet.cancellation} />
+        )}
+
         {sheet.header.length > 0 && (
           <View style={[styles.box, styles.grid]}>
             <Fields fields={sheet.header} />
@@ -162,6 +191,14 @@ function VoucherPdf({ sheet }: { sheet: VoucherSheet }) {
           <Signature label="Entrega" name={sheet.handedOverBy} />
           <Signature label="Recibe" name={sheet.receivedBy} />
         </View>
+
+        {/* Al final para quedar ENCIMA de las tablas, y `fixed` para salir en
+            cada hoja: una página suelta del vale tampoco debe parecer válida. */}
+        {sheet.cancellation && (
+          <Text style={styles.stamp} fixed>
+            CANCELADO
+          </Text>
+        )}
       </Page>
     </Document>
   );
@@ -277,6 +314,25 @@ function TagCell({ tag }: { tag: VoucherTag | null }) {
       style={[styles.cell, { width: CUT_COLUMNS.tag, backgroundColor: tag.background }]}
     >
       <Text style={[styles.center, { color: tag.text }]}>{tag.name}</Text>
+    </View>
+  );
+}
+
+/** Arriba de todo: lo primero que se lee es que este vale ya no vale. */
+function CancellationNotice({
+  cancellation,
+}: {
+  cancellation: VoucherCancellation;
+}) {
+  const who = cancellation.by ? ` por ${cancellation.by}` : "";
+
+  return (
+    <View style={styles.cancelBox}>
+      <Text style={styles.bold}>
+        VALE CANCELADO el {formatDate(cancellation.at)}
+        {who}
+      </Text>
+      {cancellation.reason && <Text>Motivo: {cancellation.reason}</Text>}
     </View>
   );
 }

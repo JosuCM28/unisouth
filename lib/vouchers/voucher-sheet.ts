@@ -23,6 +23,7 @@ import { contrastText, formatQuantity } from "@/lib/utils";
 /** Lo que hay que leer de la base para armar la hoja. */
 export const VOUCHER_SHEET_INCLUDE = {
   createdBy: { select: { name: true } },
+  cancelledBy: { select: { name: true } },
   productionRun: { select: { code: true, name: true } },
   // La empresa dueña se lee del vale, no de los rollos: una salida de puros
   // cortes no lleva rollos de los que deducirla.
@@ -81,6 +82,18 @@ export interface VoucherRollRow {
   quantity: string;
 }
 
+/**
+ * Quién canceló el vale, cuándo y por qué. Null mientras siga en pie.
+ *
+ * Va en la hoja y no sólo en el aviso porque el PDF cancelado viaja solo:
+ * reenviado en un chat, tiene que decir por sí mismo que ya no vale.
+ */
+export interface VoucherCancellation {
+  at: Date;
+  by: string | null;
+  reason: string | null;
+}
+
 /** Un dato del encabezado: "Empresa: Tamsa". */
 export interface VoucherField {
   label: string;
@@ -107,6 +120,7 @@ export interface VoucherSheet {
   notes: string | null;
   handedOverBy: string | null;
   receivedBy: string | null;
+  cancellation: VoucherCancellation | null;
 }
 
 /** Del documento leído a la hoja que se dibuja. Función pura. */
@@ -136,6 +150,18 @@ export function toVoucherSheet(document: VoucherDocument): VoucherSheet {
     notes: document.notes,
     handedOverBy: document.handedOverBy,
     receivedBy: document.receivedBy,
+    cancellation: cancellationOf(document),
+  };
+}
+
+function cancellationOf(document: VoucherDocument): VoucherCancellation | null {
+  if (document.status !== "CANCELLED") return null;
+
+  return {
+    // Un cancelado sin fecha guardada cae en la del vale.
+    at: document.cancelledAt ?? document.date,
+    by: document.cancelledBy?.name ?? null,
+    reason: document.cancellationReason,
   };
 }
 

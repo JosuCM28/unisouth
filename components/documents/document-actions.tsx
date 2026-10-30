@@ -17,9 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ApplyIssueDialog } from "./apply-issue-dialog";
+import { CancellationDeliveryDialog } from "./cancellation-delivery-dialog";
 import { ResendVoucherDialog } from "./resend-voucher-dialog";
 import {
   anyChannelEnabled,
+  canDeliver,
   type VoucherDeliveryOptions,
 } from "./voucher-delivery";
 
@@ -65,6 +67,9 @@ export function DocumentActions({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [notice, setNotice] = useState<{ id: string; code: string } | null>(
+    null,
+  );
 
   /**
    * Aplica el vale SIN refrescar la pantalla. Devuelve si se aplicó.
@@ -138,6 +143,18 @@ export function DocumentActions({
     toast.success("Documento cancelado con movimientos inversos");
     setCancelOpen(false);
     setReason("");
+
+    /* El refresco espera al aviso por la misma razón que al aplicar: si
+       llegara antes, la pantalla se repintaría a media pregunta. */
+    if (delivery && canDeliver(delivery)) {
+      setNotice({ id: documentId, code: documentCode });
+      return;
+    }
+    router.refresh();
+  }
+
+  function handleNoticeClose() {
+    setNotice(null);
     router.refresh();
   }
 
@@ -257,6 +274,14 @@ export function DocumentActions({
             </Button>
           </div>
         </ResponsiveFormDialog>
+      )}
+
+      {delivery && (
+        <CancellationDeliveryDialog
+          voucher={notice}
+          delivery={delivery}
+          onClose={handleNoticeClose}
+        />
       )}
     </div>
   );

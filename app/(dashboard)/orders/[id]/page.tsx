@@ -15,6 +15,7 @@ import { storageIsWritable } from "@/lib/core/storage";
 import { OrderPhotos } from "@/components/orders/order-photos";
 import { OrderTechSheets } from "@/components/orders/order-tech-sheets";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { loadVoucherDeliveryOptions } from "@/lib/vouchers/voucher-delivery-options";
 import { sumBundlePieces } from "@/lib/bundles";
 import {
   CUT_VERSION_LABELS,
@@ -119,6 +120,11 @@ export default async function OrderDetailPage({
   const canOpenDocuments = user
     ? roleHasPermission(user.role, "inventory:browse")
     : false;
+  /* Cancelar el vale aplicado de un envío que se borra regresa inventario:
+     pide la misma llave que cancelarlo desde Salidas. */
+  const canCancelVouchers = user
+    ? roleHasPermission(user.role, "inventory:adjust")
+    : false;
 
   const order = await prisma.cuttingOrder.findUnique({
     where: { id },
@@ -192,6 +198,7 @@ export default async function OrderDetailPage({
     files,
     storageReady,
     fabricDocuments,
+    delivery,
   ] = await Promise.all([
     new GarmentShipmentService().balances(id),
     prisma.garmentShipment.findMany({
@@ -289,6 +296,9 @@ export default async function OrderDetailPage({
     storageIsWritable(),
     // La tela que se le sacó a la orden y la que regresó.
     new OrderFabricRepository().documentsOfOrder(id),
+    /* Por dónde se avisa la cancelación del vale al borrar un envío. Sólo
+       a quien puede borrarlo: los demás no tienen botón que lo use. */
+    canWrite ? loadVoucherDeliveryOptions() : null,
   ]);
 
   /* Se reparten por tipo. Sin esto, un PDF caía en la galería de fotos y se
@@ -311,6 +321,7 @@ export default async function OrderDetailPage({
           id: shipment.document.id,
           code: shipment.document.code,
           isDraft: shipment.document.status === "DRAFT",
+          isCancelled: shipment.document.status === "CANCELLED",
         }
       : null,
     lines: shipment.lines.map((line) => ({
@@ -818,6 +829,8 @@ export default async function OrderDetailPage({
             shipments={shipmentViews}
             canWrite={canWrite}
             canOpenDocuments={canOpenDocuments}
+            canCancelVouchers={canCancelVouchers}
+            delivery={delivery}
           />
         </section>
       )}

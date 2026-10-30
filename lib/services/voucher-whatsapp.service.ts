@@ -5,6 +5,7 @@ import {
   type WhatsappRecipient,
 } from "@/lib/repositories/whatsapp-contact.repository";
 import type { SendVoucherWhatsappInput } from "@/lib/validations/whatsapp.schema";
+import { cancellationOf } from "@/lib/vouchers/voucher-email";
 import { renderVoucherPdf } from "@/lib/vouchers/voucher-pdf";
 import {
   voucherFileName,
@@ -143,7 +144,8 @@ function requireClient(): EvolutionClient {
  * vacío.
  */
 function captionOf(sheet: VoucherSheet): string {
-  const lines = [`*${sheet.title} ${sheet.code}*`];
+  const lines = [`*${titleOf(sheet)}*`];
+  if (sheet.cancellation) lines.push(...cancellationOf(sheet), "");
 
   for (const label of CAPTION_DETAILS) {
     const field = sheet.header.find((item) => item.label === label);
@@ -154,6 +156,15 @@ function captionOf(sheet: VoucherSheet): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * El renglón en negritas. Un cancelado lo dice ahí, primero: en el chat
+ * queda debajo del vale original, y quien lee de pasada sólo ve éste.
+ */
+function titleOf(sheet: VoucherSheet): string {
+  const title = `${sheet.title} ${sheet.code}`;
+  return sheet.cancellation ? `CANCELADO · ${title}` : title;
 }
 
 /** Los campos del encabezado que se suman al mensaje, en este orden. */

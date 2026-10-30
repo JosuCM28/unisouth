@@ -16,6 +16,7 @@ import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
 import { CutTagChip } from "./size-note";
 import { ShipmentDeleteButton } from "./shipment-delete-button";
+import type { VoucherDeliveryOptions } from "@/components/documents/voucher-delivery";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,12 @@ export interface ShipmentView {
   reference: string | null;
   parts: string | null;
   /** El vale de salida que generó, para ir a imprimirlo o aplicarlo. */
-  document: { id: string; code: string; isDraft: boolean } | null;
+  document: {
+    id: string;
+    code: string;
+    isDraft: boolean;
+    isCancelled: boolean;
+  } | null;
   lines: ShipmentLineView[];
 }
 
@@ -61,12 +67,18 @@ export function OrderShipments({
   shipments,
   canWrite = false,
   canOpenDocuments = false,
+  canCancelVouchers = false,
+  delivery = null,
 }: {
   shipments: ShipmentView[];
   /** Si se ofrece capturar retornos y borrar envíos. Por omisión no. */
   canWrite?: boolean;
   /** Si el folio del vale lleva a Documentos. Pide `inventory:browse`. */
   canOpenDocuments?: boolean;
+  /** Si al borrar un envío se ofrece cancelar su vale aplicado. */
+  canCancelVouchers?: boolean;
+  /** Canales para avisar la cancelación del vale. */
+  delivery?: VoucherDeliveryOptions | null;
 }) {
   if (shipments.length === 0) {
     return (
@@ -136,14 +148,9 @@ export function OrderShipments({
                   shipmentCode={shipment.code}
                   sentQuantity={totalSent}
                   hasReturns={shipmentHasReturns}
-                  voucher={
-                    shipment.document
-                      ? {
-                          code: shipment.document.code,
-                          isDraft: shipment.document.isDraft,
-                        }
-                      : null
-                  }
+                  voucher={shipment.document}
+                  delivery={delivery}
+                  canCancelVoucher={canCancelVouchers}
                 />
               )}
             </div>
