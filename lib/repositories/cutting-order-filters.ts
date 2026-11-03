@@ -123,6 +123,9 @@ export function cuttingOrderWhere(
         OR: [
           { code: contains },
           { reference: contains },
+          // La PO del cliente: puede traer varios números en el mismo campo,
+          // y `contains` encuentra cualquiera de ellos.
+          { clientPo: contains },
           { description: contains },
           { notes: contains },
           { cutFabricText: contains },

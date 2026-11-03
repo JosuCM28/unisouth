@@ -175,7 +175,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           rápido teclear el folio o la prenda que ir acotando por cliente y
           fecha hasta dar con ella. */}
       <SearchInput
-        placeholder="Folio, orden del cliente, prenda, tela, pedido…"
+        placeholder="Folio, PO u orden del cliente, prenda, tela, pedido…"
         className="w-full md:max-w-sm"
       />
 
@@ -243,6 +243,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
               showFolder={isSearching}
               isFiltered={hasFilters}
               canWrite={canWrite}
+              columnsKey="orders"
             />
           </section>
         )

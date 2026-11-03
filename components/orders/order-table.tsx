@@ -7,9 +7,14 @@ import {
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
 import { cn, cutTotals, formatDate } from "@/lib/utils";
+import { ColumnPicker } from "@/components/shared/column-picker";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { usePageParam } from "@/components/shared/use-page-param";
+import {
+  useColumnVisibility,
+  type ColumnVisibility,
+} from "@/components/shared/use-column-visibility";
 import { OrderDeleteButton } from "./order-delete-button";
 import {
   OrderListItem,
@@ -27,6 +32,12 @@ export interface OrderTableRow extends OrderListEntry {
    * todas las órdenes de la pantalla son del mismo.
    */
   folderName: string | null;
+  /**
+   * La orden de compra del cliente. Puede traer varios números separados por
+   * coma, tal como se capturaron. Opcional porque sólo la lista general la
+   * pinta.
+   */
+  clientPo?: string | null;
 }
 
 /** La página que sirvió Postgres, cuando la lista viene recortada de la base. */
@@ -77,7 +88,28 @@ interface Props {
   canWrite?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * Presente = la tabla deja elegir columnas y recuerda la elección con esta
+   * llave. También es lo que agrega la columna de PO del cliente: sin el
+   * selector nacería escondida y nadie podría prenderla.
+   */
+  columnsKey?: string;
 }
+
+/**
+ * Lo que se ve antes de que el usuario toque nada.
+ *
+ * La PO del cliente arranca escondida: sólo algunos clientes la manejan y en
+ * el resto sería una columna de guiones. Constante de módulo y no literal en
+ * el render para que el `useMemo` del gancho no se recalcule cada vez.
+ */
+const DEFAULT_VISIBILITY: ColumnVisibility = { clientPo: false };
+
+/**
+ * Columnas que no se ofrecen en el selector. El folio es el enlace a la orden
+ * —sin él no hay cómo abrirla— y la de borrar no tiene encabezado que elegir.
+ */
+const LOCKED_COLUMNS = new Set(["code", "actions"]);
 
 /**
  * Las órdenes de corte en tabla.
@@ -105,11 +137,31 @@ export function OrderTable({
   canWrite = false,
   emptyTitle,
   emptyDescription,
+  columnsKey,
 }: Props) {
   const { onPageChange, onLoadMore, onPageSizeChange } = usePageParam();
+  const { visibility, setVisible } = useColumnVisibility(
+    columnsKey ?? "orders",
+    DEFAULT_VISIBILITY,
+  );
 
-  const columns: DataTableColumn<OrderTableRow>[] = [
+  const allColumns: DataTableColumn<OrderTableRow>[] = [
+    /* Primera columna cuando se prende: quien la busca trae el número de la
+       PO en la mano y lo quiere leer antes que el folio de acá. */
+    ...(columnsKey
+      ? [
+          {
+            id: "clientPo",
+            header: "PO cliente",
+            accessorFn: (order: OrderTableRow) => order.clientPo ?? "",
+            cell: ({ row }: { row: { original: OrderTableRow } }) => (
+              <span className="tabular">{row.original.clientPo ?? "—"}</span>
+            ),
+          } satisfies DataTableColumn<OrderTableRow>,
+        ]
+      : []),
     {
+      id: "code",
       accessorKey: "code",
       header: "Folio",
       cell: ({ row }) => (
@@ -278,7 +330,16 @@ export function OrderTable({
       : []),
   ];
 
-  return (
+  const pickable = allColumns.flatMap((column) => {
+    const id = column.id ?? "";
+    if (LOCKED_COLUMNS.has(id) || typeof column.header !== "string") return [];
+    return [{ id, label: column.header }];
+  });
+  const columns = columnsKey
+    ? allColumns.filter((column) => visibility[column.id ?? ""] !== false)
+    : allColumns;
+
+  const table = (
     <DataTable
       columns={columns}
       data={orders}
@@ -313,6 +374,23 @@ export function OrderTable({
         />
       )}
     />
+  );
+
+  if (!columnsKey) return table;
+
+  /* El selector sólo existe desde `md:`: en celular se pintan tarjetas y no
+     hay columnas que elegir. */
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="hidden justify-end md:flex">
+        <ColumnPicker
+          columns={pickable}
+          visibility={visibility}
+          onChange={setVisible}
+        />
+      </div>
+      {table}
+    </div>
   );
 }
 
