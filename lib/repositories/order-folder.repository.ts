@@ -253,6 +253,7 @@ export class OrderFolderRepository extends BaseRepository<
         productionRunId: true,
         description: true,
         reference: true,
+        clientPo: true,
         notes: true,
         /* El encabezado del corte viaja entero al vale: molde, versión y sus
            notas se supieron al capturar la orden y volver a teclearlos en el

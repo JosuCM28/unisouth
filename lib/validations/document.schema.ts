@@ -50,6 +50,8 @@ export type DocumentCutLineInput = z.infer<typeof documentCutLineSchema>;
  * duplicarlos sólo abre la puerta a que se contradigan.
  */
 export const cutHeaderSchema = z.object({
+  /** Los números de PO del cliente, copiados de la orden que originó el vale. */
+  clientPo: optionalText,
   /** Qué se corta: "Blusa manga larga". */
   cutDescription: optionalText,
   /** La tela del catálogo, cuando está dada de alta. */

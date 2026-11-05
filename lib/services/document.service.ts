@@ -179,6 +179,7 @@ export class DocumentService extends BaseService {
           handedOverBy: source.handedOverBy,
           receivedBy: source.receivedBy,
           notes: source.notes,
+          clientPo: source.clientPo,
           cutDescription: source.cutDescription,
           cutFabricId: source.cutFabricId,
           cutFabricText: source.cutFabricText,
@@ -476,6 +477,7 @@ export class DocumentService extends BaseService {
  */
 function cutHeaderData(input: DocumentInput) {
   return {
+    clientPo: input.clientPo,
     cutDescription: input.cutDescription,
     cutFabricId: input.cutFabricId,
     cutFabricText: input.cutFabricText,

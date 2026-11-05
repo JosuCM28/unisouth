@@ -789,6 +789,11 @@ model InventoryDocument {
   // cover the whole breakdown, and capturing them twice invites them to
   // disagree.
 
+  /// The customer's PO numbers, copied from the order that produced the voucher.
+  /// Copied and not read through a relation: a workshop voucher is deliberately
+  /// not linked by `cuttingOrderId`, and a signed paper must keep saying what it
+  /// said the day it left.
+  clientPo        String?
   /// What is being cut: "Blusa manga larga".
   cutDescription  String?
   /// The fabric off the catalogue, when it is registered.

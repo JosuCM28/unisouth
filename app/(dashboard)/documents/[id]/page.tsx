@@ -155,7 +155,8 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             <HeaderItem label="Empresa" value={document.client?.name} />
             <HeaderItem label="Descripción" value={document.cutDescription} />
             <HeaderItem label="Fecha" value={formatDate(document.date)} />
-            <HeaderItem label="Orden" value={document.reference} />
+            <HeaderItem label="Folio de orden" value={document.reference} />
+            <HeaderItem label="PO cliente" value={document.clientPo} />
             <HeaderItem
               label="Tela"
               value={document.cutFabric?.name ?? document.cutFabricText}

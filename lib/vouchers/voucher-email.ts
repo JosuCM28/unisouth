@@ -84,7 +84,7 @@ export function cancellationOf(sheet: VoucherSheet): string[] {
 }
 
 function orderOf(sheet: VoucherSheet): string | null {
-  return headerValue(sheet, "Orden");
+  return headerValue(sheet, "Folio de orden");
 }
 
 function headerValue(sheet: VoucherSheet, label: string): string | null {

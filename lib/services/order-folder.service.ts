@@ -491,6 +491,7 @@ export class OrderFolderService extends BaseService {
         /* Del encabezado sólo viaja lo que TODAS comparten. Heredar el molde
            de una de cinco órdenes pondría en el papel un dato que es falso
            para las otras cuatro, y ese papel se corta. */
+        clientPo: sharedValue(orders, (o) => o.clientPo),
         cutDescription:
           sharedValue(orders, (o) => o.description) ?? folder.name,
         cutFabricId: sharedValue(orders, (o) => o.materialId),

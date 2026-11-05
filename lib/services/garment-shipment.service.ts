@@ -200,6 +200,7 @@ export class GarmentShipmentService extends BaseService {
       order: {
         code: string;
         reference: string | null;
+        clientPo: string | null;
         clientId: string | null;
         productionRunId: string | null;
         materialId: string | null;
@@ -248,7 +249,7 @@ export class GarmentShipmentService extends BaseService {
       concept: order.description ?? undefined,
       /* El número de orden que se escribió al levantarla —el del papel del
          cliente, el que el taller conoce— y no el folio interno PO-…: en el
-         encabezado del vale el campo se lee "Orden", y un folio que nadie
+         encabezado del vale el campo se lee "Folio de orden", y uno que nadie
          fuera de este sistema reconoce no le dice al taller de qué pedido es.
          El folio queda como respaldo para la orden que se levantó sin número,
          igual que al mandar a salidas. */
@@ -274,6 +275,7 @@ export class GarmentShipmentService extends BaseService {
         tagId: line.tagId,
         notes: line.notes,
       })),
+      clientPo: order.clientPo ?? undefined,
       cutDescription: order.description ?? undefined,
       cutFabricId: order.materialId ?? undefined,
       cutFabricText: order.cutFabricText ?? undefined,

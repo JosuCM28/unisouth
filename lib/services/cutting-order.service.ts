@@ -1170,6 +1170,7 @@ export class CuttingOrderService extends BaseService {
            prenda, el molde y la versión. Antes sólo cruzaban la descripción y
            la tela, y el auxiliar tenía que recapturar el resto en el vale
            mirando el papel de la orden. */
+        clientPo: order.clientPo ?? undefined,
         cutDescription: order.description ?? undefined,
         cutFabricId: order.materialId ?? undefined,
         cutFabricText: order.cutFabricText ?? undefined,

@@ -219,7 +219,8 @@ function headerOf(document: VoucherDocument, hasCuts: boolean): VoucherField[] {
   return fields([
     ["Empresa", company],
     ["Descripción", document.cutDescription],
-    ["Orden", document.reference],
+    ["Folio de orden", document.reference],
+    ["PO cliente", document.clientPo],
     ["Tela", fabric],
     ["Molde", document.cutPattern],
     [

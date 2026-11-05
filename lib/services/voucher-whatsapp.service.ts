@@ -168,7 +168,7 @@ function titleOf(sheet: VoucherSheet): string {
 }
 
 /** Los campos del encabezado que se suman al mensaje, en este orden. */
-const CAPTION_DETAILS = ["Orden", "Descripción", "Tela"] as const;
+const CAPTION_DETAILS = ["Folio de orden", "Descripción", "Tela"] as const;
 
 /**
  * El motivo de un fallo, para quien envió.
