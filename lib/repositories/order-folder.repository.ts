@@ -270,6 +270,8 @@ export class OrderFolderRepository extends BaseRepository<
             sizeId: true,
             tagId: true,
             notes: true,
+            // Con lo pedido se planea el reparto antes del primer corte.
+            orderedQuantity: true,
             size: { select: { code: true, order: true } },
           },
         },

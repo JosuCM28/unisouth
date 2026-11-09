@@ -19,6 +19,34 @@ export interface SplitCut {
    * se RECONSTRUYEN de los pedazos por orden y conviene confirmarlos.
    */
   partial?: boolean;
+  /**
+   * No es un corte: es lo PEDIDO, para planear el reparto antes de cortar.
+   * Sólo se calcula; no se puede mandar porque todavía no hay prendas.
+   */
+  planned?: boolean;
+}
+
+/**
+ * El reparto antes de que exista un corte: lo pedido, talla por talla.
+ *
+ * Va como una sola "corrida" para que el panel la trate igual que un corte, con
+ * un bulto por renglón sólo porque la cuenta lo necesita: nadie ha amarrado
+ * nada, y por eso el panel no enseña esos bultos ni ofrece mandarlos.
+ */
+export function buildPlannedSplitCuts(
+  lines: { orderedQuantity: number; size: { code: string } }[],
+): SplitCut[] {
+  const bundles = lines
+    .filter((line) => line.orderedQuantity > 0)
+    .map((line) => ({
+      sizeCode: line.size.code,
+      pieces: line.orderedQuantity,
+      count: 1,
+    }));
+
+  if (bundles.length === 0) return [];
+
+  return [{ id: "planned", label: "Lo pedido", planned: true, bundles }];
 }
 
 /** La forma mínima que se lee de cada orden. La da `findSendableCuts`. */

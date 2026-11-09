@@ -1,10 +1,11 @@
 /**
- * Reparto de bultos entre dos talleres (p. ej. 40% a uno y 60% a otro).
+ * Reparto de tallas entre dos talleres (p. ej. 40% a uno y 60% a otro).
  *
- * El reparto se hace con los BULTOS tal como se capturaron en el corte: partir
- * un bulto obliga a abrirlo, recontarlo y volver a amarrarlo, y eso es justo lo
- * que el auxiliar quiere evitar. Por eso el resultado no es exacto: es la
- * combinación de bultos enteros que más se acerca al porcentaje.
+ * La unidad es la TALLA completa: todos los bultos de la 32 van al mismo
+ * taller. Partirla obligaría a cada taller a recibir un pedazo de la corrida,
+ * y lo que se quiere es que cada talla se trabaje en un solo lugar. Por eso el
+ * resultado no es exacto: es la combinación de tallas que más se acerca al
+ * porcentaje.
  *
  * Es una función pura y no se guarda: el reparto es una ayuda para decidir qué
  * se carga en cada salida, y guardarlo lo dejaría contradiciendo al corte en
@@ -70,33 +71,26 @@ export interface SplitResult {
   total: number;
   firstPieces: number;
   secondPieces: number;
-  /** Lo que le tocaría al primer lado si se pudiera partir un bulto. */
+  /** Lo que le tocaría al primer lado si se pudiera partir una talla. */
   firstTarget: number;
   /** Piezas de más (+) o de menos (−) del primer lado contra su objetivo. */
   deviation: number;
 }
 
 /**
- * Topes de las tablas de programación dinámica. Con bultos de decenas de
- * piezas nunca se acercan; existen para que un corte absurdo no congele el
- * navegador, y por encima de ellos se cae a un reparto aproximado.
+ * Tope de la tabla de programación dinámica. Con cortes reales nunca se acerca;
+ * existe para que uno absurdo no congele el navegador, y por encima de él se
+ * cae a un reparto aproximado.
  */
-const MAX_DP_CELLS = 4_000_000;
 const MAX_COMBINE_STEPS = 40_000_000;
 
 /**
- * Reparte los bultos: `firstPercent` % al primer lado, el resto al segundo.
+ * Reparte las tallas: `firstPercent` % al primer lado, el resto al segundo.
  *
- * Dos criterios, en este orden:
- *
- * 1. **El total lo más cerca posible del porcentaje.** Es lo que se pidió y lo
- *    que se revisa al cargar el camión. Se buscan TODAS las combinaciones de
- *    bultos enteros y no se decide talla por talla: con un bulto por talla
- *    —76, 129, 122 y 32— decidir talla por talla mandaba 205 al lado del 40%
- *    cuando 122 + 32 = 154 quedaba a 10 piezas.
- * 2. **Parejo entre tallas.** Entre combinaciones igual de cercanas gana la
- *    que da a cada taller, de cada talla, lo más parecido a su porcentaje, y
- *    luego la que mueve menos bultos.
+ * Se buscan TODAS las combinaciones de tallas y no se decide una por una: con
+ * tallas de 76, 129, 122 y 32 piezas, decidir talla por talla mandaba 205 al
+ * lado del 40% cuando 122 + 32 = 154 quedaba a 10 piezas. A igual distancia del
+ * porcentaje gana la combinación que mueve menos bultos.
  */
 export function splitBundles(
   bundles: SplitBundle[],
@@ -106,7 +100,7 @@ export function splitBundles(
   const groups = [...groupBySize(bundles)].map(([sizeCode, units]) => ({
     sizeCode,
     units,
-    table: subsetTable(units.map((unit) => unit.pieces)),
+    table: wholeSizeTable(units),
   }));
   const tables = groups.map((group) => group.table);
 
@@ -115,10 +109,11 @@ export function splitBundles(
     chooseSums(tables, ratio, grandTotal) ?? carrySums(tables, ratio);
 
   const sizes = groups.map((group, index): SplitSize => {
-    const chosen = new Set(group.table.reconstruct(sums[index] ?? 0));
-    const firstUnits = group.units.filter((_, i) => chosen.has(i));
-    const secondUnits = group.units.filter((_, i) => !chosen.has(i));
-    const firstPieces = firstUnits.reduce((sum, unit) => sum + unit.pieces, 0);
+    // Una talla nunca suma cero aquí: los bultos vacíos no llegan a `groups`.
+    const goesFirst = (sums[index] ?? 0) > 0;
+    const firstUnits = goesFirst ? group.units : [];
+    const secondUnits = goesFirst ? [] : group.units;
+    const firstPieces = goesFirst ? group.table.total : 0;
 
     return {
       sizeCode: group.sizeCode,
@@ -145,13 +140,10 @@ export function splitBundles(
   };
 }
 
-/** Las sumas que pueden dar los bultos de una talla. */
-interface SubsetTable {
+/** Lo que una talla puede aportar al primer lado: nada, o completa. */
+interface SizeTable {
   total: number;
-  /** Cada suma alcanzable y con cuántos bultos, como mínimo. */
   options: { sum: number; bundles: number }[];
-  /** Los índices de los bultos que dan esa suma. */
-  reconstruct: (sum: number) => number[];
 }
 
 /** Lo mejor encontrado para que el primer lado sume cierto total. */
@@ -169,7 +161,7 @@ interface Reach {
  * Devuelve null si el problema es demasiado grande para el navegador.
  */
 function chooseSums(
-  tables: SubsetTable[],
+  tables: SizeTable[],
   ratio: number,
   grandTotal: number,
 ): number[] | null {
@@ -211,7 +203,7 @@ function chooseSums(
 /** Agrega una talla a la tabla de totales alcanzables. */
 function addSize(
   reach: Reach,
-  table: SubsetTable,
+  table: SizeTable,
   ratio: number,
   grandTotal: number,
 ): { reach: Reach; pick: Int32Array } {
@@ -278,7 +270,7 @@ function isBetter(cost: number, moved: number, bestCost: number, bestMoved: numb
  * Respaldo para cortes enormes: talla por talla, arrastrando el error a la
  * siguiente. Es aproximado, pero nunca deja la pantalla congelada.
  */
-function carrySums(tables: SubsetTable[], ratio: number): number[] {
+function carrySums(tables: SizeTable[], ratio: number): number[] {
   let carry = 0;
 
   return tables.map((table) => {
@@ -343,76 +335,15 @@ function collapse(units: number[]): SplitGroup[] {
     .sort((a, b) => b.pieces - a.pieces);
 }
 
-/**
- * Todas las sumas que pueden dar los bultos de una talla, con el mínimo de
- * bultos para cada una, y cómo volver a los bultos de una suma.
- */
-function subsetTable(units: number[]): SubsetTable {
-  const total = units.reduce((sum, pieces) => sum + pieces, 0);
+/** Una talla va completa a un lado o no va: sólo hay esas dos opciones. */
+function wholeSizeTable(units: Unit[]): SizeTable {
+  const total = units.reduce((sum, unit) => sum + unit.pieces, 0);
 
-  if (units.length * (total + 1) > MAX_DP_CELLS) return greedyTable(units, total);
-
-  // best[s] = menos bultos para sumar exactamente s (Infinity si no se puede).
-  const best = new Array<number>(total + 1).fill(Infinity);
-  best[0] = 0;
-  // took[i][s]: el bulto i fue el que mejoró best[s] en su pasada.
-  const took = units.map(() => new Uint8Array(total + 1));
-
-  units.forEach((pieces, i) => {
-    const row = took[i]!;
-    for (let s = total; s >= pieces; s--) {
-      const candidate = best[s - pieces]! + 1;
-      if (candidate < best[s]!) {
-        best[s] = candidate;
-        row[s] = 1;
-      }
-    }
-  });
-
-  const options: SubsetTable["options"] = [];
-  best.forEach((bundles, sum) => {
-    if (bundles !== Infinity) options.push({ sum, bundles });
-  });
-
-  // Se reconstruye hacia atrás: el último bulto que tocó la celda es el suyo.
-  function reconstruct(sum: number): number[] {
-    const chosen: number[] = [];
-    let s = sum;
-    for (let i = units.length - 1; i >= 0 && s > 0; i--) {
-      if (took[i]![s]) {
-        chosen.push(i);
-        s -= units[i]!;
-      }
-    }
-    return chosen;
-  }
-
-  return { total, options, reconstruct };
-}
-
-/** Respaldo: sólo las sumas de ir tomando los bultos de mayor a menor. */
-function greedyTable(units: number[], total: number): SubsetTable {
-  const order = units
-    .map((pieces, i) => ({ pieces, i }))
-    .sort((a, b) => b.pieces - a.pieces);
-
-  const options = [{ sum: 0, bundles: 0 }];
-  let acc = 0;
-  order.forEach(({ pieces }, k) => {
-    acc += pieces;
-    options.push({ sum: acc, bundles: k + 1 });
-  });
-
-  function reconstruct(sum: number): number[] {
-    const chosen: number[] = [];
-    let taken = 0;
-    for (const { pieces, i } of order) {
-      if (taken >= sum) break;
-      chosen.push(i);
-      taken += pieces;
-    }
-    return chosen;
-  }
-
-  return { total, options, reconstruct };
+  return {
+    total,
+    options: [
+      { sum: 0, bundles: 0 },
+      { sum: total, bundles: units.length },
+    ],
+  };
 }

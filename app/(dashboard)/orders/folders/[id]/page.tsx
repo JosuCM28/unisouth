@@ -23,7 +23,10 @@ import { FolderSendToIssueDialog } from "@/components/orders/folder-send-to-issu
 import { FolderWorkshopDialog } from "@/components/orders/folder-workshop-dialog";
 import { OrderTable } from "@/components/orders/order-table";
 import { WorkshopSplitPanel } from "@/components/orders/workshop-split-panel";
-import { buildFolderSplitCuts } from "@/lib/folder-split-cuts";
+import {
+  buildFolderSplitCuts,
+  buildPlannedSplitCuts,
+} from "@/lib/folder-split-cuts";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -287,6 +290,17 @@ export default async function OrderFolderPage({ params }: PageProps) {
   );
 }
 
+/** Los cortes del pedido y, si todavía no hay ninguno, lo pedido. */
+function folderSplitCuts(
+  orders: Awaited<ReturnType<OrderFolderRepository["findSendableCuts"]>>,
+  captured: Awaited<ReturnType<OrderFolderRepository["findGlobalCutBundles"]>>,
+) {
+  const cuts = buildFolderSplitCuts(orders, captured, cutBatchLabel);
+  if (cuts.length > 0) return cuts;
+
+  return buildPlannedSplitCuts(orders.flatMap((order) => order.lines));
+}
+
 /**
  * Lo que necesitan los dos botones de "mandar el pedido entero".
  *
@@ -326,7 +340,7 @@ async function buildSendContext(
 
   return {
     preview: buildFolderSendPreview(orders, cutBatchLabel),
-    splitCuts: buildFolderSplitCuts(orders, captured, cutBatchLabel),
+    splitCuts: folderSplitCuts(orders, captured),
     captures: capturesByGroup(captured),
     workshops,
     stages,

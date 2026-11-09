@@ -53,7 +53,11 @@ import {
   OrderBatches,
   type BatchView,
 } from "@/components/orders/order-batches";
-import { WorkshopSplitPanel } from "@/components/orders/workshop-split-panel";
+import {
+  WorkshopSplitPanel,
+  type SplitCut,
+} from "@/components/orders/workshop-split-panel";
+import { buildPlannedSplitCuts } from "@/lib/folder-split-cuts";
 import {
   OrderShipments,
   type ShipmentView,
@@ -1051,8 +1055,9 @@ export default async function OrderDetailPage({
             ofrece mandarse a taller con sus propios bultos ya cargados: el
             diálogo es el mismo del encabezado, sólo que abierto con el
             tendido puesto. */}
-        {/* El reparto a dos talleres sale de los mismos bultos del corte. */}
-        {canEdit && batchViews.length > 0 && (
+        {/* El reparto a dos talleres sale de los bultos del corte y, mientras
+            no haya corte, de lo pedido. */}
+        {canEdit && (
           <div className="mb-3">
             <WorkshopSplitPanel
               shipping={{
@@ -1064,18 +1069,7 @@ export default async function OrderDetailPage({
                 workshops,
                 stages,
               }}
-              cuts={batchViews.map((batch) => ({
-                id: batch.id,
-                label: cutBatchLabel(batch.number, batch.label),
-                bundles: batch.entries.map((entry) => ({
-                  sizeCode: entry.sizeCode,
-                  pieces: entry.quantity,
-                  count: entry.bundles,
-                  sizeId: entry.sizeId,
-                  tagId: entry.tagId,
-                  note: entry.note ?? null,
-                })),
-              }))}
+              cuts={orderSplitCuts(batchViews, order.lines)}
             />
           </div>
         )}
@@ -1097,6 +1091,28 @@ export default async function OrderDetailPage({
       />
     </div>
   );
+}
+
+/** Los cortes con piezas y, si todavía no hay ninguno, lo pedido. */
+function orderSplitCuts(
+  batches: BatchView[],
+  lines: Parameters<typeof buildPlannedSplitCuts>[0],
+): SplitCut[] {
+  const withPieces = batches.filter((batch) => batch.entries.length > 0);
+  if (withPieces.length === 0) return buildPlannedSplitCuts(lines);
+
+  return withPieces.map((batch) => ({
+    id: batch.id,
+    label: cutBatchLabel(batch.number, batch.label),
+    bundles: batch.entries.map((entry) => ({
+      sizeCode: entry.sizeCode,
+      pieces: entry.quantity,
+      count: entry.bundles,
+      sizeId: entry.sizeId,
+      tagId: entry.tagId,
+      note: entry.note ?? null,
+    })),
+  }));
 }
 
 /** Ámbar mientras falte, violeta cuando sobre: el color dice el sentido. */

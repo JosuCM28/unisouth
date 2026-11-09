@@ -51,14 +51,18 @@ const TOLERANCE_PIECES = 40;
 const DEFAULT_PERCENT = 40;
 
 /**
- * REPARTO A DOS TALLERES: qué bultos van a uno y cuáles al otro.
+ * REPARTO A DOS TALLERES: qué tallas van a uno y cuáles al otro.
  *
- * Se calcula en el navegador con los bultos ya capturados y no se guarda: es
- * una ayuda para armar las dos salidas, y un reparto guardado empezaría a
- * mentir en cuanto alguien corrigiera un bulto del corte.
+ * Se calcula en el navegador y no se guarda: es una ayuda para armar las dos
+ * salidas, y un reparto guardado empezaría a mentir en cuanto alguien
+ * corrigiera un bulto del corte.
  *
  * Los cortes se marcan uno por uno porque la salida a taller se hace por
  * tendido: lo que se reparte es lo que se va a cargar ahora, no el historial.
+ *
+ * Sin ningún corte reparte lo pedido, para planear antes de tender. Ahí sólo
+ * calcula: el envío es de prendas ya cortadas, y mandar lo pedido pondría en un
+ * vale bultos que nadie ha amarrado.
  */
 export function WorkshopSplitPanel({
   cuts,
@@ -83,6 +87,7 @@ export function WorkshopSplitPanel({
   if (cuts.length === 0) return null;
 
   const rest = 100 - percent;
+  const planned = cuts.some((cut) => cut.planned);
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -115,7 +120,9 @@ export function WorkshopSplitPanel({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(buildMessage(result, percent));
+      await navigator.clipboard.writeText(
+        buildMessage(result, percent, planned),
+      );
       toast.success("Reparto copiado.");
     } catch {
       toast.error("No se pudo copiar.");
@@ -150,6 +157,14 @@ export function WorkshopSplitPanel({
             El segundo recibe {rest}%
           </p>
         </div>
+
+        {planned && (
+          <p className="border border-border bg-muted p-2 text-xs">
+            <span className="font-medium">Todavía no hay corte:</span> se
+            reparte sobre lo pedido. Sirve para planear; se podrá mandar a
+            taller cuando se capture el corte.
+          </p>
+        )}
 
         {/* Con un solo corte no hay nada que elegir: la lista sólo estorbaría. */}
         {cuts.length > 1 && (
@@ -217,7 +232,8 @@ export function WorkshopSplitPanel({
             result={result}
             percent={percent}
             onCopy={handleCopy}
-            shipping={shipping}
+            shipping={planned ? undefined : shipping}
+            planned={planned}
           />
         )}
       </div>
@@ -230,11 +246,13 @@ function SplitSummary({
   percent,
   onCopy,
   shipping,
+  planned,
 }: {
   result: SplitResult;
   percent: number;
   onCopy: () => void;
   shipping?: SplitShipping;
+  planned: boolean;
 }) {
   const firstBundles = result.sizes.flatMap((size) => size.firstBundles);
   const secondBundles = result.sizes.flatMap((size) => size.secondBundles);
@@ -283,7 +301,7 @@ function SplitSummary({
         </span>{" "}
         pzas
         {!withinTolerance &&
-          ` (pasa de ${TOLERANCE_PIECES}: los bultos son muy grandes para acercarse más)`}
+          ` (pasa de ${TOLERANCE_PIECES}: cada talla va completa a un solo taller y no se puede acercar más)`}
         .
       </p>
 
@@ -294,8 +312,16 @@ function SplitSummary({
             className="grid grid-cols-[3.5rem_1fr_1fr] gap-2 border-t border-border py-1.5 text-sm"
           >
             <span className="tabular font-medium">{size.sizeCode}</span>
-            <SizeCell groups={size.first} pieces={size.firstPieces} />
-            <SizeCell groups={size.second} pieces={size.secondPieces} />
+            <SizeCell
+              groups={size.first}
+              pieces={size.firstPieces}
+              planned={planned}
+            />
+            <SizeCell
+              groups={size.second}
+              pieces={size.secondPieces}
+              planned={planned}
+            />
           </li>
         ))}
       </ul>
@@ -402,9 +428,12 @@ function SendSide({
 function SizeCell({
   groups,
   pieces,
+  planned,
 }: {
   groups: SplitGroup[];
   pieces: number;
+  /** Sobre lo pedido no hay bultos que enseñar: nadie ha amarrado nada. */
+  planned: boolean;
 }) {
   if (groups.length === 0) {
     return <span className="text-muted-foreground">—</span>;
@@ -413,9 +442,11 @@ function SizeCell({
   return (
     <span className="tabular flex flex-col">
       <span className="font-medium">{pieces}</span>
-      <span className="text-xs text-muted-foreground">
-        {describeGroups(groups)}
-      </span>
+      {!planned && (
+        <span className="text-xs text-muted-foreground">
+          {describeGroups(groups)}
+        </span>
+      )}
     </span>
   );
 }
@@ -426,19 +457,32 @@ function describeGroups(groups: SplitGroup[]): string {
 }
 
 /** El reparto como texto, para pegarlo en un mensaje o en el vale. */
-function buildMessage(result: SplitResult, percent: number): string {
+function buildMessage(
+  result: SplitResult,
+  percent: number,
+  planned: boolean,
+): string {
   const lines = [
-    `Reparto ${percent}% / ${100 - percent}% — total ${result.total} pzas`,
+    `Reparto ${percent}% / ${100 - percent}% — total ${result.total} pzas${planned ? " (sobre lo pedido, sin corte)" : ""}`,
     `${percent}%: ${result.firstPieces} pzas · ${100 - percent}%: ${result.secondPieces} pzas`,
   ];
 
   for (const size of result.sizes) {
     lines.push(
-      `Talla ${size.sizeCode}: ${percent}% → ${size.firstPieces} (${describeGroups(size.first) || "—"}) · ${100 - percent}% → ${size.secondPieces} (${describeGroups(size.second) || "—"})`,
+      `Talla ${size.sizeCode}: ${percent}% → ${sideText(size.firstPieces, size.first, planned)} · ${100 - percent}% → ${sideText(size.secondPieces, size.second, planned)}`,
     );
   }
 
   return lines.join("\n");
+}
+
+function sideText(
+  pieces: number,
+  groups: SplitGroup[],
+  planned: boolean,
+): string {
+  if (planned) return String(pieces);
+  return `${pieces} (${describeGroups(groups) || "—"})`;
 }
 
 /** Los nombres de corte que comparten dos o más órdenes, en orden de aparición. */
