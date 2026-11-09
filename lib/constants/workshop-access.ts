@@ -5,6 +5,7 @@ export const WORKSHOP_ROLES = [
   "WORKSHOP_ACATLAN",
   "WORKSHOP_SITEX",
   "WORKSHOP_BRODERIE",
+  "WORKSHOP_ALLENDE",
 ] as const satisfies readonly Role[];
 
 export type WorkshopRole = (typeof WORKSHOP_ROLES)[number];

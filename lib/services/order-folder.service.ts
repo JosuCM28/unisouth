@@ -484,6 +484,8 @@ export class OrderFolderService extends BaseService {
         reference: folder.reference ?? folder.code,
         handedOverBy: undefined,
         receivedBy: undefined,
+        // El taller se elige después, al corregir el borrador.
+        workshopId: undefined,
         notes: folderNotes(folder.code, sending.size, folder.notes),
         // Sin rollos: lo que sale son prendas ya cortadas, no tela.
         lines: [],

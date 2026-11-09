@@ -22,6 +22,68 @@ export function deliveryState(input: {
   return input.receivedAt ? "RECEIVED" : "PENDING";
 }
 
+/** Lo mismo para una salida de corte, que no tiene envío detrás. */
+export function voucherDeliveryState(input: {
+  status: DocumentStatus;
+  receivedAt: Date | null;
+}): WorkshopDeliveryState {
+  if (input.status === "CANCELLED") return "CANCELLED";
+  return input.receivedAt ? "RECEIVED" : "PENDING";
+}
+
+/** Lo que la casa lee de una entrega: si ya llegó, y quién lo dijo. */
+export interface DeliveryReceipt {
+  state: WorkshopDeliveryState;
+  receivedAt: Date | null;
+  receivedByName: string | null;
+}
+
+/** `null` = el taller no confirma nada: decir "por recibir" sería prometerlo. */
+export function shipmentReceipt(shipment: {
+  status: GarmentShipmentStatus;
+  createdAt: Date;
+  receivedAt: Date | null;
+  receivedBy: { name: string } | null;
+  document: { status: DocumentStatus } | null;
+  workshop: { accessRole: string | null; accessSince: Date | null };
+}): DeliveryReceipt | null {
+  if (!isTrackedByWorkshop(shipment.workshop, shipment.createdAt)) return null;
+
+  return {
+    state: deliveryState({
+      status: shipment.status,
+      documentStatus: shipment.document?.status ?? null,
+      receivedAt: shipment.receivedAt,
+    }),
+    receivedAt: shipment.receivedAt,
+    receivedByName: shipment.receivedBy?.name ?? null,
+  };
+}
+
+/**
+ * Sólo un vale ya APLICADO le aparece al taller: un borrador todavía se puede
+ * corregir o cambiar de taller, y confirmaría algo que luego deja de ser cierto.
+ */
+export function voucherReceipt(voucher: {
+  status: DocumentStatus;
+  appliedAt: Date | null;
+  workshopReceivedAt: Date | null;
+  workshopReceivedBy: { name: string } | null;
+  workshop: { accessRole: string | null; accessSince: Date | null } | null;
+}): DeliveryReceipt | null {
+  if (!voucher.workshop || !voucher.appliedAt) return null;
+  if (!isTrackedByWorkshop(voucher.workshop, voucher.appliedAt)) return null;
+
+  return {
+    state: voucherDeliveryState({
+      status: voucher.status,
+      receivedAt: voucher.workshopReceivedAt,
+    }),
+    receivedAt: voucher.workshopReceivedAt,
+    receivedByName: voucher.workshopReceivedBy?.name ?? null,
+  };
+}
+
 /**
  * Si este envío le aparece al taller en su lista.
  *

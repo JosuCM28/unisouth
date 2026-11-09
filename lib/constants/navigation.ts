@@ -267,6 +267,12 @@ export const NAVIGATION: NavSection[] = [
         icon: "dashboard",
         permission: "workshop-board:broderie",
       },
+      {
+        href: "/workshop-boards/allende",
+        label: "Tablero Allende",
+        icon: "dashboard",
+        permission: "workshop-board:allende",
+      },
     ],
   },
   {

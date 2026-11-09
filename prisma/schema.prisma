@@ -61,6 +61,7 @@ model User {
   lotsCreated               Lot[]                 @relation("LotCreatedBy")
   receiptsRecorded          Receipt[]             @relation("ReceiptRecordedBy")
   documentsCreated          InventoryDocument[]   @relation("DocumentCreatedBy")
+  documentsWorkshopReceived InventoryDocument[]   @relation("DocumentWorkshopReceivedBy")
   documentsApplied          InventoryDocument[]   @relation("DocumentAppliedBy")
   documentsCancelled        InventoryDocument[]   @relation("DocumentCancelledBy")
   reservationsCreated       Reservation[]         @relation("ReservationCreatedBy")
@@ -782,6 +783,21 @@ model InventoryDocument {
   handedOverBy String?
   receivedBy   String?
 
+  /// El taller al que va esta salida de corte, elegido en el vale.
+  ///
+  /// Aparte de `receivedBy`, que sigue siendo texto libre: ahí puede ir el
+  /// nombre de una persona, y por texto no se puede saber de qué taller es.
+  /// Vacío en los vales que nacen de un envío: ésos ya llegan por su envío, y
+  /// con los dos el taller vería la misma entrega dos veces.
+  workshopId String?
+  workshop   Workshop? @relation(fields: [workshopId], references: [id], onDelete: SetNull)
+
+  /// Cuándo confirmó el taller que le llegó, y quién. Con prefijo porque
+  /// `receivedBy` ya es el nombre que se firma en el papel.
+  workshopReceivedAt   DateTime?
+  workshopReceivedById String?
+  workshopReceivedBy   User?     @relation("DocumentWorkshopReceivedBy", fields: [workshopReceivedById], references: [id])
+
   // ── Header of the CUTTING BREAKDOWN ──────────────────────────────────────
   // Its own fields, not derived from the rolls: an issue can carry only the
   // breakdown —already-cut garments leave, no fabric is deducted— and back
@@ -839,6 +855,7 @@ model InventoryDocument {
   @@index([cuttingOrderId])
   @@index([cuttingBatchId])
   @@index([orderFolderId])
+  @@index([workshopId, status])
   @@map("inventory_documents")
 }
 
@@ -2290,6 +2307,7 @@ model Workshop {
   updatedAt DateTime  @updatedAt
 
   shipments GarmentShipment[]
+  documents InventoryDocument[]
 
   @@map("workshops")
 }

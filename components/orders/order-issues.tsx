@@ -6,6 +6,8 @@ import {
   DOCUMENT_STATUS_STYLES,
 } from "@/lib/constants/labels";
 import { cn, formatDate } from "@/lib/utils";
+import type { DeliveryReceipt } from "@/lib/workshop-delivery";
+import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 
 export interface IssueView {
   id: string;
@@ -17,6 +19,8 @@ export interface IssueView {
   batchLabel: string | null;
   pieces: number;
   sizes: number;
+  /** Si llegó, cuando la salida va a un taller con cuenta. */
+  receipt: DeliveryReceipt | null;
 }
 
 /**
@@ -89,6 +93,9 @@ function IssueCard({ issue, canOpen }: { issue: IssueView; canOpen: boolean }) {
           >
             {DOCUMENT_STATUS_LABELS[issue.status]}
           </span>
+          {issue.receipt && !isCancelled && (
+            <ReceiptChip receipt={issue.receipt} />
+          )}
         </p>
 
         <p className="tabular mt-1 text-xs text-muted-foreground">

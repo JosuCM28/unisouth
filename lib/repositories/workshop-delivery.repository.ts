@@ -34,6 +34,108 @@ export type WorkshopDeliveryListRow = Prisma.GarmentShipmentGetPayload<{
   select: typeof LIST_SELECT;
 }>;
 
+const VOUCHER_LIST_SELECT = {
+  id: true,
+  code: true,
+  status: true,
+  date: true,
+  concept: true,
+  reference: true,
+  cutDescription: true,
+  workshopReceivedAt: true,
+  client: { select: { name: true } },
+  cuttingOrder: { select: { code: true, reference: true } },
+  cutLines: { select: { quantity: true, bundles: true } },
+} satisfies Prisma.InventoryDocumentSelect;
+
+export type WorkshopVoucherListRow = Prisma.InventoryDocumentGetPayload<{
+  select: typeof VOUCHER_LIST_SELECT;
+}>;
+
+/** Los cortes de una orden, en la forma que los pinta la ficha del taller. */
+const ORDER_CUTS_SELECT = {
+  batches: {
+    orderBy: { number: "desc" },
+    select: {
+      id: true,
+      number: true,
+      label: true,
+      notes: true,
+      openedAt: true,
+      groupId: true,
+    },
+  },
+  lines: {
+    orderBy: { position: "asc" },
+    select: {
+      id: true,
+      sizeId: true,
+      notes: true,
+      size: { select: { code: true } },
+      cutTag: { select: { name: true, color: true } },
+      progress: {
+        select: {
+          id: true,
+          batchId: true,
+          quantity: true,
+          bundles: true,
+          tagId: true,
+          notes: true,
+          createdAt: true,
+          cutTag: { select: { name: true, color: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.CuttingOrderSelect;
+
+/** Igual de enumerado que el del envío, y por lo mismo. */
+const VOUCHER_DETAIL_SELECT = {
+  id: true,
+  code: true,
+  status: true,
+  date: true,
+  concept: true,
+  reference: true,
+  notes: true,
+  clientPo: true,
+  cutDescription: true,
+  cutFabricText: true,
+  cutPattern: true,
+  cutVersion: true,
+  cutVersionNotes: true,
+  cutNotes: true,
+  cuttingBatchId: true,
+  workshopReceivedAt: true,
+  workshopReceivedBy: { select: { name: true } },
+  client: { select: { name: true } },
+  cutFabric: { select: { code: true, name: true } },
+  cutLines: {
+    orderBy: { order: "asc" },
+    select: {
+      id: true,
+      quantity: true,
+      bundles: true,
+      notes: true,
+      size: { select: { code: true } },
+      cutTag: { select: { name: true, color: true } },
+    },
+  },
+  cuttingOrder: {
+    select: {
+      code: true,
+      reference: true,
+      dueDate: true,
+      notes: true,
+      ...ORDER_CUTS_SELECT,
+    },
+  },
+} satisfies Prisma.InventoryDocumentSelect;
+
+export type WorkshopVoucherDetailRow = Prisma.InventoryDocumentGetPayload<{
+  select: typeof VOUCHER_DETAIL_SELECT;
+}>;
+
 /**
  * Lo que el taller puede leer de la orden.
  *
@@ -80,39 +182,7 @@ const DETAIL_SELECT = {
       cutNotes: true,
       client: { select: { name: true } },
       material: { select: { code: true, name: true } },
-      batches: {
-        orderBy: { number: "desc" },
-        select: {
-          id: true,
-          number: true,
-          label: true,
-          notes: true,
-          openedAt: true,
-          groupId: true,
-        },
-      },
-      lines: {
-        orderBy: { position: "asc" },
-        select: {
-          id: true,
-          sizeId: true,
-          notes: true,
-          size: { select: { code: true } },
-          cutTag: { select: { name: true, color: true } },
-          progress: {
-            select: {
-              id: true,
-              batchId: true,
-              quantity: true,
-              bundles: true,
-              tagId: true,
-              notes: true,
-              createdAt: true,
-              cutTag: { select: { name: true, color: true } },
-            },
-          },
-        },
-      },
+      ...ORDER_CUTS_SELECT,
     },
   },
 } satisfies Prisma.GarmentShipmentSelect;
@@ -155,10 +225,39 @@ export class WorkshopDeliveryRepository extends BaseRepository<
 
   async findList(scope: WorkshopScope): Promise<WorkshopDeliveryListRow[]> {
     return this.db.garmentShipment.findMany({
-      where: scopeWhere(scope),
+      where: shipmentScopeWhere(scope),
       orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
       take: WORKSHOP_DELIVERY_LIMIT,
       select: LIST_SELECT,
+    });
+  }
+
+  async findVoucherList(
+    scope: WorkshopScope,
+  ): Promise<WorkshopVoucherListRow[]> {
+    return this.db.inventoryDocument.findMany({
+      where: voucherScopeWhere(scope),
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: WORKSHOP_DELIVERY_LIMIT,
+      select: VOUCHER_LIST_SELECT,
+    });
+  }
+
+  async findVoucherDetail(
+    scope: WorkshopScope,
+    id: string,
+  ): Promise<WorkshopVoucherDetailRow | null> {
+    return this.db.inventoryDocument.findFirst({
+      where: { id, ...voucherScopeWhere(scope) },
+      select: VOUCHER_DETAIL_SELECT,
+    });
+  }
+
+  /** Para la reimpresión: la salida de corte si es de este taller. */
+  async findVoucherState(scope: WorkshopScope, id: string) {
+    return this.db.inventoryDocument.findFirst({
+      where: { id, ...voucherScopeWhere(scope) },
+      select: { status: true, workshopReceivedAt: true },
     });
   }
 
@@ -167,7 +266,7 @@ export class WorkshopDeliveryRepository extends BaseRepository<
     id: string,
   ): Promise<WorkshopDeliveryDetailRow | null> {
     return this.db.garmentShipment.findFirst({
-      where: { id, ...scopeWhere(scope) },
+      where: { id, ...shipmentScopeWhere(scope) },
       select: DETAIL_SELECT,
     });
   }
@@ -175,7 +274,7 @@ export class WorkshopDeliveryRepository extends BaseRepository<
   /** El vale sólo si es de una entrega de este taller. */
   async findByDocument(scope: WorkshopScope, documentId: string) {
     return this.db.garmentShipment.findFirst({
-      where: { documentId, ...scopeWhere(scope) },
+      where: { documentId, ...shipmentScopeWhere(scope) },
       select: {
         status: true,
         receivedAt: true,
@@ -185,10 +284,29 @@ export class WorkshopDeliveryRepository extends BaseRepository<
   }
 }
 
-function scopeWhere(scope: WorkshopScope): Prisma.GarmentShipmentWhereInput {
+export function shipmentScopeWhere(
+  scope: WorkshopScope,
+): Prisma.GarmentShipmentWhereInput {
   return {
     workshopId: scope.id,
     // Sólo lo enviado desde que el taller tiene cuenta.
     createdAt: scope.accessSince ? { gte: scope.accessSince } : undefined,
+  };
+}
+
+/**
+ * Las salidas de corte que ya le tocan al taller: sólo las APLICADAS (exigir
+ * `appliedAt` deja fuera el borrador, y una cancelada sin aplicar nunca la vio).
+ */
+export function voucherScopeWhere(
+  scope: WorkshopScope,
+): Prisma.InventoryDocumentWhereInput {
+  return {
+    type: "ISSUE",
+    workshopId: scope.id,
+    cutLines: { some: {} },
+    appliedAt: scope.accessSince
+      ? { gte: scope.accessSince }
+      : { not: null },
   };
 }

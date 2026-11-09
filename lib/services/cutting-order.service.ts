@@ -1167,6 +1167,8 @@ export class CuttingOrderService extends BaseService {
         reference: order.reference ?? order.code,
         handedOverBy: undefined,
         receivedBy: undefined,
+        // El taller se elige después, al corregir el borrador.
+        workshopId: undefined,
         notes: order.notes ?? undefined,
         // Sin rollos: el vale sale con puro desglose y el auxiliar agrega la
         // tela a descontar si hace falta.

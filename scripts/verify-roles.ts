@@ -34,7 +34,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
     "Documentos",
     "Requisiciones", "Reportes", "Auditoría",
-    "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie",
+    "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
     "Usuarios", "Notificaciones", "Solicitudes de edición",
   ],
 
@@ -78,6 +78,7 @@ const ESPERADO: Record<Role, string[]> = {
   WORKSHOP_ACATLAN: ["Órdenes", "Tablero Acatlán"],
   WORKSHOP_SITEX: ["Órdenes", "Tablero Sitex"],
   WORKSHOP_BRODERIE: ["Órdenes", "Tablero Broderie"],
+  WORKSHOP_ALLENDE: ["Órdenes", "Tablero Allende"],
 };
 
 let fallos = 0;

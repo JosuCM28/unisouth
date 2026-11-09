@@ -9,13 +9,17 @@ import {
 } from "@/lib/core/errors";
 import type { PrismaExecutor } from "@/lib/prisma";
 import {
+  shipmentScopeWhere,
+  voucherScopeWhere,
   WORKSHOP_DELIVERY_LIMIT,
   WorkshopDeliveryRepository,
   type WorkshopDeliveryDetailRow,
   type WorkshopDeliveryListRow,
+  type WorkshopVoucherDetailRow,
+  type WorkshopVoucherListRow,
 } from "@/lib/repositories/workshop-delivery.repository";
 import type { WorkshopInput } from "@/lib/validations/garment-shipment.schema";
-import { deliveryState } from "@/lib/workshop-delivery";
+import { deliveryState, voucherDeliveryState } from "@/lib/workshop-delivery";
 import { BaseService } from "./base.service";
 
 export interface WorkshopDeliveryRow {
@@ -86,6 +90,8 @@ export interface ActiveWorkshopDelivery {
     cutNotes: string[];
   };
   cuts: DeliveryCut[];
+  /** Un vale capturado sin orden de origen no tiene cortes que enseñar. */
+  showCuts: boolean;
 }
 
 export type WorkshopDeliveryDetail =
@@ -123,6 +129,8 @@ interface DeliveryCutEntry {
 
 const NO_CLIENT_LABEL = "Fábrica";
 const NO_DESCRIPTION_LABEL = "Sin descripción";
+/* Un vale no pasa por una etapa del catálogo: el renglón dice qué fue. */
+const VOUCHER_STAGE_LABEL = "Salida de corte";
 
 /**
  * Lo que un taller externo ve y confirma de lo que se le manda.
@@ -139,7 +147,19 @@ export class WorkshopDeliveryService extends BaseService {
     const workshop = await this.repository.findWorkshopByRole(role);
     if (!workshop) return null;
 
-    const rows = (await this.repository.findList(workshop)).map(toListRow);
+    /* Dos orígenes, una sola lista: al taller no le importa si le llegó por
+       "Mandar a taller" o por un vale de salida. */
+    const [shipments, vouchers] = await Promise.all([
+      this.repository.findList(workshop),
+      this.repository.findVoucherList(workshop),
+    ]);
+
+    const rows = [
+      ...shipments.map(toListRow),
+      ...vouchers.map(toVoucherListRow),
+    ]
+      .sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime())
+      .slice(0, WORKSHOP_DELIVERY_LIMIT);
 
     return {
       workshopName: workshop.name,
@@ -156,20 +176,34 @@ export class WorkshopDeliveryService extends BaseService {
     const workshop = await this.repository.findWorkshopByRole(role);
     if (!workshop) return null;
 
-    const row = await this.repository.findDetail(workshop, id);
-    return row ? toDetail(row) : null;
+    const shipment = await this.repository.findDetail(workshop, id);
+    if (shipment) return toDetail(shipment);
+
+    const voucher = await this.repository.findVoucherDetail(workshop, id);
+    return voucher ? toVoucherDetail(voucher) : null;
   }
 
   /** La reimpresión: sólo su propio vale, y sólo mientras siga vigente. */
   async assertCanPrint(role: string, documentId: string): Promise<void> {
     const workshop = await this.repository.findWorkshopByRole(role);
-    const shipment = workshop
-      ? await this.repository.findByDocument(workshop, documentId)
+    const state = workshop
+      ? await this.printableState(workshop, documentId)
       : null;
 
-    if (!shipment || stateOf(shipment) === "CANCELLED") {
+    if (!state || state === "CANCELLED") {
       throw new ForbiddenError("No puedes imprimir este vale.");
     }
+  }
+
+  private async printableState(
+    workshop: { id: string; accessSince: Date | null },
+    documentId: string,
+  ): Promise<WorkshopDeliveryState | null> {
+    const shipment = await this.repository.findByDocument(workshop, documentId);
+    if (shipment) return stateOf(shipment);
+
+    const voucher = await this.repository.findVoucherState(workshop, documentId);
+    return voucher ? voucherStateOf(voucher) : null;
   }
 
   /**
@@ -187,13 +221,7 @@ export class WorkshopDeliveryService extends BaseService {
       if (!workshop) throw new NotFoundError("la entrega", id);
 
       const shipment = await tx.garmentShipment.findFirst({
-        where: {
-          id,
-          workshopId: workshop.id,
-          createdAt: workshop.accessSince
-            ? { gte: workshop.accessSince }
-            : undefined,
-        },
+        where: { id, ...shipmentScopeWhere(workshop) },
         select: {
           code: true,
           status: true,
@@ -201,43 +229,73 @@ export class WorkshopDeliveryService extends BaseService {
           document: { select: { status: true } },
         },
       });
-      if (!shipment) throw new NotFoundError("la entrega", id);
 
-      this.assertReceivable(shipment);
+      if (shipment) {
+        this.assertReceivable(stateOf(shipment), shipment.code);
+        await tx.garmentShipment.update({
+          where: { id },
+          data: { receivedAt: new Date(), receivedById: this.context.userId },
+        });
+        await this.auditReceipt(tx, "GarmentShipment", id, shipment.code, workshop.name);
+        return { code: shipment.code };
+      }
 
-      await tx.garmentShipment.update({
-        where: { id },
-        data: { receivedAt: new Date(), receivedById: this.context.userId },
-      });
-
-      await this.auditWith(tx).record({
-        entity: "GarmentShipment",
-        entityId: id,
-        action: "UPDATE",
-        reference: shipment.code,
-        newValue: { recibido: true, taller: workshop.name },
-        sensitivity: "LOW",
-      });
-
-      return { code: shipment.code };
+      return this.confirmVoucher(tx, id, workshop);
     });
   }
 
-  private assertReceivable(
-    shipment: Parameters<typeof stateOf>[0] & { code: string },
-  ) {
-    const state = stateOf(shipment);
+  /** Si no era un envío, tiene que ser una salida de corte de este taller. */
+  private async confirmVoucher(
+    tx: PrismaExecutor,
+    id: string,
+    workshop: { id: string; name: string; accessSince: Date | null },
+  ): Promise<{ code: string }> {
+    const voucher = await tx.inventoryDocument.findFirst({
+      where: { id, ...voucherScopeWhere(workshop) },
+      select: { code: true, status: true, workshopReceivedAt: true },
+    });
+    if (!voucher) throw new NotFoundError("la entrega", id);
 
+    this.assertReceivable(voucherStateOf(voucher), voucher.code);
+
+    await tx.inventoryDocument.update({
+      where: { id },
+      data: {
+        workshopReceivedAt: new Date(),
+        workshopReceivedById: this.context.userId,
+      },
+    });
+    await this.auditReceipt(tx, "InventoryDocument", id, voucher.code, workshop.name);
+
+    return { code: voucher.code };
+  }
+
+  private assertReceivable(state: WorkshopDeliveryState, code: string) {
     if (state === "CANCELLED") {
-      throw new BusinessRuleError(
-        `La entrega ${shipment.code} fue cancelada.`,
-      );
+      throw new BusinessRuleError(`La entrega ${code} fue cancelada.`);
     }
     if (state === "RECEIVED") {
       throw new BusinessRuleError(
-        `La entrega ${shipment.code} ya estaba marcada como recibida.`,
+        `La entrega ${code} ya estaba marcada como recibida.`,
       );
     }
+  }
+
+  private async auditReceipt(
+    tx: PrismaExecutor,
+    entity: string,
+    entityId: string,
+    code: string,
+    workshopName: string,
+  ) {
+    await this.auditWith(tx).record({
+      entity,
+      entityId,
+      action: "UPDATE",
+      reference: code,
+      newValue: { recibido: true, taller: workshopName },
+      sensitivity: "LOW",
+    });
   }
 
   async createWorkshop(input: WorkshopInput): Promise<Workshop> {
@@ -339,6 +397,16 @@ function stateOf(shipment: {
   });
 }
 
+function voucherStateOf(voucher: {
+  status: WorkshopVoucherListRow["status"];
+  workshopReceivedAt: Date | null;
+}): WorkshopDeliveryState {
+  return voucherDeliveryState({
+    status: voucher.status,
+    receivedAt: voucher.workshopReceivedAt,
+  });
+}
+
 function totals(
   lines: { sentQuantity: number; bundles: number }[],
 ): { pieces: number; bundles: number } {
@@ -369,6 +437,92 @@ function toListRow(row: WorkshopDeliveryListRow): WorkshopDeliveryRow {
   };
 }
 
+/** El número que conoce el taller; el folio del vale si no hay otro. */
+function voucherReference(voucher: {
+  code: string;
+  reference: string | null;
+  cuttingOrder: { code: string; reference: string | null } | null;
+}): string {
+  return (
+    voucher.reference ??
+    voucher.cuttingOrder?.reference ??
+    voucher.cuttingOrder?.code ??
+    voucher.code
+  );
+}
+
+function voucherLineTotals(
+  lines: { quantity: number; bundles: number }[],
+): { pieces: number; bundles: number } {
+  return totals(
+    lines.map((line) => ({
+      sentQuantity: line.quantity,
+      bundles: line.bundles,
+    })),
+  );
+}
+
+function toVoucherListRow(row: WorkshopVoucherListRow): WorkshopDeliveryRow {
+  return {
+    id: row.id,
+    code: row.code,
+    state: voucherStateOf(row),
+    orderReference: voucherReference(row),
+    clientName: row.client?.name ?? NO_CLIENT_LABEL,
+    description: row.cutDescription ?? row.concept ?? NO_DESCRIPTION_LABEL,
+    stageName: VOUCHER_STAGE_LABEL,
+    parts: null,
+    sentAt: row.date,
+    ...voucherLineTotals(row.cutLines),
+  };
+}
+
+function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail {
+  const state = voucherStateOf(row);
+  if (state === "CANCELLED") return { state, code: row.code };
+
+  return {
+    state,
+    id: row.id,
+    code: row.code,
+    voucherId: row.id,
+    voucherCode: row.code,
+    sentAt: row.date,
+    stageName: VOUCHER_STAGE_LABEL,
+    parts: null,
+    reference: null,
+    notes: row.notes,
+    receivedAt: row.workshopReceivedAt,
+    receivedByName: row.workshopReceivedBy?.name ?? null,
+    ...voucherLineTotals(row.cutLines),
+    lines: row.cutLines.map((line) => ({
+      id: line.id,
+      sizeCode: line.size.code,
+      sentQuantity: line.quantity,
+      bundles: line.bundles,
+      notes: line.notes,
+      tag: line.cutTag,
+    })),
+    order: {
+      reference: voucherReference(row),
+      clientPo: row.clientPo,
+      clientName: row.client?.name ?? NO_CLIENT_LABEL,
+      description: row.cutDescription ?? row.concept,
+      dueDate: row.cuttingOrder?.dueDate ?? null,
+      notes: row.cuttingOrder?.notes ?? null,
+      fabric: row.cutFabric
+        ? `${row.cutFabric.code} · ${row.cutFabric.name}`
+        : row.cutFabricText,
+      pattern: row.cutPattern,
+      version: row.cutVersion ? CUT_VERSION_LABELS[row.cutVersion] : null,
+      versionNotes: row.cutVersionNotes,
+      cutNotes: row.cutNotes,
+    },
+    cuts: row.cuttingOrder ? toCuts(row.cuttingOrder, row.cuttingBatchId) : [],
+    showCuts: row.cuttingOrder !== null,
+  };
+}
+
 function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
   const state = stateOf(row);
   if (state === "CANCELLED") return { state, code: row.code };
@@ -396,7 +550,8 @@ function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
       tag: line.cutTag,
     })),
     order: toOrderView(row.order),
-    cuts: toCuts(row.order),
+    cuts: toCuts(row.order, null),
+    showCuts: true,
   };
 }
 
@@ -423,7 +578,11 @@ function fabricOf(order: WorkshopDeliveryDetailRow["order"]): string | null {
   return order.cutFabricText;
 }
 
-function toCuts(order: WorkshopDeliveryDetailRow["order"]): DeliveryCut[] {
+/** Con `onlyBatchId`, sólo el corte que se llevó el vale. */
+function toCuts(
+  order: Pick<WorkshopDeliveryDetailRow["order"], "batches" | "lines">,
+  onlyBatchId: string | null,
+): DeliveryCut[] {
   const entries = order.lines.flatMap((line) =>
     line.progress.map((entry) => ({
       batchId: entry.batchId,
@@ -445,6 +604,7 @@ function toCuts(order: WorkshopDeliveryDetailRow["order"]): DeliveryCut[] {
   );
 
   return order.batches
+    .filter((batch) => !onlyBatchId || batch.id === onlyBatchId)
     .map((batch) => ({
       ...batch,
       openedByName: null,

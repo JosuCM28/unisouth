@@ -25,6 +25,7 @@ export async function getIssueFormOptions() {
     clients,
     productionRuns,
     locations,
+    workshops,
   ] = await Promise.all([
       // Qué hay REALMENTE surtible hoy, por dueño y material.
       new LotRepository().findIssuableOptions(),
@@ -68,6 +69,12 @@ export async function getIssueFormOptions() {
       // Para el alta de rollo desde el propio vale: dónde se acomodó lo que
       // acaba de llegar. Opcional, como en el alta de siempre.
       new LocationRepository().findOptions(),
+      // A qué taller va la salida de corte. Se dan de alta en /workshops.
+      prisma.workshop.findMany({
+        where: { deletedAt: null, active: true },
+        select: { id: true, name: true, accessRole: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
   const productOptions: IssueProductOption[] = products.map((product) => ({
@@ -152,5 +159,10 @@ export async function getIssueFormOptions() {
     cutTags,
     productionRuns,
     locations,
+    workshops: workshops.map((workshop) => ({
+      id: workshop.id,
+      name: workshop.name,
+      hasAccount: workshop.accessRole !== null,
+    })),
   };
 }

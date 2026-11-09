@@ -94,6 +94,7 @@ export class DocumentService extends BaseService {
           reference: input.reference,
           handedOverBy: input.handedOverBy,
           receivedBy: input.receivedBy,
+          workshopId: input.workshopId,
           notes: input.notes,
           ...cutHeaderData(input),
           createdById: this.context.userId,
@@ -178,6 +179,7 @@ export class DocumentService extends BaseService {
           reference: source.reference,
           handedOverBy: source.handedOverBy,
           receivedBy: source.receivedBy,
+          workshopId: source.workshopId,
           notes: source.notes,
           clientPo: source.clientPo,
           cutDescription: source.cutDescription,
@@ -248,6 +250,11 @@ export class DocumentService extends BaseService {
       await tx.documentLine.deleteMany({ where: { documentId: id } });
       await tx.documentCutLine.deleteMany({ where: { documentId: id } });
 
+      /* El vale de un envío ya le llega al taller por su envío: ligarlo también
+         aquí le pintaría la misma entrega dos veces. */
+      const carriedByShipment =
+        (await tx.garmentShipment.count({ where: { documentId: id } })) > 0;
+
       const document = await tx.inventoryDocument.update({
         where: { id },
         data: {
@@ -258,6 +265,8 @@ export class DocumentService extends BaseService {
           reference: input.reference,
           handedOverBy: input.handedOverBy,
           receivedBy: input.receivedBy,
+          // `null` y no `undefined`: quitar el taller del borrador debe quitarlo.
+          workshopId: carriedByShipment ? null : (input.workshopId ?? null),
           notes: input.notes,
           ...cutHeaderData(input),
           lines: {

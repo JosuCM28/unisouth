@@ -16,6 +16,7 @@ export const ROLES = [
   "WORKSHOP_ACATLAN",
   "WORKSHOP_SITEX",
   "WORKSHOP_BRODERIE",
+  "WORKSHOP_ALLENDE",
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -33,6 +34,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   WORKSHOP_ACATLAN: "Taller Acatlán",
   WORKSHOP_SITEX: "Taller Sitex",
   WORKSHOP_BRODERIE: "Taller Broderie",
+  WORKSHOP_ALLENDE: "Taller Allende",
 };
 
 /**
@@ -133,6 +135,7 @@ export const PERMISSIONS = [
   "workshop-board:acatlan",
   "workshop-board:sitex",
   "workshop-board:broderie",
+  "workshop-board:allende",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -251,6 +254,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-board:acatlan"],
   WORKSHOP_SITEX: ["workshop-orders:access", "workshop-board:sitex"],
   WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-board:broderie"],
+  WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-board:allende"],
 };
 
 /** Convierte el String de la base a un Role válido. */

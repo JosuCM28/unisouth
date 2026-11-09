@@ -11,10 +11,9 @@ import { runAction } from "@/lib/offline/run-action";
 import {
   GARMENT_SHIPMENT_STATUS_LABELS,
   GARMENT_SHIPMENT_STATUS_STYLES,
-  WORKSHOP_DELIVERY_STATE_LABELS,
-  WORKSHOP_DELIVERY_STATE_STYLES,
 } from "@/lib/constants/labels";
-import type { WorkshopDeliveryState } from "@/lib/constants/workshop-access";
+import type { DeliveryReceipt } from "@/lib/workshop-delivery";
+import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
 import { CutTagChip } from "./size-note";
@@ -48,11 +47,7 @@ export interface ShipmentView {
    * Si llegó, para los talleres con cuenta. `null` = el taller no confirma
    * nada, y decir "por recibir" sería prometer un aviso que nunca va a llegar.
    */
-  receipt: {
-    state: WorkshopDeliveryState;
-    receivedAt: Date | null;
-    receivedByName: string | null;
-  } | null;
+  receipt: DeliveryReceipt | null;
   stageName: string;
   sentAt: Date;
   reference: string | null;
@@ -239,29 +234,6 @@ export function OrderShipments({
         );
       })}
     </ul>
-  );
-}
-
-/** Si el taller ya confirmó que le llegó, y quién. */
-function ReceiptChip({
-  receipt,
-}: {
-  receipt: NonNullable<ShipmentView["receipt"]>;
-}) {
-  const detail = receipt.receivedAt
-    ? ` el ${formatDate(receipt.receivedAt)}${receipt.receivedByName ? ` por ${receipt.receivedByName}` : ""}`
-    : "";
-
-  return (
-    <span
-      className={cn(
-        "tabular rounded px-1.5 py-0.5 text-xs",
-        WORKSHOP_DELIVERY_STATE_STYLES[receipt.state],
-      )}
-    >
-      {WORKSHOP_DELIVERY_STATE_LABELS[receipt.state]}
-      {receipt.state === "RECEIVED" && detail}
-    </span>
   );
 }
 

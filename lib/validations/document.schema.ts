@@ -113,6 +113,8 @@ export const documentSchema = z.object({
   /** Quién entrega y quién recibe: el vale se firma en físico. */
   handedOverBy: optionalText,
   receivedBy: optionalText,
+  /** El taller al que va la salida de corte, si va a uno. */
+  workshopId: optionalCuid,
   notes: optionalText,
   lines: z.array(documentLineSchema),
   /**
@@ -123,6 +125,16 @@ export const documentSchema = z.object({
   cutLines: z.array(documentCutLineSchema).optional(),
   ...cutHeaderSchema.shape,
 }).superRefine((input, ctx) => {
+  /* El taller revisa y confirma el desglose por talla: sin él no le aparecería
+     nada que revisar, y el vale se quedaría prometiendo una entrega muda. */
+  if (input.workshopId && (input.cutLines?.length ?? 0) === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["workshopId"],
+      message: "Para mandarlo a un taller, agrega el desglose de corte.",
+    });
+  }
+
   /* Una SALIDA puede llevar sólo el desglose de cortes: a veces lo que se
      manda al taller son prendas ya cortadas y no hay tela que descontar. Los
      demás tipos —recepciones, ajustes, traspasos— existen precisamente para

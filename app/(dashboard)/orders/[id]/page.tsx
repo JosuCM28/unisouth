@@ -58,7 +58,7 @@ import {
   type SplitCut,
 } from "@/components/orders/workshop-split-panel";
 import { buildPlannedSplitCuts } from "@/lib/folder-split-cuts";
-import { deliveryState, isTrackedByWorkshop } from "@/lib/workshop-delivery";
+import { shipmentReceipt, voucherReceipt } from "@/lib/workshop-delivery";
 import {
   OrderShipments,
   type ShipmentView,
@@ -272,6 +272,10 @@ export default async function OrderDetailPage({
         date: true,
         cuttingBatchId: true,
         receivedBy: true,
+        appliedAt: true,
+        workshopReceivedAt: true,
+        workshopReceivedBy: { select: { name: true } },
+        workshop: { select: { accessRole: true, accessSince: true } },
         _count: { select: { cutLines: true } },
         // `bundles` junto a la cantidad: el renglón guarda lo que lleva CADA
         // bulto, y sumar sólo la cantidad enseñaba una fracción de lo que salió.
@@ -320,17 +324,7 @@ export default async function OrderDetailPage({
     code: shipment.code,
     status: shipment.status,
     workshopName: shipment.workshop.name,
-    receipt: isTrackedByWorkshop(shipment.workshop, shipment.createdAt)
-      ? {
-          state: deliveryState({
-            status: shipment.status,
-            documentStatus: shipment.document?.status ?? null,
-            receivedAt: shipment.receivedAt,
-          }),
-          receivedAt: shipment.receivedAt,
-          receivedByName: shipment.receivedBy?.name ?? null,
-        }
-      : null,
+    receipt: shipmentReceipt(shipment),
     stageName: shipment.stage.name,
     sentAt: shipment.sentAt,
     reference: shipment.reference,
@@ -523,6 +517,7 @@ export default async function OrderDetailPage({
     // Cantidad × bultos: "64 en 2 bultos" son 128 prendas, no 64.
     pieces: sumBundlePieces(issue.cutLines),
     sizes: issue._count.cutLines,
+    receipt: voucherReceipt(issue),
   }));
 
   /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las

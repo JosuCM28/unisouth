@@ -49,6 +49,7 @@ export default async function EditIssuePage({ params }: PageProps) {
       cutLines: { orderBy: { order: "asc" } },
       // Para regresar a la orden: el borrador se abre desde su pestaña de tela.
       cuttingOrder: { select: { id: true, code: true } },
+      _count: { select: { shipments: true } },
     },
   });
 
@@ -68,6 +69,8 @@ export default async function EditIssuePage({ params }: PageProps) {
     concept: document.concept,
     reference: document.reference,
     receivedBy: document.receivedBy,
+    workshopId: document.workshopId,
+    carriedByShipment: document._count.shipments > 0,
     notes: document.notes,
     cutHeader: {
       cutDescription: document.cutDescription ?? "",
@@ -132,6 +135,7 @@ export default async function EditIssuePage({ params }: PageProps) {
         clients={options.clients}
         productionRuns={options.productionRuns}
         locations={options.locations}
+        workshops={options.workshops}
         document={editable}
         canAdjust={canAdjust}
       />

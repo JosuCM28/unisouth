@@ -9,6 +9,8 @@ import {
 import type { IssueSummary } from "@/lib/issue-summary";
 import { issueFabric } from "@/lib/issue-fabric";
 import { cn, formatDate, formatQuantity } from "@/lib/utils";
+import type { DeliveryReceipt } from "@/lib/workshop-delivery";
+import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 
 export interface IssueRow {
   id: string;
@@ -50,6 +52,8 @@ export interface IssueRow {
     workshopName: string;
     stageName: string;
   } | null;
+  /** Si llegó, cuando va a un taller con cuenta. */
+  receipt: DeliveryReceipt | null;
   summary: IssueSummary;
 }
 
@@ -97,6 +101,10 @@ export function IssueCard({ issue }: { issue: IssueRow }) {
               <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
                 <Send className="size-3 shrink-0" aria-hidden />A taller
               </span>
+            )}
+
+            {issue.receipt && issue.receipt.state !== "CANCELLED" && (
+              <ReceiptChip receipt={issue.receipt} />
             )}
           </div>
 

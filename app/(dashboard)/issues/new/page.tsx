@@ -66,6 +66,7 @@ export default async function NewIssuePage({ searchParams }: PageProps) {
         clients={options.clients}
         productionRuns={options.productionRuns}
         locations={options.locations}
+        workshops={options.workshops}
         order={order ?? undefined}
         canAdjust={canAdjust}
       />

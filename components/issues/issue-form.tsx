@@ -82,6 +82,9 @@ export interface EditableIssue {
   concept: string | null;
   reference: string | null;
   receivedBy: string | null;
+  workshopId: string | null;
+  /** Nació de un envío a taller: ya está ligado y no se ofrece elegir. */
+  carriedByShipment: boolean;
   notes: string | null;
   cutHeader: CutHeaderDraft;
   lines: {
@@ -126,6 +129,8 @@ interface Props {
   productionRuns: { id: string; code: string; name: string | null }[];
   /** Para dar de alta un rollo sin salirse del vale: dónde se acomodó. */
   locations: NewLotLocationOption[];
+  /** Los talleres del catálogo, para ligar la salida de corte a uno. */
+  workshops: { id: string; name: string; hasAccount: boolean }[];
   /** Presente = se está corrigiendo un borrador, no creando uno nuevo. */
   document?: EditableIssue;
   /**
@@ -188,6 +193,7 @@ export function IssueForm({
   clients,
   productionRuns,
   locations,
+  workshops,
   document,
   order,
   canAdjust = false,
@@ -207,7 +213,21 @@ export function IssueForm({
     document?.reference ?? order?.code ?? "",
   );
   const [receivedBy, setReceivedBy] = useState(document?.receivedBy ?? "");
+  const [workshopId, setWorkshopId] = useState(document?.workshopId ?? "");
   const [notes, setNotes] = useState(document?.notes ?? "");
+
+  /* Elegir el taller propone su nombre en "Quién recibe", que es lo que se
+     firma. Sólo si ahí no escribieron a una persona: pisar un nombre tecleado
+     a mano borraría justo el dato que el taller no puede dar. */
+  function handleWorkshopChange(nextId: string) {
+    const nameOf = (id: string) =>
+      workshops.find((workshop) => workshop.id === id)?.name ?? "";
+
+    if (!receivedBy.trim() || receivedBy === nameOf(workshopId)) {
+      setReceivedBy(nameOf(nextId));
+    }
+    setWorkshopId(nextId);
+  }
 
   /* El centinela "de la fábrica" sólo vive en la interfaz: hacia el servidor
      viaja como ausencia de dueño, que es como está guardado en la base. */
@@ -511,6 +531,7 @@ export function IssueForm({
       concept: concept || undefined,
       reference: reference || undefined,
       receivedBy: receivedBy || undefined,
+      workshopId: workshopId || undefined,
       notes: notes || undefined,
       // El encabezado del desglose: qué prenda, con qué tela y en qué versión.
       // Va siempre, aunque el vale no lleve tallas: no estorba y evita tener
@@ -602,12 +623,13 @@ export function IssueForm({
     !isSubmitting &&
     (isEditing
       ? snapshot(lines, cutLines, cutHeader, concept, reference, receivedBy, notes) !==
-        originalSnapshot
+          originalSnapshot || workshopId !== (document?.workshopId ?? "")
       : hasSomething ||
         Boolean(
           concept ||
             (reference && reference !== order?.code) ||
             receivedBy ||
+            workshopId ||
             notes,
         ));
 
@@ -876,6 +898,28 @@ export function IssueForm({
                 className="touch-target"
               />
             </div>
+
+            {!document?.carriedByShipment && (
+              <FormSelectField
+                id="issue-workshop"
+                label="Taller que recibe"
+                hint="Si tiene cuenta, le aparece en su lista al aplicar el vale."
+              >
+                <SearchSelect
+                  id="issue-workshop"
+                  options={workshops.map((workshop) => ({
+                    value: workshop.id,
+                    label: workshop.name,
+                    hint: workshop.hasAccount ? "Con cuenta" : undefined,
+                  }))}
+                  value={workshopId}
+                  onChange={handleWorkshopChange}
+                  placeholder="Sin taller"
+                  searchPlaceholder="Buscar taller…"
+                  clearLabel="Sin taller"
+                />
+              </FormSelectField>
+            )}
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="issue-received-by">Quién recibe</Label>

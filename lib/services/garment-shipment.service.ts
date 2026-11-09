@@ -258,6 +258,8 @@ export class GarmentShipmentService extends BaseService {
       // Quien entrega se firma en el papel, no se teclea aquí.
       handedOverBy: undefined,
       receivedBy: input.workshopName,
+      // Vacío a propósito: al taller le llega por el envío, no por el vale.
+      workshopId: undefined,
       notes: `Envío ${input.shipmentCode}`,
       // Sin rollos: lo que sale son prendas cortadas, no tela por descontar.
       lines: [],

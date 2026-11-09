@@ -13,6 +13,7 @@ import { issueFabric } from "@/lib/issue-fabric";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { usePageParam } from "@/components/shared/use-page-param";
+import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 import { IssueCard, type IssueRow } from "./issue-card";
 
 /** Una salida en la tabla: lo mismo que pinta la tarjeta del celular. */
@@ -135,9 +136,15 @@ export function IssueTable({ issues, server, isFiltered = false }: Props) {
       header: "Recibió",
       accessorFn: (issue) => issue.receivedBy ?? "",
       cell: ({ row }) => (
-        <span className="text-muted-foreground">
-          {row.original.receivedBy ?? "—"}
-        </span>
+        <div className="flex flex-col items-start gap-1">
+          <span className="text-muted-foreground">
+            {row.original.receivedBy ?? "—"}
+          </span>
+          {row.original.receipt &&
+            row.original.receipt.state !== "CANCELLED" && (
+              <ReceiptChip receipt={row.original.receipt} />
+            )}
+        </div>
       ),
     },
     {

@@ -34,23 +34,29 @@ export function DeliveryDetail({
       <OrderData delivery={delivery} />
       <Notes delivery={delivery} />
 
-      <section className="flat-surface p-4">
-        <h2 className="mb-3 text-sm font-semibold">
-          Cortes de la orden ({delivery.cuts.length})
-        </h2>
-        {delivery.cuts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Esta orden todavía no tiene cortes capturados.
-          </p>
-        ) : (
-          <OrderBatches
-            batches={delivery.cuts}
-            orderId={delivery.id}
-            orderCode={delivery.order.reference}
-          />
-        )}
-      </section>
+      {delivery.showCuts && <OrderCuts delivery={delivery} />}
     </div>
+  );
+}
+
+function OrderCuts({ delivery }: { delivery: ActiveWorkshopDelivery }) {
+  return (
+    <section className="flat-surface p-4">
+      <h2 className="mb-3 text-sm font-semibold">
+        Cortes de la orden ({delivery.cuts.length})
+      </h2>
+      {delivery.cuts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Esta orden todavía no tiene cortes capturados.
+        </p>
+      ) : (
+        <OrderBatches
+          batches={delivery.cuts}
+          orderId={delivery.id}
+          orderCode={delivery.order.reference}
+        />
+      )}
+    </section>
   );
 }
 

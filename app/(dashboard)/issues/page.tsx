@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Layers, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getIssueSummaries } from "@/lib/issue-summary";
+import { shipmentReceipt, voucherReceipt } from "@/lib/workshop-delivery";
 import { parseIssueFilters, issueWhere } from "@/lib/repositories/issue-filters";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchInput } from "@/components/shared/search-input";
@@ -101,10 +102,19 @@ export default async function IssuesPage({ searchParams }: PageProps) {
           take: 1,
           select: {
             code: true,
-            workshop: { select: { name: true } },
+            status: true,
+            createdAt: true,
+            receivedAt: true,
+            receivedBy: { select: { name: true } },
+            workshop: {
+              select: { name: true, accessRole: true, accessSince: true },
+            },
             stage: { select: { name: true } },
           },
         },
+        // El taller elegido en el vale y si ya confirmó que le llegó.
+        workshop: { select: { accessRole: true, accessSince: true } },
+        workshopReceivedBy: { select: { name: true } },
       },
     }),
   ]);
@@ -129,6 +139,12 @@ export default async function IssuesPage({ searchParams }: PageProps) {
     cutFabricText: issue.cutFabricText,
     cutDescription: issue.cutDescription,
     shipment: toShipmentBadge(issue.shipments[0]),
+    receipt: issue.shipments[0]
+      ? shipmentReceipt({
+          ...issue.shipments[0],
+          document: { status: issue.status },
+        })
+      : voucherReceipt(issue),
     summary: summaries.get(issue.id) ?? EMPTY_SUMMARY,
   }));
 
