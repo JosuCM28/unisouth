@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/core/session";
+import { requireUser } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
+import { WorkshopDeliveryService } from "@/lib/services/workshop-delivery.service";
 import {
   CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
@@ -25,8 +27,14 @@ export const metadata: Metadata = { title: "Orden de corte" };
  * estas y cuándo", que un total no puede responder.
  */
 export default async function PrintOrderPage({ params }: PageProps) {
-  await requirePermission("orders:browse");
+  const user = await requireUser();
   const { id } = await params;
+
+  /* Quien mira las órdenes imprime cualquiera; un taller, sólo las que tiene
+     con una entrega vigente. */
+  if (!roleHasPermission(user.role, "orders:browse")) {
+    await new WorkshopDeliveryService().assertCanPrintOrder(user.role, id);
+  }
 
   const order = await prisma.cuttingOrder.findUnique({
     where: { id },

@@ -16,7 +16,10 @@ const LIST_SELECT = {
   status: true,
   sentAt: true,
   parts: true,
+  dispatchedAt: true,
   receivedAt: true,
+  receivedNotes: true,
+  receivedBy: { select: { name: true } },
   stage: { select: { name: true } },
   document: { select: { status: true } },
   order: {
@@ -42,7 +45,10 @@ const VOUCHER_LIST_SELECT = {
   concept: true,
   reference: true,
   cutDescription: true,
+  dispatchedAt: true,
   workshopReceivedAt: true,
+  workshopReceivedNotes: true,
+  workshopReceivedBy: { select: { name: true } },
   client: { select: { name: true } },
   cuttingOrder: { select: { code: true, reference: true } },
   cutLines: { select: { quantity: true, bundles: true } },
@@ -105,8 +111,11 @@ const VOUCHER_DETAIL_SELECT = {
   cutVersion: true,
   cutVersionNotes: true,
   cutNotes: true,
+  cuttingOrderId: true,
   cuttingBatchId: true,
+  dispatchedAt: true,
   workshopReceivedAt: true,
+  workshopReceivedNotes: true,
   workshopReceivedBy: { select: { name: true } },
   client: { select: { name: true } },
   cutFabric: { select: { code: true, name: true } },
@@ -151,7 +160,10 @@ const DETAIL_SELECT = {
   parts: true,
   notes: true,
   reference: true,
+  dispatchedAt: true,
   receivedAt: true,
+  receivedNotes: true,
+  orderId: true,
   documentId: true,
   receivedBy: { select: { name: true } },
   stage: { select: { name: true } },
@@ -251,6 +263,26 @@ export class WorkshopDeliveryRepository extends BaseRepository<
       where: { id, ...voucherScopeWhere(scope) },
       select: VOUCHER_DETAIL_SELECT,
     });
+  }
+
+  /** Lo que este taller recibió de una orden, para dejarle imprimir su hoja. */
+  async findOrderDeliveries(scope: WorkshopScope, orderId: string) {
+    const [shipments, vouchers] = await Promise.all([
+      this.db.garmentShipment.findMany({
+        where: { orderId, ...shipmentScopeWhere(scope) },
+        select: {
+          status: true,
+          receivedAt: true,
+          document: { select: { status: true } },
+        },
+      }),
+      this.db.inventoryDocument.findMany({
+        where: { cuttingOrderId: orderId, ...voucherScopeWhere(scope) },
+        select: { status: true, workshopReceivedAt: true },
+      }),
+    ]);
+
+    return { shipments, vouchers };
   }
 
   /** Para la reimpresión: la salida de corte si es de este taller. */

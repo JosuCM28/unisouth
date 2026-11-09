@@ -7,6 +7,7 @@ import { OrderBatches } from "@/components/orders/order-batches";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { DeliveryStateBadge } from "./delivery-state-badge";
+import { DispatchNote } from "./dispatch-status";
 import { ReceiveButton } from "./receive-button";
 
 export function CancelledDelivery({ code }: { code: string }) {
@@ -73,6 +74,8 @@ function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
         {formatQuantity(delivery.pieces)} pzas · {delivery.bundles} bultos
       </p>
 
+      <DispatchNote dispatchedAt={delivery.dispatchedAt} />
+
       {delivery.state === "RECEIVED" && (
         <p className="tabular text-sm">
           Recibida el {formatDateTime(delivery.receivedAt)}
@@ -80,8 +83,14 @@ function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
         </p>
       )}
 
+      {delivery.receivedNotes && (
+        <p className="break-words border border-border bg-muted p-2 text-sm">
+          <span className="font-medium">Nota:</span> {delivery.receivedNotes}
+        </p>
+      )}
+
       <div className="flex flex-col gap-2 sm:flex-row">
-        {delivery.state === "PENDING" && (
+        {delivery.state === "PENDING" && delivery.dispatchedAt && (
           <ReceiveButton
             id={delivery.id}
             code={delivery.code}
@@ -98,6 +107,18 @@ function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
             >
               <Printer className="size-4" aria-hidden />
               Reimprimir salida
+            </a>
+          </Button>
+        )}
+        {delivery.orderId && (
+          <Button asChild variant="outline" className="touch-target">
+            <a
+              href={`/print/order/${delivery.orderId}`}
+              target="_blank"
+              rel="noopener"
+            >
+              <Printer className="size-4" aria-hidden />
+              Reimprimir orden
             </a>
           </Button>
         )}

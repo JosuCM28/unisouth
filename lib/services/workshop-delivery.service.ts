@@ -34,6 +34,11 @@ export interface WorkshopDeliveryRow {
   sentAt: Date;
   pieces: number;
   bundles: number;
+  /** Cuándo salió de verdad de la planta. Vacío = sigue allá. */
+  dispatchedAt: Date | null;
+  receivedAt: Date | null;
+  receivedByName: string | null;
+  receivedNotes: string | null;
 }
 
 export interface WorkshopDeliveryList {
@@ -57,6 +62,8 @@ export interface ActiveWorkshopDelivery {
   state: "PENDING" | "RECEIVED";
   id: string;
   code: string;
+  /** Para reimprimir la hoja. Vacío en un vale que no nació de una orden. */
+  orderId: string | null;
   voucherId: string | null;
   voucherCode: string | null;
   sentAt: Date;
@@ -64,8 +71,10 @@ export interface ActiveWorkshopDelivery {
   parts: string | null;
   reference: string | null;
   notes: string | null;
+  dispatchedAt: Date | null;
   receivedAt: Date | null;
   receivedByName: string | null;
+  receivedNotes: string | null;
   pieces: number;
   bundles: number;
   lines: {
@@ -195,6 +204,30 @@ export class WorkshopDeliveryService extends BaseService {
     }
   }
 
+  /**
+   * La hoja de la orden: sólo si el taller tiene una entrega vigente de ella.
+   *
+   * Basta una: la orden se le pudo mandar en dos envíos y cancelar uno no le
+   * quita lo que el otro sí le dejó.
+   */
+  async assertCanPrintOrder(role: string, orderId: string): Promise<void> {
+    const workshop = await this.repository.findWorkshopByRole(role);
+    const deliveries = workshop
+      ? await this.repository.findOrderDeliveries(workshop, orderId)
+      : null;
+
+    const hasLiveDelivery =
+      deliveries !== null &&
+      [
+        ...deliveries.shipments.map(stateOf),
+        ...deliveries.vouchers.map(voucherStateOf),
+      ].some((state) => state !== "CANCELLED");
+
+    if (!hasLiveDelivery) {
+      throw new ForbiddenError("No puedes imprimir esta orden.");
+    }
+  }
+
   private async printableState(
     workshop: { id: string; accessSince: Date | null },
     documentId: string,
@@ -212,7 +245,11 @@ export class WorkshopDeliveryService extends BaseService {
    * Sin deshacer para el taller: "ya está allá" es lo que la casa va a dar por
    * cierto, y si se pudiera apagar y prender dejaría de significar algo.
    */
-  async confirmReceipt(id: string, role: string): Promise<{ code: string }> {
+  async confirmReceipt(
+    id: string,
+    role: string,
+    notes?: string,
+  ): Promise<{ code: string }> {
     return this.transaction(async (tx) => {
       const workshop = await tx.workshop.findFirst({
         where: { accessRole: role, deletedAt: null },
@@ -225,22 +262,27 @@ export class WorkshopDeliveryService extends BaseService {
         select: {
           code: true,
           status: true,
+          dispatchedAt: true,
           receivedAt: true,
           document: { select: { status: true } },
         },
       });
 
       if (shipment) {
-        this.assertReceivable(stateOf(shipment), shipment.code);
+        this.assertReceivable(stateOf(shipment), shipment);
         await tx.garmentShipment.update({
           where: { id },
-          data: { receivedAt: new Date(), receivedById: this.context.userId },
+          data: {
+            receivedAt: new Date(),
+            receivedById: this.context.userId,
+            receivedNotes: notes,
+          },
         });
-        await this.auditReceipt(tx, "GarmentShipment", id, shipment.code, workshop.name);
+        await this.auditReceipt(tx, "GarmentShipment", id, shipment.code, workshop.name, notes);
         return { code: shipment.code };
       }
 
-      return this.confirmVoucher(tx, id, workshop);
+      return this.confirmVoucher(tx, id, workshop, notes);
     });
   }
 
@@ -249,34 +291,50 @@ export class WorkshopDeliveryService extends BaseService {
     tx: PrismaExecutor,
     id: string,
     workshop: { id: string; name: string; accessSince: Date | null },
+    notes?: string,
   ): Promise<{ code: string }> {
     const voucher = await tx.inventoryDocument.findFirst({
       where: { id, ...voucherScopeWhere(workshop) },
-      select: { code: true, status: true, workshopReceivedAt: true },
+      select: {
+        code: true,
+        status: true,
+        dispatchedAt: true,
+        workshopReceivedAt: true,
+      },
     });
     if (!voucher) throw new NotFoundError("la entrega", id);
 
-    this.assertReceivable(voucherStateOf(voucher), voucher.code);
+    this.assertReceivable(voucherStateOf(voucher), voucher);
 
     await tx.inventoryDocument.update({
       where: { id },
       data: {
         workshopReceivedAt: new Date(),
         workshopReceivedById: this.context.userId,
+        workshopReceivedNotes: notes,
       },
     });
-    await this.auditReceipt(tx, "InventoryDocument", id, voucher.code, workshop.name);
+    await this.auditReceipt(tx, "InventoryDocument", id, voucher.code, workshop.name, notes);
 
     return { code: voucher.code };
   }
 
-  private assertReceivable(state: WorkshopDeliveryState, code: string) {
+  private assertReceivable(
+    state: WorkshopDeliveryState,
+    { code, dispatchedAt }: { code: string; dispatchedAt: Date | null },
+  ) {
     if (state === "CANCELLED") {
       throw new BusinessRuleError(`La entrega ${code} fue cancelada.`);
     }
     if (state === "RECEIVED") {
       throw new BusinessRuleError(
         `La entrega ${code} ya estaba marcada como recibida.`,
+      );
+    }
+    // No se puede confirmar lo que sigue físicamente en la planta de corte.
+    if (!dispatchedAt) {
+      throw new BusinessRuleError(
+        `La entrega ${code} todavía no sale de la planta de corte.`,
       );
     }
   }
@@ -287,13 +345,14 @@ export class WorkshopDeliveryService extends BaseService {
     entityId: string,
     code: string,
     workshopName: string,
+    notes?: string,
   ) {
     await this.auditWith(tx).record({
       entity,
       entityId,
       action: "UPDATE",
       reference: code,
-      newValue: { recibido: true, taller: workshopName },
+      newValue: { recibido: true, taller: workshopName, nota: notes ?? null },
       sensitivity: "LOW",
     });
   }
@@ -434,6 +493,10 @@ function toListRow(row: WorkshopDeliveryListRow): WorkshopDeliveryRow {
     parts: row.parts,
     sentAt: row.sentAt,
     ...totals(row.lines),
+    dispatchedAt: row.dispatchedAt,
+    receivedAt: row.receivedAt,
+    receivedByName: row.receivedBy?.name ?? null,
+    receivedNotes: row.receivedNotes,
   };
 }
 
@@ -474,6 +537,10 @@ function toVoucherListRow(row: WorkshopVoucherListRow): WorkshopDeliveryRow {
     parts: null,
     sentAt: row.date,
     ...voucherLineTotals(row.cutLines),
+    dispatchedAt: row.dispatchedAt,
+    receivedAt: row.workshopReceivedAt,
+    receivedByName: row.workshopReceivedBy?.name ?? null,
+    receivedNotes: row.workshopReceivedNotes,
   };
 }
 
@@ -485,6 +552,7 @@ function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail 
     state,
     id: row.id,
     code: row.code,
+    orderId: row.cuttingOrderId,
     voucherId: row.id,
     voucherCode: row.code,
     sentAt: row.date,
@@ -492,8 +560,10 @@ function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail 
     parts: null,
     reference: null,
     notes: row.notes,
+    dispatchedAt: row.dispatchedAt,
     receivedAt: row.workshopReceivedAt,
     receivedByName: row.workshopReceivedBy?.name ?? null,
+    receivedNotes: row.workshopReceivedNotes,
     ...voucherLineTotals(row.cutLines),
     lines: row.cutLines.map((line) => ({
       id: line.id,
@@ -531,6 +601,7 @@ function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
     state,
     id: row.id,
     code: row.code,
+    orderId: row.orderId,
     voucherId: row.documentId,
     voucherCode: row.document?.code ?? null,
     sentAt: row.sentAt,
@@ -538,8 +609,10 @@ function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
     parts: row.parts,
     reference: row.reference,
     notes: row.notes,
+    dispatchedAt: row.dispatchedAt,
     receivedAt: row.receivedAt,
     receivedByName: row.receivedBy?.name ?? null,
+    receivedNotes: row.receivedNotes,
     ...totals(row.lines),
     lines: row.lines.map((line) => ({
       id: line.id,

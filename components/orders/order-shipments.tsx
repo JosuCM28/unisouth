@@ -13,6 +13,7 @@ import {
   GARMENT_SHIPMENT_STATUS_STYLES,
 } from "@/lib/constants/labels";
 import type { DeliveryReceipt } from "@/lib/workshop-delivery";
+import { DispatchChip } from "@/components/workshop-orders/dispatch-status";
 import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
@@ -48,6 +49,9 @@ export interface ShipmentView {
    * nada, y decir "por recibir" sería prometer un aviso que nunca va a llegar.
    */
   receipt: DeliveryReceipt | null;
+  /** Cuándo salió de verdad de la planta, y quién lo marcó. */
+  dispatchedAt: Date | null;
+  dispatchedByName: string | null;
   stageName: string;
   sentAt: Date;
   reference: string | null;
@@ -126,6 +130,13 @@ export function OrderShipments({
                 >
                   {GARMENT_SHIPMENT_STATUS_LABELS[shipment.status]}
                 </span>
+                {shipment.status !== "CANCELLED" && (
+                  <DispatchChip
+                    dispatchedAt={shipment.dispatchedAt}
+                    dispatchedByName={shipment.dispatchedByName}
+                    tracked={shipment.receipt !== null}
+                  />
+                )}
                 {shipment.receipt && shipment.status !== "CANCELLED" && (
                   <ReceiptChip receipt={shipment.receipt} />
                 )}

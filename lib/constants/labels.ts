@@ -23,9 +23,15 @@ import type {
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
-import type { WorkshopDeliveryState } from "./workshop-access";
+import type { WorkshopBoardTab, WorkshopDeliveryState } from "./workshop-access";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
+
+/** Las pestañas del tablero de un taller. */
+export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {
+  pending: "Por recibir",
+  received: "Recibidas",
+};
 
 /** Cómo ve el taller una entrega. */
 export const WORKSHOP_DELIVERY_STATE_LABELS: Record<

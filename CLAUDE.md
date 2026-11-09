@@ -329,6 +329,14 @@ recibe** (`InventoryDocument.workshopId`), pero sólo al APLICARLA: un borrador
 todavía se puede corregir o cambiar de taller. Un vale que nace de un envío no
 lleva ese campo: ya le llega por su envío, y con los dos lo vería duplicado.
 
+El tablero de cada taller separa sus entregas en **Por recibir** y **Recibidas**.
+Al recibir puede dejar una nota opcional, que la casa lee junto al estado. ADMIN
+ve los tableros pero no confirma: eso le toca al taller.
+
+Capturar un envío no es que haya salido: el corte puede seguir en la planta. El
+botón **Enviar** de Órdenes marca qué sale hoy (`dispatchedAt` y quién) y sólo
+entonces el taller puede recibirlo. Un vale en borrador no se puede enviar.
+
 `catalog:write` quedó acotado a los cinco catálogos del piso; cada dominio que
 salió tiene su propia llave de escritura, para que "no verlo" y "no poder
 escribirlo" sean lo mismo.

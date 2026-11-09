@@ -214,6 +214,7 @@ export default async function OrderDetailPage({
           select: { name: true, accessRole: true, accessSince: true },
         },
         receivedBy: { select: { name: true } },
+        dispatchedBy: { select: { name: true } },
         stage: { select: { name: true } },
         document: { select: { id: true, code: true, status: true } },
         lines: {
@@ -273,7 +274,10 @@ export default async function OrderDetailPage({
         cuttingBatchId: true,
         receivedBy: true,
         appliedAt: true,
+        dispatchedAt: true,
+        dispatchedBy: { select: { name: true } },
         workshopReceivedAt: true,
+        workshopReceivedNotes: true,
         workshopReceivedBy: { select: { name: true } },
         workshop: { select: { accessRole: true, accessSince: true } },
         _count: { select: { cutLines: true } },
@@ -325,6 +329,8 @@ export default async function OrderDetailPage({
     status: shipment.status,
     workshopName: shipment.workshop.name,
     receipt: shipmentReceipt(shipment),
+    dispatchedAt: shipment.dispatchedAt,
+    dispatchedByName: shipment.dispatchedBy?.name ?? null,
     stageName: shipment.stage.name,
     sentAt: shipment.sentAt,
     reference: shipment.reference,
@@ -518,6 +524,8 @@ export default async function OrderDetailPage({
     pieces: sumBundlePieces(issue.cutLines),
     sizes: issue._count.cutLines,
     receipt: voucherReceipt(issue),
+    dispatchedAt: issue.dispatchedAt,
+    dispatchedByName: issue.dispatchedBy?.name ?? null,
   }));
 
   /* Lo que necesitan los dos diálogos de captura: el corte al que cargar las

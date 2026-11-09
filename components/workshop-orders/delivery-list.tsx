@@ -7,6 +7,7 @@ import type {
 import { formatDate, formatQuantity } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DeliveryStateBadge } from "./delivery-state-badge";
+import { DispatchNote } from "./dispatch-status";
 
 /** Las entregas del taller: tarjetas en celular, tabla desde `md:`. */
 export function DeliveryList({ list }: { list: WorkshopDeliveryList }) {
@@ -96,6 +97,7 @@ function CardBody({ row }: { row: WorkshopDeliveryRow }) {
         {row.stageName} · {formatDate(row.sentAt)} ·{" "}
         {formatQuantity(row.pieces)} pzas · {row.bundles} bultos
       </p>
+      <DispatchNote dispatchedAt={row.dispatchedAt} />
     </>
   );
 }
@@ -152,6 +154,7 @@ function TableRow({ row }: { row: WorkshopDeliveryRow }) {
       </td>
       <td className="p-3">
         <DeliveryStateBadge state={row.state} />
+        <DispatchNote dispatchedAt={row.dispatchedAt} />
       </td>
       <td className="tabular p-3">
         {row.orderReference}

@@ -36,6 +36,8 @@ export interface DeliveryReceipt {
   state: WorkshopDeliveryState;
   receivedAt: Date | null;
   receivedByName: string | null;
+  /** Lo que anotó el taller al recibir. */
+  notes: string | null;
 }
 
 /** `null` = el taller no confirma nada: decir "por recibir" sería prometerlo. */
@@ -43,6 +45,7 @@ export function shipmentReceipt(shipment: {
   status: GarmentShipmentStatus;
   createdAt: Date;
   receivedAt: Date | null;
+  receivedNotes: string | null;
   receivedBy: { name: string } | null;
   document: { status: DocumentStatus } | null;
   workshop: { accessRole: string | null; accessSince: Date | null };
@@ -57,6 +60,7 @@ export function shipmentReceipt(shipment: {
     }),
     receivedAt: shipment.receivedAt,
     receivedByName: shipment.receivedBy?.name ?? null,
+    notes: shipment.receivedNotes,
   };
 }
 
@@ -68,6 +72,7 @@ export function voucherReceipt(voucher: {
   status: DocumentStatus;
   appliedAt: Date | null;
   workshopReceivedAt: Date | null;
+  workshopReceivedNotes: string | null;
   workshopReceivedBy: { name: string } | null;
   workshop: { accessRole: string | null; accessSince: Date | null } | null;
 }): DeliveryReceipt | null {
@@ -81,6 +86,7 @@ export function voucherReceipt(voucher: {
     }),
     receivedAt: voucher.workshopReceivedAt,
     receivedByName: voucher.workshopReceivedBy?.name ?? null,
+    notes: voucher.workshopReceivedNotes,
   };
 }
 

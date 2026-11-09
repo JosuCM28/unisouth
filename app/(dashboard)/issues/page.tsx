@@ -105,6 +105,7 @@ export default async function IssuesPage({ searchParams }: PageProps) {
             status: true,
             createdAt: true,
             receivedAt: true,
+            receivedNotes: true,
             receivedBy: { select: { name: true } },
             workshop: {
               select: { name: true, accessRole: true, accessSince: true },

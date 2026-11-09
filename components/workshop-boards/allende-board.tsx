@@ -1,19 +1,22 @@
-import { LayoutDashboard } from "lucide-react";
-import { PageHeader } from "@/components/layout/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
+import type { Role } from "@/lib/constants/roles";
+import type { WorkshopBoardTab } from "@/lib/constants/workshop-access";
+import { DeliveryBoard } from "./delivery-board";
 
-/** El tablero de Allende. Componente propio: se va a diseñar aparte del resto. */
-export function AllendeBoard() {
+/** El tablero de Allende. Componente propio: puede crecer aparte del resto. */
+export function AllendeBoard({
+  viewerRole,
+  tab,
+}: {
+  viewerRole: Role;
+  tab: WorkshopBoardTab;
+}) {
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Tablero Allende" description="Taller Allende" />
-      <div className="flat-surface">
-        <EmptyState
-          icon={LayoutDashboard}
-          title="Este tablero está en preparación"
-          description="Tus entregas están en Órdenes."
-        />
-      </div>
-    </div>
+    <DeliveryBoard
+      title="Tablero Allende"
+      boardRole="WORKSHOP_ALLENDE"
+      basePath="/workshop-boards/allende"
+      viewerRole={viewerRole}
+      tab={tab}
+    />
   );
 }

@@ -16,6 +16,7 @@ import {
   type ColumnVisibility,
 } from "@/components/shared/use-column-visibility";
 import { OrderDeleteButton } from "./order-delete-button";
+import { OrderDispatchDialog } from "./order-dispatch-dialog";
 import {
   OrderListItem,
   orderFabric,
@@ -319,11 +320,19 @@ export function OrderTable({
             header: "",
             enableSorting: false,
             cell: ({ row }: { row: { original: OrderTableRow } }) => (
-              <OrderDeleteButton
-                orderId={row.original.id}
-                orderCode={row.original.code}
-                cutQuantity={totalsOf(row.original).cut}
-              />
+              <div className="flex items-center justify-end gap-1">
+                {row.original.status !== "CANCELLED" && (
+                  <OrderDispatchDialog
+                    orderId={row.original.id}
+                    orderCode={row.original.code}
+                  />
+                )}
+                <OrderDeleteButton
+                  orderId={row.original.id}
+                  orderCode={row.original.code}
+                  cutQuantity={totalsOf(row.original).cut}
+                />
+              </div>
             ),
           },
         ]

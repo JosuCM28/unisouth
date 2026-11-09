@@ -7,6 +7,7 @@ import {
 } from "@/lib/constants/labels";
 import { cn, cutTotals, formatDate } from "@/lib/utils";
 import { OrderDeleteButton } from "./order-delete-button";
+import { OrderDispatchDialog } from "./order-dispatch-dialog";
 
 /** Lo mínimo que la tarjeta necesita saber de una orden. */
 export interface OrderListEntry {
@@ -223,12 +224,16 @@ export function OrderListItem({
 
         {/* Por encima de la capa del enlace, o el toque abriría la orden. */}
         {canWrite && (
-          <OrderDeleteButton
-            orderId={order.id}
-            orderCode={order.code}
-            cutQuantity={cut}
-            className="relative z-20"
-          />
+          <div className="relative z-20 flex shrink-0 items-center gap-1">
+            {order.status !== "CANCELLED" && (
+              <OrderDispatchDialog orderId={order.id} orderCode={order.code} />
+            )}
+            <OrderDeleteButton
+              orderId={order.id}
+              orderCode={order.code}
+              cutQuantity={cut}
+            />
+          </div>
         )}
       </div>
       </div>

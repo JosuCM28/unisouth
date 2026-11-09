@@ -7,6 +7,7 @@ import {
 } from "@/lib/constants/labels";
 import { cn, formatDate } from "@/lib/utils";
 import type { DeliveryReceipt } from "@/lib/workshop-delivery";
+import { DispatchChip } from "@/components/workshop-orders/dispatch-status";
 import { ReceiptChip } from "@/components/workshop-orders/receipt-chip";
 
 export interface IssueView {
@@ -21,6 +22,9 @@ export interface IssueView {
   sizes: number;
   /** Si llegó, cuando la salida va a un taller con cuenta. */
   receipt: DeliveryReceipt | null;
+  /** Cuándo salió de verdad de la planta, y quién lo marcó. */
+  dispatchedAt: Date | null;
+  dispatchedByName: string | null;
 }
 
 /**
@@ -93,6 +97,13 @@ function IssueCard({ issue, canOpen }: { issue: IssueView; canOpen: boolean }) {
           >
             {DOCUMENT_STATUS_LABELS[issue.status]}
           </span>
+          {!isCancelled && (
+            <DispatchChip
+              dispatchedAt={issue.dispatchedAt}
+              dispatchedByName={issue.dispatchedByName}
+              tracked={issue.receipt !== null}
+            />
+          )}
           {issue.receipt && !isCancelled && (
             <ReceiptChip receipt={issue.receipt} />
           )}

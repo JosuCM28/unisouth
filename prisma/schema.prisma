@@ -82,6 +82,8 @@ model User {
   garmentReturns            GarmentReturn[]       @relation("GarmentReturnBy")
   garmentShipments          GarmentShipment[]     @relation("GarmentShipmentCreatedBy")
   garmentShipmentsReceived  GarmentShipment[]     @relation("GarmentShipmentReceivedBy")
+  garmentShipmentsDispatched GarmentShipment[]    @relation("GarmentShipmentDispatchedBy")
+  documentsDispatched       InventoryDocument[]   @relation("DocumentDispatchedBy")
   garmentFolders            GarmentFolder[]       @relation("GarmentFolderCreatedBy")
   garmentsCreated           Garment[]             @relation("GarmentCreatedBy")
   garmentPhotos             GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
@@ -792,11 +794,19 @@ model InventoryDocument {
   workshopId String?
   workshop   Workshop? @relation(fields: [workshopId], references: [id], onDelete: SetNull)
 
+  /// Cuándo salió de verdad de la planta de corte, y quién lo marcó. Aparte de
+  /// `appliedAt`: aplicar el vale mueve el papel, no el camión.
+  dispatchedAt   DateTime?
+  dispatchedById String?
+  dispatchedBy   User?     @relation("DocumentDispatchedBy", fields: [dispatchedById], references: [id])
+
   /// Cuándo confirmó el taller que le llegó, y quién. Con prefijo porque
   /// `receivedBy` ya es el nombre que se firma en el papel.
   workshopReceivedAt   DateTime?
   workshopReceivedById String?
   workshopReceivedBy   User?     @relation("DocumentWorkshopReceivedBy", fields: [workshopReceivedById], references: [id])
+  /// Lo que el taller anotó al recibir.
+  workshopReceivedNotes String?
 
   // ── Header of the CUTTING BREAKDOWN ──────────────────────────────────────
   // Its own fields, not derived from the rolls: an issue can carry only the
@@ -2395,6 +2405,14 @@ model GarmentShipment {
   cancelledAt        DateTime?
   cancellationReason String?
 
+  /// Cuándo salió de verdad de la planta de corte, y quién lo marcó.
+  ///
+  /// Aparte de `sentAt`, que es la fecha que se capturó en el envío: el corte
+  /// puede estar capturado y seguir aquí hasta que vengan por él.
+  dispatchedAt   DateTime?
+  dispatchedById String?
+  dispatchedBy   User?     @relation("GarmentShipmentDispatchedBy", fields: [dispatchedById], references: [id])
+
   /// Cuándo confirmó el taller que le llegó, y quién. Vacío = todavía no.
   ///
   /// Fecha y no booleano, y aparte de `status`: el estado habla de retornos,
@@ -2403,6 +2421,8 @@ model GarmentShipment {
   receivedAt   DateTime?
   receivedById String?
   receivedBy   User?     @relation("GarmentShipmentReceivedBy", fields: [receivedById], references: [id])
+  /// Lo que el taller anotó al recibir: "llegaron 2 bultos mojados".
+  receivedNotes String?
 
   createdById String?
   createdBy   User?    @relation("GarmentShipmentCreatedBy", fields: [createdById], references: [id])

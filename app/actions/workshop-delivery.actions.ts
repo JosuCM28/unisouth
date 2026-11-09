@@ -17,6 +17,7 @@ export async function confirmWorkshopDeliveryAction(input: unknown) {
       new WorkshopDeliveryService(auditContext).confirmReceipt(
         input.id,
         user.role,
+        input.notes,
       ),
   });
 }
