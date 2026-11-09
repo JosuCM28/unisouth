@@ -12,6 +12,27 @@
  * ensucia el promedio de toda la hoja.
  */
 
+/**
+ * Los cortes del semáforo de la retacería, en tanto por uno.
+ *
+ * Verde hasta 2%, amarillo hasta 3% y rojo de ahí en adelante. Son los mismos
+ * de la hoja de la fábrica: es el criterio con el que hoy se decide si un
+ * tendido salió caro, y moverlo aquí lo cambiaría sin que nadie lo acordara.
+ * Los leen la hoja de corte y el reporte de dirección: si cada uno tuviera los
+ * suyos, el mismo tendido podría salir verde en uno y amarillo en el otro.
+ */
+export const REMNANT_YELLOW_FROM = 0.02;
+export const REMNANT_RED_FROM = 0.03;
+
+export type RemnantLevel = "ok" | "warn" | "high";
+
+export function remnantLevel(rate: number | null): RemnantLevel | null {
+  if (rate === null) return null;
+  if (rate >= REMNANT_RED_FROM) return "high";
+  if (rate >= REMNANT_YELLOW_FROM) return "warn";
+  return "ok";
+}
+
 /** Lo que se capturó de una orden, ya en números planos. */
 export interface CutReportInput {
   orderedQuantity: number;

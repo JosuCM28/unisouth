@@ -6,6 +6,7 @@ import type {
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
+import { assignCaptureDates, freshCaptureDate } from "@/lib/cutting/capture-dates";
 import { cutTotals } from "@/lib/utils";
 import {
   toCutLines,
@@ -536,6 +537,7 @@ export class CuttingOrderService extends BaseService {
           tagId: input.tagId,
           notes: input.notes,
           userId: this.context.userId,
+          capturedAt: freshCaptureDate(input.quantity, new Date()),
         },
       });
 
@@ -639,15 +641,18 @@ export class CuttingOrderService extends BaseService {
       /* Los renglones que el corte tenía ANTES. Se guardan porque hay que
          recalcularlos aunque ya no vengan en la captura: si alguien quitó de
          este corte la talla 38, su acumulado tiene que bajar, y una talla que
-         ya no está en el formulario no aparece en `lineIds`. */
+         ya no está en el formulario no aparece en `lineIds`.
+
+         Su fecha de captura se lee ANTES de borrarlos: es lo único que permite
+         que corregir un corte deje cada bulto en el día en que se capturó. */
       const previous = await tx.cuttingProgress.findMany({
         where: { batchId: batch.id },
-        select: { lineId: true, quantity: true, bundles: true },
+        select: { lineId: true, quantity: true, bundles: true, capturedAt: true },
       });
 
       await tx.cuttingProgress.deleteMany({ where: { batchId: batch.id } });
 
-      for (const entry of input.lines) {
+      for (const entry of assignCaptureDates(previous, input.lines, new Date())) {
         await tx.cuttingProgress.create({
           data: {
             lineId: entry.lineId,
@@ -659,6 +664,7 @@ export class CuttingOrderService extends BaseService {
             tagId: entry.tagId,
             notes: input.notes,
             userId: this.context.userId,
+            capturedAt: entry.capturedAt,
           },
         });
       }

@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/core/session";
 import { parseRangeDays } from "@/lib/constants/report-ranges";
 import { ReportService } from "@/lib/services/report.service";
 import { formatDate, formatQuantity } from "@/lib/utils";
+import { Figure, Section, Table } from "@/components/reports/print-parts";
 import { PrintButton } from "@/components/shared/print-button";
 
 export const metadata: Metadata = { title: "Reporte" };
@@ -116,88 +117,5 @@ export default async function PrintReportPage({ searchParams }: PageProps) {
         </footer>
       </article>
     </main>
-  );
-}
-
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-black p-2">
-      <p className="text-xs">{label}</p>
-      <p className="tabular mt-1 text-xl font-bold leading-none">{value}</p>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-5">
-      <h2 className="border-b border-black pb-1 text-sm font-bold uppercase">
-        {title}
-      </h2>
-      <div className="mt-2">{children}</div>
-    </section>
-  );
-}
-
-/**
- * Tabla del reporte impreso.
- *
- * La última columna va alineada a la derecha porque siempre es la cifra, y
- * las columnas de números se comparan en vertical.
- */
-function Table({
-  head,
-  rows,
-  empty,
-}: {
-  head: string[];
-  rows: string[][];
-  empty: string;
-}) {
-  if (rows.length === 0) {
-    return <p className="text-sm text-neutral-600">{empty}</p>;
-  }
-
-  return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-neutral-400 text-left">
-          {head.map((label, index) => (
-            <th
-              key={label}
-              className={
-                index === head.length - 1 ? "py-1 text-right" : "py-1 pr-4"
-              }
-            >
-              {label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((cells) => (
-          <tr key={cells.join("|")} className="border-b border-neutral-200">
-            {cells.map((cell, index) => (
-              <td
-                key={index}
-                className={
-                  index === cells.length - 1
-                    ? "tabular py-1 text-right"
-                    : "py-1 pr-4"
-                }
-              >
-                {cell}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }

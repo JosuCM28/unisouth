@@ -21,8 +21,24 @@ import type {
   TaskStatus,
   Unit,
 } from "@prisma/client";
+import type { RemnantLevel } from "@/lib/export/cut-report";
+import type { CutDetailGroup } from "@/lib/report-period";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
+
+/** Cómo se agrupa el detalle de corte. */
+export const CUT_DETAIL_GROUP_LABELS: Record<CutDetailGroup, string> = {
+  day: "Por día",
+  week: "Por semana",
+  month: "Por mes",
+};
+
+/** El semáforo de retacería, con los mismos cortes de la hoja de la fábrica. */
+export const REMNANT_LEVEL_LABELS: Record<RemnantLevel, string> = {
+  ok: "Dentro de lo esperado",
+  warn: "Al límite",
+  high: "Alta",
+};
 
 /**
  * Traducciones de los enums.

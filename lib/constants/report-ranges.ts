@@ -7,9 +7,9 @@
  * `RANGE_OPTIONS.some is not a function` en runtime, con la pantalla en
  * blanco. El compilador no lo detecta porque los tipos sí cuadran.
  *
- * Son las tres ventanas que se preguntan de verdad: el mes, el trimestre y el
- * año. Un selector de fechas libre daría infinitas combinaciones que nadie
- * pide y obligaría a meter un calendario en pantalla de celular.
+ * Son las tres ventanas de la pestaña Almacén: el mes, el trimestre y el año.
+ * El reporte de corte, que es el que se lleva a dirección, se mira por mes o
+ * por fechas y resuelve su periodo en `lib/report-period.ts`.
  */
 export const RANGE_OPTIONS = [
   { days: 30, label: "Mes" },

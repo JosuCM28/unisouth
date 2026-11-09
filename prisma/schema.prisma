@@ -1909,6 +1909,18 @@ model CuttingProgress {
   bundles  Int     @default(1)
   notes    String?
 
+  /// El día que se CAPTURÓ este bulto: es el día en que cuenta en los reportes.
+  ///
+  /// Columna propia y no `createdAt` porque guardar un corte recrea todos sus
+  /// renglones, así que `createdAt` dice cuándo se guardó por última vez.
+  /// Corregir un corte tiene que dejar cada bulto en su día, y sólo el bulto
+  /// nuevo cuenta hoy.
+  ///
+  /// Vacío = el día del corte (`CuttingBatch.openedAt`). Así quedan los bultos
+  /// capturados antes de que existiera esta columna, y por eso sus cifras no
+  /// se movieron.
+  capturedAt DateTime?
+
   /// The tag tied to THIS bundle on the table.
   ///
   /// Lives on the capture and not only on the order line because the colour is
@@ -1929,6 +1941,7 @@ model CuttingProgress {
 
   @@index([lineId])
   @@index([batchId])
+  @@index([capturedAt])
   @@map("cutting_progress")
 }
 

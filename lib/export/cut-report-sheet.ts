@@ -1,3 +1,4 @@
+import { REMNANT_RED_FROM, REMNANT_YELLOW_FROM } from "./cut-report";
 import { createZip } from "./zip";
 
 /**
@@ -22,16 +23,6 @@ const WHITE = "FFFFFFFF";
 const GREEN = "FF00FF00";
 const YELLOW = "FFFFFF00";
 const RED = "FFFF0000";
-
-/**
- * Los cortes del semáforo de la retacería, en tanto por uno.
- *
- * Verde hasta 2%, amarillo hasta 3% y rojo de ahí en adelante. Son los mismos
- * de la hoja de la fábrica: es el criterio con el que hoy se decide si un
- * tendido salió caro, y moverlo aquí lo cambiaría sin que nadie lo acordara.
- */
-const REMNANT_YELLOW_FROM = 0.02;
-const REMNANT_RED_FROM = 0.03;
 
 /** Cómo se pinta y se formatea cada columna. */
 type ColumnKind =
