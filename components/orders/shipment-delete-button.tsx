@@ -35,6 +35,8 @@ interface Props {
   delivery: VoucherDeliveryOptions | null;
   /** Si puede cancelar un vale aplicado (`inventory:adjust`). */
   canCancelVoucher: boolean;
+  /** El taller tiene cuenta y ya lo ve: no se borra, se le cancela. */
+  keepsAsCancelled: boolean;
 }
 
 type Step = "confirm" | "voucher" | "notify";
@@ -67,6 +69,7 @@ export function ShipmentDeleteButton({
   voucher,
   delivery,
   canCancelVoucher,
+  keepsAsCancelled,
 }: Props) {
   const router = useRouter();
   const options = delivery ?? NO_DELIVERY;
@@ -143,10 +146,12 @@ export function ShipmentDeleteButton({
       return null;
     }
 
+    const verb = result.data.keptAsCancelled ? "cancelado" : "eliminado";
+
     toast.success(
       result.data.voucherCancelled
-        ? `Envío eliminado y vale ${result.data.voucherCode} cancelado`
-        : "Envío eliminado",
+        ? `Envío ${verb} y vale ${result.data.voucherCode} cancelado`
+        : `Envío ${verb}`,
     );
     return result.data;
   }
@@ -175,8 +180,12 @@ export function ShipmentDeleteButton({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={handleOpenChange}
-      title={`Borrar ${shipmentCode}`}
-      description={`Se borra el registro de las ${sentQuantity} piezas que salieron. No se puede deshacer.`}
+      title={`${keepsAsCancelled ? "Cancelar" : "Borrar"} ${shipmentCode}`}
+      description={
+        keepsAsCancelled
+          ? `El taller verá este envío de ${sentQuantity} piezas como cancelado y ya no podrá abrirlo. No se puede deshacer.`
+          : `Se borra el registro de las ${sentQuantity} piezas que salieron. No se puede deshacer.`
+      }
       trigger={
         <Button
           type="button"
@@ -191,10 +200,13 @@ export function ShipmentDeleteButton({
     >
       {step === "confirm" && (
         <ConfirmStep
-          hasReturns={hasReturns}
+          hasReturns={hasReturns && !keepsAsCancelled}
           voucherNote={voucherNoteOf(voucher, canCancelVoucher)}
           onConfirm={handleConfirm}
           busyLabel={busyLabel}
+          confirmLabel={
+            keepsAsCancelled ? "Sí, cancelar el envío" : "Sí, borrar el envío"
+          }
         />
       )}
 
@@ -229,11 +241,13 @@ function ConfirmStep({
   voucherNote,
   onConfirm,
   busyLabel,
+  confirmLabel,
 }: {
   hasReturns: boolean;
   voucherNote: string | null;
   onConfirm: () => void;
   busyLabel: string | null;
+  confirmLabel: string;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -256,7 +270,7 @@ function ConfirmStep({
         disabled={busyLabel !== null}
         className="h-12 w-full bg-destructive text-white hover:bg-destructive/90"
       >
-        {busyLabel ?? "Sí, borrar el envío"}
+        {busyLabel ?? confirmLabel}
       </Button>
     </div>
   );

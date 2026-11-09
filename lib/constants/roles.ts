@@ -13,6 +13,9 @@ export const ROLES = [
   "PURCHASING",
   "MANAGEMENT",
   "READ_ONLY",
+  "WORKSHOP_ACATLAN",
+  "WORKSHOP_SITEX",
+  "WORKSHOP_BRODERIE",
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -27,6 +30,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   PURCHASING: "Compras",
   MANAGEMENT: "Dirección",
   READ_ONLY: "Sólo lectura",
+  WORKSHOP_ACATLAN: "Taller Acatlán",
+  WORKSHOP_SITEX: "Taller Sitex",
+  WORKSHOP_BRODERIE: "Taller Broderie",
 };
 
 /**
@@ -118,6 +124,15 @@ export const PERMISSIONS = [
      vale al aplicarlo —eso cuelga de `inventory:write`— pero no decidir a
      quién le llega. */
   "notifications:write",
+  /* Las entregas que le mandaron a UN taller: verlas, reimprimir su vale y
+     confirmar que llegaron. Qué taller es lo decide el rol de quien entra, y
+     el filtro por taller se aplica en el servidor en cada lectura. */
+  "workshop-orders:access",
+  /* Un tablero por taller, con llave propia cada uno: son pantallas distintas
+     y uno no tiene por qué ver el del otro. */
+  "workshop-board:acatlan",
+  "workshop-board:sitex",
+  "workshop-board:broderie",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -128,8 +143,12 @@ export const PERMISSION_VALUES: Permission[] = [...PERMISSIONS];
  * Matriz de la sección 8 del contrato.
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  // Todo, incluido usuarios y configuración.
-  ADMIN: PERMISSIONS,
+  /* Todo, incluido usuarios y configuración, menos ser un taller: la lista de
+     entregas se arma con el taller del rol que entra y ADMIN no tiene uno. Lo
+     que confirman los talleres lo ve en la ficha de cada orden. */
+  ADMIN: PERMISSIONS.filter(
+    (permission) => permission !== "workshop-orders:access",
+  ),
 
   /* Es quien MUEVE EL MATERIAL, y nada más: recibe, acomoda, surte y
      documenta. Su menú son trece destinos —Tablero, Inventario, Escanear,
@@ -225,6 +244,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
      `executeAction`; esconder los botones sólo evita ofrecerle lo que le va a
      rebotar. */
   READ_ONLY: ["orders:browse"],
+
+  /* Un taller externo: sus entregas y su tablero, nada más. Sin
+     `orders:browse` a propósito: esa llave abre TODAS las órdenes de la casa,
+     de todos los clientes, y aquí sólo debe verse lo que le mandaron a él. */
+  WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-board:acatlan"],
+  WORKSHOP_SITEX: ["workshop-orders:access", "workshop-board:sitex"],
+  WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-board:broderie"],
 };
 
 /** Convierte el String de la base a un Role válido. */

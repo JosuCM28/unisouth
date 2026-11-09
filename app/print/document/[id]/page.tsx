@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { requirePermission } from "@/lib/core/session";
+import { requireUser } from "@/lib/core/session";
+import { roleHasPermission } from "@/lib/constants/roles";
 import { VoucherRepository } from "@/lib/repositories/voucher.repository";
+import { WorkshopDeliveryService } from "@/lib/services/workshop-delivery.service";
 import {
   toVoucherSheet,
   type VoucherField,
@@ -33,8 +35,14 @@ export const metadata: Metadata = { title: "Vale" };
  * WhatsApp: aquí sólo se dibuja.
  */
 export default async function PrintDocumentPage({ params }: PageProps) {
-  await requirePermission("inventory:browse");
+  const user = await requireUser();
   const { id } = await params;
+
+  /* Quien recorre el almacén imprime cualquier vale; un taller, sólo los de
+     sus propias entregas y mientras sigan vigentes. */
+  if (!roleHasPermission(user.role, "inventory:browse")) {
+    await new WorkshopDeliveryService().assertCanPrint(user.role, id);
+  }
 
   const document = await new VoucherRepository().findSheetDocument(id);
   if (!document) notFound();

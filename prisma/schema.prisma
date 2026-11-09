@@ -80,6 +80,7 @@ model User {
   orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
   garmentReturns            GarmentReturn[]       @relation("GarmentReturnBy")
   garmentShipments          GarmentShipment[]     @relation("GarmentShipmentCreatedBy")
+  garmentShipmentsReceived  GarmentShipment[]     @relation("GarmentShipmentReceivedBy")
   garmentFolders            GarmentFolder[]       @relation("GarmentFolderCreatedBy")
   garmentsCreated           Garment[]             @relation("GarmentCreatedBy")
   garmentPhotos             GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
@@ -2272,6 +2273,17 @@ model Workshop {
   address String?
   notes   String?
 
+  /// El rol con el que este taller entra al sistema (`WORKSHOP_SITEX`…). Vacío
+  /// = el taller no tiene cuenta y todo sigue como siempre.
+  ///
+  /// Unique porque un rol que apuntara a dos talleres dejaría ver a cada uno
+  /// las entregas del otro. Es String por la misma razón que `User.role`: la
+  /// lista válida vive en `lib/constants/roles.ts`.
+  accessRole  String?   @unique
+  /// Desde cuándo tiene cuenta. Sólo se le enseña lo enviado de ahí en
+  /// adelante: si no, todo su historial le aparecería "por recibir".
+  accessSince DateTime?
+
   active    Boolean   @default(true)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -2364,6 +2376,15 @@ model GarmentShipment {
 
   cancelledAt        DateTime?
   cancellationReason String?
+
+  /// Cuándo confirmó el taller que le llegó, y quién. Vacío = todavía no.
+  ///
+  /// Fecha y no booleano, y aparte de `status`: el estado habla de retornos,
+  /// que son la excepción; esto responde "¿ya está allá?", que es lo que se
+  /// pregunta de cada envío.
+  receivedAt   DateTime?
+  receivedById String?
+  receivedBy   User?     @relation("GarmentShipmentReceivedBy", fields: [receivedById], references: [id])
 
   createdById String?
   createdBy   User?    @relation("GarmentShipmentCreatedBy", fields: [createdById], references: [id])

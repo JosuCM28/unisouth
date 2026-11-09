@@ -13,6 +13,7 @@ import {
   workshopSchema,
 } from "@/lib/validations/garment-shipment.schema";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
+import { WorkshopDeliveryService } from "@/lib/services/workshop-delivery.service";
 
 /* La ficha de la orden es donde se ve el tablero, así que se revalida por id
    además de las listas: mandar un envío cambia justo la pantalla de la que se
@@ -76,11 +77,11 @@ export async function cancelGarmentShipmentAction(input: unknown) {
 }
 
 /* ── Catálogos ──────────────────────────────────────────────────────────────
-   Talleres y etapas son catálogos planos: no tienen reglas de negocio propias
-   más allá de existir, así que las acciones hablan con Prisma sin un servicio
-   de por medio, igual que el resto de los catálogos del sistema. */
+   Las etapas son un catálogo plano y sus acciones hablan con Prisma, igual que
+   el resto de los catálogos del sistema. Los talleres ya no: pueden traer la
+   cuenta con la que entra alguien, y eso tiene reglas y deja rastro. */
 
-const CATALOG_REVALIDATE = ["/workshops", "/orders"];
+const CATALOG_REVALIDATE = ["/workshops", "/orders", "/workshop-orders"];
 
 export async function createWorkshopAction(input: unknown) {
   return executeAction(input, {
@@ -88,7 +89,8 @@ export async function createWorkshopAction(input: unknown) {
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller creado",
-    handler: ({ input }) => prisma.workshop.create({ data: input }),
+    handler: ({ input, auditContext }) =>
+      new WorkshopDeliveryService(auditContext).createWorkshop(input),
   });
 }
 
@@ -98,8 +100,11 @@ export async function updateWorkshopAction(input: unknown) {
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller actualizado",
-    handler: ({ input }) =>
-      prisma.workshop.update({ where: { id: input.id }, data: input.data }),
+    handler: ({ input, auditContext }) =>
+      new WorkshopDeliveryService(auditContext).updateWorkshop(
+        input.id,
+        input.data,
+      ),
   });
 }
 
@@ -113,7 +118,13 @@ export async function removeWorkshopAction(input: unknown) {
     handler: ({ input }) =>
       prisma.workshop.update({
         where: { id: input.id },
-        data: { active: false, deletedAt: new Date() },
+        // Suelta la cuenta: dado de baja no debe seguir apartando ese rol.
+        data: {
+          active: false,
+          deletedAt: new Date(),
+          accessRole: null,
+          accessSince: null,
+        },
       }),
   });
 }

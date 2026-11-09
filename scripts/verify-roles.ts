@@ -34,6 +34,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
     "Documentos",
     "Requisiciones", "Reportes", "Auditoría",
+    "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie",
     "Usuarios", "Notificaciones", "Solicitudes de edición",
   ],
 
@@ -71,6 +72,12 @@ const ESPERADO: Record<Role, string[]> = {
      Dentro de Órdenes tampoco puede tocar nada, porque no lleva
      `inventory:write`: eso lo cuida la pantalla escondiendo los botones. */
   READ_ONLY: ["Órdenes"],
+
+  /* Cada taller: sus entregas y su tablero. El "Órdenes" de aquí es
+     /workshop-orders, no el concentrado de la casa. */
+  WORKSHOP_ACATLAN: ["Órdenes", "Tablero Acatlán"],
+  WORKSHOP_SITEX: ["Órdenes", "Tablero Sitex"],
+  WORKSHOP_BRODERIE: ["Órdenes", "Tablero Broderie"],
 };
 
 let fallos = 0;

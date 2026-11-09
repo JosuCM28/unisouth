@@ -23,8 +23,28 @@ import type {
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
+import type { WorkshopDeliveryState } from "./workshop-access";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
+
+/** Cómo ve el taller una entrega. */
+export const WORKSHOP_DELIVERY_STATE_LABELS: Record<
+  WorkshopDeliveryState,
+  string
+> = {
+  PENDING: "Por recibir",
+  RECEIVED: "Recibida",
+  CANCELLED: "Cancelada",
+};
+
+export const WORKSHOP_DELIVERY_STATE_STYLES: Record<
+  WorkshopDeliveryState,
+  string
+> = {
+  PENDING: "bg-state-reserved text-state-reserved-foreground",
+  RECEIVED: "bg-state-available text-state-available-foreground",
+  CANCELLED: "bg-state-defective text-state-defective-foreground",
+};
 
 /** Cómo se agrupa el detalle de corte. */
 export const CUT_DETAIL_GROUP_LABELS: Record<CutDetailGroup, string> = {

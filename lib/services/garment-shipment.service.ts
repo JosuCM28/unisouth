@@ -2,6 +2,7 @@ import type { CutVersion, GarmentShipment } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
+import { isTrackedByWorkshop } from "@/lib/workshop-delivery";
 import type {
   GarmentReturnInput,
   GarmentShipmentInput,
@@ -454,18 +455,25 @@ export class GarmentShipmentService extends BaseService {
    * con el envío.
    *
    * Lo que sobrevive es el AuditLog, con el resumen de lo que se llevó.
+   *
+   * La excepción es el envío que un taller con cuenta ya tiene en su lista: no
+   * puede desaparecerle sin explicación, así que ahí "borrar" lo cancela y él
+   * lo ve como cancelado.
    */
   async remove(id: string): Promise<{
     code: string;
     voucherCode: string | null;
     voucherCancelled: boolean;
+    keptAsCancelled: boolean;
   }> {
     return this.transaction(async (tx) => {
       const current = await tx.garmentShipment.findUnique({
         where: { id },
         include: {
           stage: { select: { name: true } },
-          workshop: { select: { name: true } },
+          workshop: {
+            select: { name: true, accessRole: true, accessSince: true },
+          },
           document: { select: { id: true, code: true, status: true } },
           lines: {
             select: {
@@ -491,8 +499,30 @@ export class GarmentShipmentService extends BaseService {
         0,
       );
 
-      // Los renglones y sus retornos se van por cascada del esquema.
-      await tx.garmentShipment.delete({ where: { id } });
+      const keptAsCancelled = isTrackedByWorkshop(
+        current.workshop,
+        current.createdAt,
+      );
+
+      if (keptAsCancelled && current.status === "CANCELLED") {
+        throw new BusinessRuleError(
+          `El envío ${current.code} ya está cancelado.`,
+        );
+      }
+
+      if (keptAsCancelled) {
+        await tx.garmentShipment.update({
+          where: { id },
+          data: {
+            status: "CANCELLED",
+            cancelledAt: new Date(),
+            cancellationReason: "Se eliminó por error",
+          },
+        });
+      } else {
+        // Los renglones y sus retornos se van por cascada del esquema.
+        await tx.garmentShipment.delete({ where: { id } });
+      }
 
       const voucher = current.document;
       const cancelVoucher = voucher?.status === "DRAFT";
@@ -527,6 +557,7 @@ export class GarmentShipmentService extends BaseService {
         code: current.code,
         voucherCode: voucher?.code ?? null,
         voucherCancelled: Boolean(voucher && cancelVoucher),
+        keptAsCancelled,
       };
     });
   }

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -10,11 +10,20 @@ import {
   createWorkshopAction,
   updateWorkshopAction,
 } from "@/app/actions/garment-shipment.actions";
+import { ROLE_LABELS } from "@/lib/constants/roles";
+import { WORKSHOP_ROLES } from "@/lib/constants/workshop-access";
 import { runAction } from "@/lib/offline/run-action";
-import { FormField } from "@/components/shared/form-field";
+import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Sólo el nombre es obligatorio: dar de alta un taller son 10 segundos. */
 const formSchema = z.object({
@@ -24,7 +33,12 @@ const formSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  accessRole: z.string(),
 });
+
+/* Radix no admite un valor vacío en sus opciones, así que "sin cuenta" necesita
+   un valor propio que se traduce a `null` al guardar. */
+const NO_ACCESS = "none";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -36,6 +50,7 @@ export interface EditableWorkshop {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  accessRole: string | null;
 }
 
 export function WorkshopFormDialog({
@@ -54,11 +69,16 @@ export function WorkshopFormDialog({
   });
 
   async function onSubmit(values: FormValues) {
+    const data = {
+      ...values,
+      accessRole: values.accessRole === NO_ACCESS ? null : values.accessRole,
+    };
+
     const result = workshop
       ? await runAction(() =>
-          updateWorkshopAction({ id: workshop.id, data: values }),
+          updateWorkshopAction({ id: workshop.id, data }),
         )
-      : await runAction(() => createWorkshopAction(values));
+      : await runAction(() => createWorkshopAction(data));
 
     if (!result.success) {
       toast.error(result.error);
@@ -97,6 +117,33 @@ export function WorkshopFormDialog({
           error={errors.name?.message}
           {...form.register("name")}
         />
+
+        <FormSelectField
+          id="accessRole"
+          label="Cuenta de acceso"
+          hint="Quien entre con este rol verá lo que le mandes a este taller."
+          error={errors.accessRole?.message}
+        >
+          <Controller
+            control={form.control}
+            name="accessRole"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="accessRole" className="touch-target w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_ACCESS}>Sin cuenta</SelectItem>
+                  {WORKSHOP_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {ROLE_LABELS[role]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </FormSelectField>
 
         {/* Lo demás plegado: se llena cuando hace falta, no al dar de alta. */}
         <FormSection title="Contacto">
@@ -146,5 +193,6 @@ function toFormValues(workshop?: EditableWorkshop): FormValues {
     phone: workshop?.phone ?? "",
     address: workshop?.address ?? "",
     notes: workshop?.notes ?? "",
+    accessRole: workshop?.accessRole ?? NO_ACCESS,
   };
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Factory, Layers, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
+import { ROLE_LABELS, toRole } from "@/lib/constants/roles";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { WorkshopFormDialog } from "@/components/workshops/workshop-form-dialog";
@@ -82,6 +83,8 @@ export default async function WorkshopsPage() {
                       .filter(Boolean)
                       .join(" · ") || "Sin contacto"}
                     {` · ${workshop._count.shipments} ${workshop._count.shipments === 1 ? "envío" : "envíos"}`}
+                    {workshop.accessRole &&
+                      ` · Cuenta: ${ROLE_LABELS[toRole(workshop.accessRole)]}`}
                   </p>
                 </div>
 

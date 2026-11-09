@@ -237,6 +237,39 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
+    /* Lo de los talleres externos. Cada uno ve sus Órdenes y su tablero, y
+       ADMIN los tres tableros. Órdenes va primero porque el destino de entrada
+       es el primero que el rol puede ver, y al taller se le abre en sus
+       entregas. */
+    label: "Talleres",
+    items: [
+      {
+        href: "/workshop-orders",
+        label: "Órdenes",
+        icon: "orders",
+        permission: "workshop-orders:access",
+      },
+      {
+        href: "/workshop-boards/acatlan",
+        label: "Tablero Acatlán",
+        icon: "dashboard",
+        permission: "workshop-board:acatlan",
+      },
+      {
+        href: "/workshop-boards/sitex",
+        label: "Tablero Sitex",
+        icon: "dashboard",
+        permission: "workshop-board:sitex",
+      },
+      {
+        href: "/workshop-boards/broderie",
+        label: "Tablero Broderie",
+        icon: "dashboard",
+        permission: "workshop-board:broderie",
+      },
+    ],
+  },
+  {
     /* Hasta abajo y en su propia sección: no es parte de la operación del
        almacén, y como `user:manage` sólo lo trae ADMIN, para todos los demás
        roles la sección entera desaparece —ni siquiera ven el encabezado. */

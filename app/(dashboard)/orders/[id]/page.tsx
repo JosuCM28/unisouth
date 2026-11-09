@@ -58,6 +58,7 @@ import {
   type SplitCut,
 } from "@/components/orders/workshop-split-panel";
 import { buildPlannedSplitCuts } from "@/lib/folder-split-cuts";
+import { deliveryState, isTrackedByWorkshop } from "@/lib/workshop-delivery";
 import {
   OrderShipments,
   type ShipmentView,
@@ -209,7 +210,10 @@ export default async function OrderDetailPage({
       where: { orderId: id },
       orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
       include: {
-        workshop: { select: { name: true } },
+        workshop: {
+          select: { name: true, accessRole: true, accessSince: true },
+        },
+        receivedBy: { select: { name: true } },
         stage: { select: { name: true } },
         document: { select: { id: true, code: true, status: true } },
         lines: {
@@ -316,6 +320,17 @@ export default async function OrderDetailPage({
     code: shipment.code,
     status: shipment.status,
     workshopName: shipment.workshop.name,
+    receipt: isTrackedByWorkshop(shipment.workshop, shipment.createdAt)
+      ? {
+          state: deliveryState({
+            status: shipment.status,
+            documentStatus: shipment.document?.status ?? null,
+            receivedAt: shipment.receivedAt,
+          }),
+          receivedAt: shipment.receivedAt,
+          receivedByName: shipment.receivedBy?.name ?? null,
+        }
+      : null,
     stageName: shipment.stage.name,
     sentAt: shipment.sentAt,
     reference: shipment.reference,

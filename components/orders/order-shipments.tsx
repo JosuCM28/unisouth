@@ -11,7 +11,10 @@ import { runAction } from "@/lib/offline/run-action";
 import {
   GARMENT_SHIPMENT_STATUS_LABELS,
   GARMENT_SHIPMENT_STATUS_STYLES,
+  WORKSHOP_DELIVERY_STATE_LABELS,
+  WORKSHOP_DELIVERY_STATE_STYLES,
 } from "@/lib/constants/labels";
+import type { WorkshopDeliveryState } from "@/lib/constants/workshop-access";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { cn, formatDate } from "@/lib/utils";
 import { CutTagChip } from "./size-note";
@@ -41,6 +44,15 @@ export interface ShipmentView {
   code: string;
   status: GarmentShipmentStatus;
   workshopName: string;
+  /**
+   * Si llegó, para los talleres con cuenta. `null` = el taller no confirma
+   * nada, y decir "por recibir" sería prometer un aviso que nunca va a llegar.
+   */
+  receipt: {
+    state: WorkshopDeliveryState;
+    receivedAt: Date | null;
+    receivedByName: string | null;
+  } | null;
   stageName: string;
   sentAt: Date;
   reference: string | null;
@@ -119,6 +131,9 @@ export function OrderShipments({
                 >
                   {GARMENT_SHIPMENT_STATUS_LABELS[shipment.status]}
                 </span>
+                {shipment.receipt && shipment.status !== "CANCELLED" && (
+                  <ReceiptChip receipt={shipment.receipt} />
+                )}
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 {shipment.stageName} · {shipment.workshopName} ·{" "}
@@ -142,7 +157,9 @@ export function OrderShipments({
                 />
               )}
 
-              {canWrite && (
+              {/* Uno que el taller ya ve como cancelado se queda: borrarlo era
+                  justo lo que no debía pasar. */}
+              {canWrite && !(shipment.receipt && shipment.status === "CANCELLED") && (
                 <ShipmentDeleteButton
                   shipmentId={shipment.id}
                   shipmentCode={shipment.code}
@@ -151,6 +168,7 @@ export function OrderShipments({
                   voucher={shipment.document}
                   delivery={delivery}
                   canCancelVoucher={canCancelVouchers}
+                  keepsAsCancelled={shipment.receipt !== null}
                 />
               )}
             </div>
@@ -221,6 +239,29 @@ export function OrderShipments({
         );
       })}
     </ul>
+  );
+}
+
+/** Si el taller ya confirmó que le llegó, y quién. */
+function ReceiptChip({
+  receipt,
+}: {
+  receipt: NonNullable<ShipmentView["receipt"]>;
+}) {
+  const detail = receipt.receivedAt
+    ? ` el ${formatDate(receipt.receivedAt)}${receipt.receivedByName ? ` por ${receipt.receivedByName}` : ""}`
+    : "";
+
+  return (
+    <span
+      className={cn(
+        "tabular rounded px-1.5 py-0.5 text-xs",
+        WORKSHOP_DELIVERY_STATE_STYLES[receipt.state],
+      )}
+    >
+      {WORKSHOP_DELIVERY_STATE_LABELS[receipt.state]}
+      {receipt.state === "RECEIVED" && detail}
+    </span>
   );
 }
 

@@ -246,6 +246,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | **La OTRA PLANTA. Dos pantallas: Órdenes · Órdenes de planta.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
+| `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, folios,
 talleres, corridas, reglas y bodegas son del lado de producción: el auxiliar
@@ -311,6 +312,17 @@ Nueve capacidades separan lo anterior:
 | `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, folios, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
+| `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
+| `workshop-board:acatlan` · `:sitex` · `:broderie` | El tablero de cada taller. Uno por llave: son pantallas distintas |
+
+**Los talleres con cuenta.** El taller del catálogo se liga a su rol en
+**Talleres → Cuenta de acceso** (`Workshop.accessRole`, único). Qué taller ve
+alguien lo decide su rol en el servidor, nunca un id que venga del navegador.
+Sólo le aparece lo enviado desde que se ligó (`accessSince`). Cancelar el envío
+o su vale se lo enseña como Cancelada y sin datos, y "borrar" un envío que ya
+tiene en su lista lo cancela en vez de borrarlo: no puede desaparecerle sin
+explicación. Confirmar que llegó guarda `receivedAt` y quién, y la casa lo lee
+en la ficha de la orden.
 
 `catalog:write` quedó acotado a los cinco catálogos del piso; cada dominio que
 salió tiene su propia llave de escritura, para que "no verlo" y "no poder

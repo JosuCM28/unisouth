@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WORKSHOP_ROLES } from "@/lib/constants/workshop-access";
 import {
   cuidSchema,
   localDate,
@@ -106,6 +107,8 @@ export const workshopSchema = z.object({
   phone: optionalText,
   address: optionalText,
   notes: optionalText,
+  /* La cuenta con la que entra el taller. `null` = no tiene cuenta. */
+  accessRole: z.enum(WORKSHOP_ROLES).nullable().default(null),
 });
 
 export type WorkshopInput = z.infer<typeof workshopSchema>;
