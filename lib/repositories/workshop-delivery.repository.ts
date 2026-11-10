@@ -26,6 +26,7 @@ const LIST_SELECT = {
     select: {
       code: true,
       reference: true,
+      clientPo: true,
       description: true,
       client: { select: { name: true } },
     },
@@ -50,7 +51,7 @@ const VOUCHER_LIST_SELECT = {
   workshopReceivedNotes: true,
   workshopReceivedBy: { select: { name: true } },
   client: { select: { name: true } },
-  cuttingOrder: { select: { code: true, reference: true } },
+  cuttingOrder: { select: { code: true, reference: true, clientPo: true } },
   cutLines: { select: { quantity: true, bundles: true } },
 } satisfies Prisma.InventoryDocumentSelect;
 

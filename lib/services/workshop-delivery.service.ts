@@ -27,6 +27,8 @@ export interface WorkshopDeliveryRow {
   code: string;
   state: WorkshopDeliveryState;
   orderReference: string;
+  /** La PO del cliente, para que el taller busque con el papel en la mano. */
+  clientPo: string | null;
   clientName: string;
   description: string;
   stageName: string;
@@ -487,6 +489,7 @@ function toListRow(row: WorkshopDeliveryListRow): WorkshopDeliveryRow {
     state: stateOf(row),
     // El número que el taller conoce: el del papel, no el folio interno.
     orderReference: row.order.reference ?? row.order.code,
+    clientPo: row.order.clientPo,
     clientName: row.order.client?.name ?? NO_CLIENT_LABEL,
     description: row.order.description ?? NO_DESCRIPTION_LABEL,
     stageName: row.stage.name,
@@ -531,6 +534,8 @@ function toVoucherListRow(row: WorkshopVoucherListRow): WorkshopDeliveryRow {
     code: row.code,
     state: voucherStateOf(row),
     orderReference: voucherReference(row),
+    // Un vale no lleva PO propia: la hereda de la orden de la que salió.
+    clientPo: row.cuttingOrder?.clientPo ?? null,
     clientName: row.client?.name ?? NO_CLIENT_LABEL,
     description: row.cutDescription ?? row.concept ?? NO_DESCRIPTION_LABEL,
     stageName: VOUCHER_STAGE_LABEL,
