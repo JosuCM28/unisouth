@@ -1,6 +1,22 @@
 import type { WorkshopDeliveryRow } from "@/lib/services/workshop-delivery.service";
 
 /**
+ * Lo que la búsqueda necesita de una entrega. Estructural y no el renglón
+ * completo: el reporte del tablero filtra sus propias filas con la MISMA
+ * regla, para que el Excel salga con lo que se ve en pantalla.
+ */
+export type SearchableDelivery = Pick<
+  WorkshopDeliveryRow,
+  | "code"
+  | "state"
+  | "orderReference"
+  | "clientPo"
+  | "clientName"
+  | "description"
+  | "stageName"
+>;
+
+/**
  * Minúsculas y sin acentos: en el piso se escribe "camisa", "CAMISA" o
  * "Camisá" con guantes, y las tres tienen que encontrar lo mismo.
  */
@@ -17,7 +33,7 @@ function normalize(value: string): string {
  * que sólo se encuentra por su folio: buscarla por empresa sería enseñar un
  * dato que el servidor ya decidió no mandar.
  */
-function searchableText(row: WorkshopDeliveryRow): string {
+function searchableText(row: SearchableDelivery): string {
   if (row.state === "CANCELLED") return normalize(row.code);
 
   return normalize(
@@ -40,10 +56,10 @@ function searchableText(row: WorkshopDeliveryRow): string {
  * "ternium camisa" encuentra las camisas de Ternium sin que el taller tenga
  * que saber en qué columna vive cada dato.
  */
-export function filterDeliveries(
-  rows: WorkshopDeliveryRow[],
+export function filterDeliveries<T extends SearchableDelivery>(
+  rows: T[],
   query: string,
-): WorkshopDeliveryRow[] {
+): T[] {
   const terms = normalize(query).split(/\s+/).filter(Boolean);
   if (terms.length === 0) return rows;
 

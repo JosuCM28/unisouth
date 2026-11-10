@@ -1,6 +1,7 @@
 import { roleHasPermission } from "@/lib/constants/roles";
 import { NotFoundError } from "@/lib/core/errors";
-import { inlinePdfResponse, pdfErrorResponse } from "@/lib/core/pdf-response";
+import { fileErrorResponse } from "@/lib/core/file-error-response";
+import { inlinePdfResponse } from "@/lib/core/pdf-response";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
 import { requireUser } from "@/lib/core/session";
 import { VoucherRepository } from "@/lib/repositories/voucher.repository";
@@ -39,6 +40,6 @@ export async function GET(
       voucherFileName(sheet),
     );
   } catch (error) {
-    return pdfErrorResponse(error);
+    return fileErrorResponse(error);
   }
 }

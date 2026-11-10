@@ -138,10 +138,10 @@ interface DeliveryCutEntry {
   tag: { name: string; color: string } | null;
 }
 
-const NO_CLIENT_LABEL = "Fábrica";
-const NO_DESCRIPTION_LABEL = "Sin descripción";
+export const NO_CLIENT_LABEL = "Fábrica";
+export const NO_DESCRIPTION_LABEL = "Sin descripción";
 /* Un vale no pasa por una etapa del catálogo: el renglón dice qué fue. */
-const VOUCHER_STAGE_LABEL = "Salida de corte";
+export const VOUCHER_STAGE_LABEL = "Salida de corte";
 
 /**
  * Lo que un taller externo ve y confirma de lo que se le manda.
@@ -504,7 +504,7 @@ function toListRow(row: WorkshopDeliveryListRow): WorkshopDeliveryRow {
 }
 
 /** El número que conoce el taller; el folio del vale si no hay otro. */
-function voucherReference(voucher: {
+export function voucherReference(voucher: {
   code: string;
   reference: string | null;
   cuttingOrder: { code: string; reference: string | null } | null;

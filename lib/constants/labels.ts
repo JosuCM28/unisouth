@@ -24,7 +24,13 @@ import type {
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
 import type { OrderView } from "./order-view";
-import type { WorkshopBoardTab, WorkshopDeliveryState } from "./workshop-access";
+import type {
+  DeliveryAge,
+  DeliveryKind,
+  DeliveryProgress,
+  WorkshopBoardTab,
+  WorkshopDeliveryState,
+} from "./workshop-access";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
 
@@ -38,6 +44,28 @@ export const ORDER_VIEW_LABELS: Record<OrderView, string> = {
 export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {
   pending: "Por recibir",
   received: "Recibidas",
+};
+
+/** De dónde vino una entrega del taller, en el reporte del tablero. */
+export const DELIVERY_KIND_LABELS: Record<DeliveryKind, string> = {
+  shipment: "Envío a taller",
+  voucher: "Salida de corte",
+};
+
+/** En qué va una entrega, en el reporte del tablero. */
+export const DELIVERY_PROGRESS_LABELS: Record<DeliveryProgress, string> = {
+  RECEIVED: "Recibida",
+  IN_TRANSIT: "En camino",
+  IN_PLANT: "Aún en planta",
+  CANCELLED: "Cancelada",
+};
+
+/** Tramos de días que tardó o lleva una entrega. */
+export const DELIVERY_AGE_LABELS: Record<DeliveryAge, string> = {
+  UP_TO_1: "0 a 1 día",
+  UP_TO_3: "2 a 3 días",
+  UP_TO_7: "4 a 7 días",
+  OVER_7: "Más de 7 días",
 };
 
 /** Cómo ve el taller una entrega. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import Link from "next/link";
 import { Inbox, SearchX } from "lucide-react";
 import { WORKSHOP_BOARD_TAB_LABELS } from "@/lib/constants/labels";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { DeliveryFilter } from "@/components/workshop-orders/delivery-filter";
 import { DispatchNote } from "@/components/workshop-orders/dispatch-status";
 import { ReceiveButton } from "@/components/workshop-orders/receive-button";
+import { BoardReportDialog } from "./board-report-dialog";
 
 interface Props {
   rows: WorkshopDeliveryRow[];
@@ -19,6 +20,8 @@ interface Props {
   basePath: string;
   /** Sólo el dueño abre el detalle y confirma; ADMIN nada más mira. */
   isOwner: boolean;
+  /** Lo que la ventana del reporte necesita; el filtro lo pone el buscador. */
+  report: Omit<ComponentProps<typeof BoardReportDialog>, "search">;
 }
 
 const TAB_PARAMS: Record<WorkshopBoardTab, string> = {
@@ -40,7 +43,13 @@ const EMPTY_MESSAGES: Record<WorkshopBoardTab, string> = {
  * cuántas coinciden, y el taller ve de un vistazo si lo que busca ya lo
  * recibió o sigue pendiente.
  */
-export function DeliveryBoardBody({ rows, tab, basePath, isOwner }: Props) {
+export function DeliveryBoardBody({
+  rows,
+  tab,
+  basePath,
+  isOwner,
+  report,
+}: Props) {
   const [query, setQuery] = useState("");
   const groups = useMemo(
     () => groupRows(filterDeliveries(rows, query)),
@@ -49,7 +58,10 @@ export function DeliveryBoardBody({ rows, tab, basePath, isOwner }: Props) {
 
   return (
     <>
-      <DeliveryFilter value={query} onChange={setQuery} />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <DeliveryFilter value={query} onChange={setQuery} className="flex-1" />
+        <BoardReportDialog {...report} search={query} />
+      </div>
 
       <nav className="flex border-b border-border" aria-label="Entregas">
         {TABS.map((item) => (

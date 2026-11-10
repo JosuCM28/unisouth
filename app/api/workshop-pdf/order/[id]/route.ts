@@ -1,6 +1,7 @@
 import { roleHasPermission } from "@/lib/constants/roles";
 import { NotFoundError } from "@/lib/core/errors";
-import { inlinePdfResponse, pdfErrorResponse } from "@/lib/core/pdf-response";
+import { fileErrorResponse } from "@/lib/core/file-error-response";
+import { inlinePdfResponse } from "@/lib/core/pdf-response";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
 import { requireUser } from "@/lib/core/session";
 import { renderOrderPdf } from "@/lib/orders/order-pdf";
@@ -38,6 +39,6 @@ export async function GET(
       orderSheetFileName(sheet),
     );
   } catch (error) {
-    return pdfErrorResponse(error);
+    return fileErrorResponse(error);
   }
 }

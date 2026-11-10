@@ -1,9 +1,12 @@
 import { Factory } from "lucide-react";
 import type { Role } from "@/lib/constants/roles";
-import type {
-  WorkshopBoardTab,
-  WorkshopRole,
+import {
+  BOARD_KEY_BY_ROLE,
+  type WorkshopBoardTab,
+  type WorkshopRole,
 } from "@/lib/constants/workshop-access";
+import { listReportMonths } from "@/lib/report-period";
+import { todayInputValue } from "@/lib/utils";
 import {
   WorkshopDeliveryService,
   type WorkshopDeliveryList,
@@ -60,6 +63,11 @@ export function DeliveryBoardView({
         basePath={basePath}
         // El detalle pide la llave del taller: a ADMIN lo mandaría a un error.
         isOwner={viewerRole === boardRole}
+        report={{
+          boardKey: BOARD_KEY_BY_ROLE[boardRole],
+          months: listReportMonths(),
+          today: todayInputValue(),
+        }}
       />
     </div>
   );
