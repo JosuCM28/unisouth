@@ -1,17 +1,12 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { toOrderSheet } from "@/lib/orders/order-sheet";
+import { OrderSheetRepository } from "@/lib/repositories/order-sheet.repository";
 import { WorkshopDeliveryService } from "@/lib/services/workshop-delivery.service";
-import {
-  CUT_VERSION_LABELS,
-  CUTTING_ORDER_STATUS_LABELS,
-  cutBatchLabel,
-} from "@/lib/constants/labels";
-import { bundlePieces } from "@/lib/bundles";
-import { cutProgress, cutTotals, formatDate, formatDateTime } from "@/lib/utils";
 import { PrintButton } from "@/components/shared/print-button";
+import { OrderPrintSheet } from "@/components/orders/order-print-sheet";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,9 +17,8 @@ export const metadata: Metadata = { title: "Orden de corte" };
 /**
  * Hoja de una orden para archivar o firmar en el taller.
  *
- * Lleva el historial completo y no sólo el acumulado: la hoja se guarda, y
- * meses después la pregunta no es "cuántas se cortaron" sino "quién cortó
- * estas y cuándo", que un total no puede responder.
+ * QUÉ dice la hoja lo decide `toOrderSheet`, el mismo que arma el PDF que el
+ * taller abre en el celular: aquí sólo se dibuja.
  */
 export default async function PrintOrderPage({ params }: PageProps) {
   const user = await requireUser();
@@ -36,260 +30,13 @@ export default async function PrintOrderPage({ params }: PageProps) {
     await new WorkshopDeliveryService().assertCanPrintOrder(user.role, id);
   }
 
-  const order = await prisma.cuttingOrder.findUnique({
-    where: { id },
-    include: {
-      client: { select: { name: true } },
-      material: { select: { code: true, name: true } },
-      productionRun: { select: { code: true, name: true } },
-      createdBy: { select: { name: true } },
-      lines: {
-        orderBy: { position: "asc" },
-        include: {
-          size: { select: { code: true, name: true } },
-          cutTag: { select: { name: true } },
-          progress: {
-            orderBy: { createdAt: "asc" },
-            include: {
-              user: { select: { name: true } },
-              batch: { select: { number: true, label: true } },
-            },
-          },
-        },
-      },
-    },
-  });
-
+  const order = await new OrderSheetRepository().findSheetOrder(id);
   if (!order) notFound();
-
-  const { ordered, cut, pending, surplus } = cutTotals(order.lines);
-
-  const history = order.lines
-    .flatMap((line) =>
-      line.progress.map((entry) => ({ ...entry, sizeCode: line.size.code })),
-    )
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   return (
     <main className="mx-auto max-w-3xl bg-white p-8 text-black">
       <PrintButton />
-
-      <header className="flex items-start justify-between gap-4 border-b-2 border-black pb-4">
-        <div>
-          <h1 className="text-xl font-bold">UNISOUTH</h1>
-          <p className="text-sm">Orden de corte</p>
-        </div>
-        <div className="text-right">
-          <p className="tabular text-lg font-bold">{order.code}</p>
-          <p className="tabular text-sm">{formatDate(order.orderedAt)}</p>
-          <p className="text-xs uppercase">
-            {CUTTING_ORDER_STATUS_LABELS[order.status]}
-          </p>
-        </div>
-      </header>
-
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 border-b border-black py-3 text-sm">
-        <Field label="Cliente" value={order.client?.name ?? "Fábrica"} />
-        <Field label="Descripción" value={order.description} />
-        <Field label="Folio de orden" value={order.reference} />
-        <Field label="PO cliente" value={order.clientPo} />
-        <Field
-          label="Entrega"
-          value={order.dueDate ? formatDate(order.dueDate) : null}
-        />
-        <Field label="Lugar de entrega" value={order.deliveryPlace} />
-        <Field
-          label="Material"
-          value={
-            order.material
-              ? `${order.material.code} · ${order.material.name}`
-              : null
-          }
-        />
-        <Field
-          label="Producción"
-          value={
-            order.productionRun
-              ? `${order.productionRun.code} · ${order.productionRun.name ?? ""}`
-              : null
-          }
-        />
-        <Field label="Capturó" value={order.createdBy?.name} />
-        {/* El encabezado del corte va en la MISMA rejilla y no en un bloque
-            aparte: en la hoja impresa el taller lee molde y versión junto a la
-            tela, no en otra parte de la página. */}
-        <Field label="Tela (a mano)" value={order.cutFabricText} />
-        <Field label="Molde" value={order.cutPattern} />
-        <Field
-          label="Versión"
-          value={order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null}
-        />
-        <Field label="Cambios de la versión" value={order.cutVersionNotes} />
-      </dl>
-
-      {/* Numeradas, para irlas palomeando en el taller. */}
-      {order.cutNotes.length > 0 && (
-        <section className="border-b border-black py-3 text-sm">
-          <p className="font-semibold">Notas del corte</p>
-          <ol className="mt-1 flex flex-col gap-0.5">
-            {order.cutNotes.map((note, index) => (
-              <li key={index} className="flex gap-2">
-                <span className="tabular shrink-0">{index + 1}.</span>
-                <span>{note}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      <table className="mt-4 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-1 pr-2">Talla</th>
-            <th className="py-1 pr-2">Folio</th>
-            <th className="py-1 pr-2 text-right">Pedidas</th>
-            <th className="py-1 pr-2 text-right">Cortadas</th>
-            <th className="py-1 pr-2 text-right">Faltan</th>
-            <th className="py-1 pr-2 text-right">Sobran</th>
-            {/* La anotación de la talla ("va sin bolsa") es una instrucción
-                para quien corta, y ésta es la hoja que tiene enfrente. Vive
-                en el renglón desde siempre y no se imprimía: una nota que
-                sólo existe en la pantalla no sirve de nada en la mesa. */}
-            <th className="py-1">Anotaciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.lines.map((line) => {
-            const progress = cutProgress(
-              line.orderedQuantity,
-              line.cutQuantity,
-            );
-
-            return (
-              <tr key={line.id} className="border-b border-black/30">
-                <td className="py-1 pr-2 font-medium">{line.size.code}</td>
-                <td className="py-1 pr-2">{line.cutTag?.name ?? ""}</td>
-                <td className="tabular py-1 pr-2 text-right">
-                  {line.orderedQuantity}
-                </td>
-                <td className="tabular py-1 pr-2 text-right">
-                  {line.cutQuantity}
-                </td>
-                <td className="tabular py-1 pr-2 text-right">
-                  {progress.pending > 0 ? progress.pending : ""}
-                </td>
-                <td className="tabular py-1 pr-2 text-right font-medium">
-                  {progress.surplus > 0 ? `+${progress.surplus}` : ""}
-                </td>
-                {/* `whitespace-pre-wrap` para respetar los renglones tal como
-                    se escribieron: una nota de dos líneas aplastada en una
-                    deja de leerse como dos instrucciones. */}
-                <td className="whitespace-pre-wrap py-1">{line.notes ?? ""}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-black font-bold">
-            <td className="py-1 pr-2" colSpan={2}>
-              Total
-            </td>
-            <td className="tabular py-1 pr-2 text-right">{ordered}</td>
-            <td className="tabular py-1 pr-2 text-right">{cut}</td>
-            <td className="tabular py-1 pr-2 text-right">
-              {pending > 0 ? pending : ""}
-            </td>
-            <td className="tabular py-1 pr-2 text-right">
-              {surplus > 0 ? `+${surplus}` : ""}
-            </td>
-            {/* La columna de anotaciones no suma nada, pero la celda tiene que
-                existir: sin ella el renglón de totales queda corto y el borde
-                superior no llega hasta el final de la tabla. */}
-            <td className="py-1" />
-          </tr>
-        </tfoot>
-      </table>
-
-      {history.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-1 border-b border-black pb-1 text-sm font-bold">
-            Historial de cortes
-          </h2>
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-black text-left">
-                <th className="py-1 pr-2">Fecha</th>
-                {/* De qué tendido salieron: sin esta columna el papel es una
-                    lista de fechas y hay que deducir dónde acabó una tanda. */}
-                <th className="py-1 pr-2">Corte</th>
-                <th className="py-1 pr-2">Talla</th>
-                {/* Cómo se amarró: la captura es por bulto y sin esta columna
-                    el papel dice 180 sin decir que son 3 bultos de 60, que es
-                    lo que se cuenta al recibirlos. */}
-                <th className="py-1 pr-2 text-right">Bultos</th>
-                <th className="py-1 pr-2 text-right">Piezas</th>
-                <th className="py-1 pr-2">Quién</th>
-                <th className="py-1">Notas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((entry) => (
-                <tr key={entry.id} className="border-b border-black/20">
-                  <td className="tabular py-1 pr-2">
-                    {formatDateTime(entry.createdAt)}
-                  </td>
-                  <td className="py-1 pr-2">
-                    {cutBatchLabel(entry.batch.number, entry.batch.label)}
-                  </td>
-                  <td className="py-1 pr-2">{entry.sizeCode}</td>
-                  <td className="tabular py-1 pr-2 text-right">
-                    {entry.bundles > 1
-                      ? `${entry.bundles} × ${entry.quantity}`
-                      : entry.bundles}
-                  </td>
-                  <td className="tabular py-1 pr-2 text-right">
-                    {entry.quantity > 0 ? "+" : ""}
-                    {bundlePieces(entry)}
-                  </td>
-                  <td className="py-1 pr-2">{entry.user?.name ?? ""}</td>
-                  <td className="py-1">{entry.notes ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {order.notes && (
-        <p className="mt-4 whitespace-pre-wrap border-t border-black pt-2 text-sm">
-          {order.notes}
-        </p>
-      )}
-
-      <div className="mt-12 grid grid-cols-2 gap-8 text-sm">
-        <Signature label="Entrega" />
-        <Signature label="Recibe" />
-      </div>
+      <OrderPrintSheet sheet={toOrderSheet(order)} />
     </main>
-  );
-}
-
-function Field({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
-
-  return (
-    <div className="flex gap-2">
-      <dt className="font-medium">{label}:</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function Signature({ label }: { label: string }) {
-  return (
-    <div>
-      <div className="h-12 border-b border-black" />
-      <p className="mt-1 text-center text-xs">{label}</p>
-    </div>
   );
 }

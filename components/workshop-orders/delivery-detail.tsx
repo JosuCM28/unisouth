@@ -1,4 +1,4 @@
-import { Ban, Printer } from "lucide-react";
+import { Ban, FileText, Printer } from "lucide-react";
 import { sumBundlePieces } from "@/lib/bundles";
 import type { ActiveWorkshopDelivery } from "@/lib/services/workshop-delivery.service";
 import { formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
@@ -99,31 +99,55 @@ function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
           />
         )}
         {delivery.voucherId && (
-          <Button asChild variant="outline" className="touch-target">
-            <a
-              href={`/print/document/${delivery.voucherId}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <Printer className="size-4" aria-hidden />
-              Reimprimir salida
-            </a>
-          </Button>
+          <DocumentLinks
+            label="salida"
+            pdfHref={`/api/workshop-pdf/voucher/${delivery.voucherId}`}
+            printHref={`/print/document/${delivery.voucherId}`}
+          />
         )}
         {delivery.orderId && (
-          <Button asChild variant="outline" className="touch-target">
-            <a
-              href={`/print/order/${delivery.orderId}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <Printer className="size-4" aria-hidden />
-              Reimprimir orden
-            </a>
-          </Button>
+          <DocumentLinks
+            label="orden"
+            pdfHref={`/api/workshop-pdf/order/${delivery.orderId}`}
+            printHref={`/print/order/${delivery.orderId}`}
+          />
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * Cada hoja con dos salidas: el PDF y la página de impresión.
+ *
+ * El PDF va primero porque en el celular la página de impresión, hecha para
+ * una hoja carta, no cabe y se ve rota; el visor del teléfono sí la enseña
+ * completa y deja hacerle zoom. Reimprimir sigue para quien imprime en PC.
+ */
+function DocumentLinks({
+  label,
+  pdfHref,
+  printHref,
+}: {
+  label: string;
+  pdfHref: string;
+  printHref: string;
+}) {
+  return (
+    <>
+      <Button asChild variant="outline" className="touch-target">
+        <a href={pdfHref} target="_blank" rel="noopener">
+          <FileText className="size-4" aria-hidden />
+          Ver {label} en PDF
+        </a>
+      </Button>
+      <Button asChild variant="outline" className="touch-target">
+        <a href={printHref} target="_blank" rel="noopener">
+          <Printer className="size-4" aria-hidden />
+          Reimprimir {label}
+        </a>
+      </Button>
+    </>
   );
 }
 
