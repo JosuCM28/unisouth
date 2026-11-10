@@ -16,6 +16,17 @@ export interface OrderFolderFilters extends PaginationInput {
   /** Cuántas traer. Se topa en `MAX_FOLDERS` aunque se pida más. */
   limit?: number;
   skip?: number;
+  /**
+   * La búsqueda también encuentra el pedido por sus ÓRDENES: quien teclea
+   * "camisa" o una PO busca el pedido donde vive esa orden, aunque el nombre
+   * de la carpeta no diga nada de eso. Se suma a `search` con un OR.
+   */
+  orderSearch?: Prisma.CuttingOrderWhereInput;
+  /**
+   * Estado o fechas, que son de la orden y no de la carpeta: el pedido sale
+   * sólo si alguna de sus órdenes cumple.
+   */
+  orderFilter?: Prisma.CuttingOrderWhereInput;
 }
 
 /**
@@ -370,7 +381,14 @@ export class OrderFolderRepository extends BaseRepository<
         { name: { contains: filters.search, mode: "insensitive" } },
         { code: { contains: filters.search, mode: "insensitive" } },
         { reference: { contains: filters.search, mode: "insensitive" } },
+        ...(filters.orderSearch
+          ? [{ orders: { some: filters.orderSearch } }]
+          : []),
       ];
+    }
+
+    if (filters.orderFilter) {
+      where.orders = { some: filters.orderFilter };
     }
 
     return where;

@@ -23,9 +23,16 @@ import type {
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
+import type { OrderView } from "./order-view";
 import type { WorkshopBoardTab, WorkshopDeliveryState } from "./workshop-access";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
+
+/** Las pestañas de la pantalla de Órdenes. */
+export const ORDER_VIEW_LABELS: Record<OrderView, string> = {
+  orders: "Órdenes sueltas",
+  folders: "Pedidos",
+};
 
 /** Las pestañas del tablero de un taller. */
 export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {

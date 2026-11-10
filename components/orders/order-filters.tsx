@@ -15,6 +15,11 @@ interface Props {
   clients: { id: string; name: string }[];
   /** Si los pedidos archivados se están mostrando. */
   showArchived?: boolean;
+  /**
+   * Si se ofrece el botón de Archivados. Sólo en la pestaña de pedidos: lo
+   * que se archiva son los pedidos, y en la de órdenes no movería nada.
+   */
+  showArchiveToggle?: boolean;
 }
 
 /**
@@ -25,7 +30,11 @@ interface Props {
  * exactamente lo que se está viendo, sin una segunda ruta que mantener en
  * sincronía.
  */
-export function OrderFilters({ clients, showArchived }: Props) {
+export function OrderFilters({
+  clients,
+  showArchived,
+  showArchiveToggle = true,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -39,6 +48,15 @@ export function OrderFilters({ clients, showArchived }: Props) {
     params.delete("page");
     params.delete("all");
     router.replace(params.toString() ? `${pathname}?${params}` : pathname, {
+      scroll: false,
+    });
+  }
+
+  /* Limpia los filtros pero se queda en la pestaña: quien limpia en Pedidos
+     quiere ver todos los pedidos, no que lo regresen a las órdenes. */
+  function clearFilters() {
+    const vista = searchParams.get("vista");
+    router.replace(vista ? `${pathname}?vista=${vista}` : pathname, {
       scroll: false,
     });
   }
@@ -138,34 +156,32 @@ export function OrderFilters({ clients, showArchived }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <ExportButton href={exportHref} exact />
-        <ExportButton
-          href={cutReportHref}
-          label="Reporte de corte"
-          exact
-        />
+        <ExportButton href={cutReportHref} label="Reporte de corte" exact />
         <PrintLinkButton href="/print/orders" />
 
         {/* Los pedidos archivados se piden a propósito: son los entregados, y
             si salieran siempre la lista crecería sin parar con trabajo que ya
             no existe. */}
-        <button
-          type="button"
-          onClick={() => setParam("archived", showArchived ? null : "1")}
-          aria-pressed={showArchived}
-          className={
-            showArchived
-              ? "touch-target flex items-center gap-1.5 rounded border border-primary bg-card px-3 text-sm text-primary"
-              : "touch-target flex items-center gap-1.5 rounded border border-border bg-card px-3 text-sm text-muted-foreground"
-          }
-        >
-          <Archive className="size-3.5" aria-hidden />
-          Archivados
-        </button>
+        {showArchiveToggle && (
+          <button
+            type="button"
+            onClick={() => setParam("archived", showArchived ? null : "1")}
+            aria-pressed={showArchived}
+            className={
+              showArchived
+                ? "touch-target flex items-center gap-1.5 rounded border border-primary bg-card px-3 text-sm text-primary"
+                : "touch-target flex items-center gap-1.5 rounded border border-border bg-card px-3 text-sm text-muted-foreground"
+            }
+          >
+            <Archive className="size-3.5" aria-hidden />
+            Archivados
+          </button>
+        )}
 
         {hasFilters && (
           <button
             type="button"
-            onClick={() => router.replace(pathname)}
+            onClick={clearFilters}
             className="touch-target flex items-center gap-1.5 rounded border border-border bg-card px-3 text-sm text-muted-foreground"
           >
             <X className="size-3.5" aria-hidden />

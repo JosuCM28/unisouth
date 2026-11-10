@@ -1,62 +1,68 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ClipboardList, FolderPlus, Plus } from "lucide-react";
+import { ClipboardList, FolderPlus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { parseOrderView } from "@/lib/constants/order-view";
 import { OrderDispatchRepository } from "@/lib/repositories/order-dispatch.repository";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
-import { FolderCard } from "@/components/orders/folder-card";
+import { FolderList } from "@/components/orders/folder-list";
 import { OrderFilters } from "@/components/orders/order-filters";
 import { OrderTable } from "@/components/orders/order-table";
+import { OrderViewTabs } from "@/components/orders/order-view-tabs";
 import {
   cuttingOrderWhere,
   LOOSE_ORDERS,
   parseCuttingOrderFilters,
+  type CuttingOrderFilters,
 } from "@/lib/repositories/cutting-order-filters";
 
 export const metadata: Metadata = { title: "Órdenes" };
 
 const PAGE_SIZE = 50;
 
+/** Pedidos por página: cada tarjeta suma sus órdenes, así que van menos. */
+const FOLDER_PAGE_SIZE = 25;
+
 /** Los tamaños que ofrece el selector de la tabla. Cualquier otro se ignora. */
 const PAGE_SIZES = [10, 25, 50, 100];
 
-/**
- * Cuántos pedidos se asoman en esta pantalla.
- *
- * Son un aperitivo, no la lista: el resto vive en /orders/folders, paginado.
- * Antes se bajaban TODOS y, por cada uno, sus órdenes y sus renglones para
- * sumar el avance —una consulta que crece sin techo conforme se acumulan
- * pedidos, encima de una pantalla que ya nadie recorre entera.
- */
-const FOLDER_PREVIEW = 6;
+type Params = {
+  q?: string;
+  page?: string;
+  all?: string;
+  client?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  folder?: string;
+  archived?: string;
+  filas?: string;
+  vista?: string;
+};
 
 interface PageProps {
-  searchParams: Promise<{
-    q?: string;
-    page?: string;
-    all?: string;
-    client?: string;
-    status?: string;
-    from?: string;
-    to?: string;
-    folder?: string;
-    archived?: string;
-    filas?: string;
-  }>;
+  searchParams: Promise<Params>;
+}
+
+interface ViewContext {
+  params: Params;
+  filters: CuttingOrderFilters;
+  page: number;
+  accumulate: boolean;
+  canWrite: boolean;
 }
 
 /**
  * Órdenes de corte: qué pidió cada cliente y cómo va.
  *
- * Arriba los pedidos —las carpetas que agrupan varias órdenes— y abajo las
- * órdenes sueltas. La lista responde de un vistazo lo único que importa a
- * diario: cuánto falta por cortar.
+ * Dos pestañas, órdenes sueltas (la que abre) y pedidos. Los filtros de
+ * arriba son los mismos para las dos y sobreviven al cambiar de pestaña.
  */
 export default async function OrdersPage({ searchParams }: PageProps) {
   const user = await requirePermission("orders:browse");
@@ -66,117 +72,29 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   const canWrite = roleHasPermission(user.role, "inventory:write");
 
   const params = await searchParams;
-  const page = parsePositiveInt(params.page) ?? 1;
-  const accumulate = params.all === "1";
-  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
-     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
-  const pageSize = PAGE_SIZES.includes(Number(params.filas))
-    ? Number(params.filas)
-    : PAGE_SIZE;
-  const skip = accumulate ? 0 : (page - 1) * pageSize;
-  const take = accumulate ? Math.min(page * pageSize, 300) : pageSize;
-
-  const filters = parseCuttingOrderFilters(params);
-  const showArchived = params.archived === "1";
-
-  /* Sin filtros, abajo van SÓLO las sueltas: las que están en un pedido ya se
-     ven dentro de su carpeta y repetirlas haría la lista el doble de larga.
-     En cuanto se filtra por algo, se busca en todas —quien filtra por cliente
-     o por fecha quiere encontrar la orden, esté donde esté. */
-  const isSearching = Boolean(
-    filters.search ||
-      filters.clientId ||
-      filters.status ||
-      filters.from ||
-      filters.to,
-  );
-  const listFilters = {
-    ...filters,
-    folderId: filters.folderId ?? (isSearching ? undefined : LOOSE_ORDERS),
-    /* SÓLO lo que ya está en el concentrado de la casa.
-
-       Las órdenes de la otra planta existen desde que las capturan allá, pero
-       aquí no son nuestras hasta que alguien las jala con el botón de
-       Agregar. Sin esta línea aparecerían en esta lista el día que se
-       capturan —y nadie de acá se enteraría de que todavía no se decidió
-       cortarlas—. Las de la casa nacen agregadas, así que el filtro no les
-       hace nada. */
-    adopted: true,
-  };
-  const where = cuttingOrderWhere(listFilters);
-
-  const folderFilters = {
-    clientId: filters.clientId,
-    includeArchived: showArchived,
+  const view = parseOrderView(params.vista);
+  const context: ViewContext = {
+    params,
+    filters: parseCuttingOrderFilters(params),
+    page: parsePositiveInt(params.page) ?? 1,
+    accumulate: params.all === "1",
+    canWrite,
   };
 
-  const [total, orders, clients, folders, folderTotal] = await Promise.all([
-    prisma.cuttingOrder.count({ where }),
-    prisma.cuttingOrder.findMany({
-      where,
-      /* Desempate por `createdAt` y no por `id`: la fecha se ancla al inicio
-         del día, así que todo lo capturado hoy queda empatado, y `cuid()` no
-         es cronológico. Sin esto lo más viejo del día sale hasta arriba. */
-      orderBy: [{ orderedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-      skip,
-      take,
-      include: {
-        client: { select: { name: true } },
-        material: { select: { name: true } },
-        folder: { select: { name: true } },
-        lines: { select: { orderedQuantity: true, cutQuantity: true } },
-        // Para el contador de comentarios internos de la tarjeta.
-        _count: { select: { comments: true } },
-      },
-    }),
-    // Sólo los clientes que de verdad tienen órdenes: ofrecer el catálogo
-    // entero llena el filtro de nombres que no devuelven nada.
-    prisma.client.findMany({
-      where: { cuttingOrders: { some: {} } },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    new OrderFolderRepository().findAllWithTotals({
-      ...folderFilters,
-      limit: FOLDER_PREVIEW,
-    }),
-    new OrderFolderRepository().countWithTotals(folderFilters),
-  ]);
-
-  // Sólo quien captura ve Enviar: a quien consulta no se le pregunta nada.
-  const pendingDispatch = canWrite
-    ? await new OrderDispatchRepository().findOrderIdsWithPendingDispatch(
-        orders.map((order) => order.id),
-      )
-    : new Set<string>();
-
-  const totalPages = Math.ceil(total / pageSize) || 1;
-  const hasFilters = isSearching || Boolean(filters.folderId);
-  const isEmpty = orders.length === 0 && folders.length === 0;
+  /* Sólo los clientes que de verdad tienen órdenes: ofrecer el catálogo
+     entero llena el filtro de nombres que no devuelven nada. */
+  const clients = await prisma.client.findMany({
+    where: { cuttingOrders: { some: {} } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Órdenes"
         description="Qué pidieron y cuánto falta por cortar"
-        action={
-          canWrite ? (
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" className="touch-target">
-                <Link href="/orders/folders/new">
-                  <FolderPlus className="size-4" aria-hidden />
-                  Pedido
-                </Link>
-              </Button>
-              <Button asChild className="touch-target">
-                <Link href="/orders/new">
-                  <Plus className="size-4" aria-hidden />
-                  Nueva
-                </Link>
-              </Button>
-            </div>
-          ) : undefined
-        }
+        action={canWrite ? <CreateButtons /> : undefined}
       />
 
       {/* El buscador va ARRIBA de los filtros: con muchas órdenes es más
@@ -187,77 +105,197 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         className="w-full md:max-w-sm"
       />
 
-      <OrderFilters clients={clients} showArchived={showArchived} />
+      <OrderFilters
+        clients={clients}
+        showArchived={view === "folders" && params.archived === "1"}
+        showArchiveToggle={view === "folders"}
+      />
 
-      {folders.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Pedidos
-            </h2>
-            {/* Siempre visible, aunque quepan todos: allá se puede buscar
-                por nombre y sacar los archivados, y aquí no. Si estuviera
-                sólo cuando sobran, esa pantalla no existiría para quien
-                todavía tiene pocos pedidos. */}
-            <Link
-              href="/orders/folders"
-              className="touch-target flex items-center gap-1 text-sm text-muted-foreground"
-            >
-              {folderTotal > folders.length ? `Ver los ${folderTotal}` : "Ver todos"}
-              <ArrowRight className="size-3.5" aria-hidden />
-            </Link>
-          </div>
-          <ul className="flex flex-col gap-2">
-            {folders.map((folder) => (
-              <li key={folder.id}>
-                <FolderCard folder={folder} canWrite={canWrite} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <OrderViewTabs view={view} params={params} />
 
-      {isEmpty ? (
-        <div className="flat-surface">
-          {/* Con filtros puestos, "aún no hay órdenes" haría creer que se
-              perdieron: lo que no hay es coincidencias. */}
-          <EmptyState
-            icon={ClipboardList}
-            title={hasFilters ? "Ninguna orden coincide" : "Aún no hay órdenes"}
-            description={emptyDescription(hasFilters, canWrite)}
-          />
-        </div>
+      {/* Cada pestaña consulta sólo lo suyo. */}
+      {view === "folders" ? (
+        <FoldersView {...context} />
       ) : (
-        orders.length > 0 && (
-          <section className="flex flex-col gap-2">
-            {/* El encabezado sólo aparece si hay pedidos arriba: sin ellos
-                sería una etiqueta sobre la única lista de la pantalla. */}
-            {folders.length > 0 && (
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {isSearching ? "Órdenes" : "Órdenes sueltas"}
-              </h2>
-            )}
-            {/* Tabla desde `md:` y tarjetas en celular: lo resuelve la tabla,
-                no esta página. El paginador viaja dentro, por eso ya no hay
-                `Pager` aquí abajo. */}
-            <OrderTable
-              orders={orders.map((order) => ({
-                ...order,
-                folderName: order.folder?.name ?? null,
-                hasPendingDispatch: pendingDispatch.has(order.id),
-              }))}
-              server={{ page, totalPages, total, pageSize }}
-              // El pedido sólo se etiqueta al buscar, que es cuando aparecen
-              // mezcladas órdenes de dentro y de fuera de una carpeta.
-              showFolder={isSearching}
-              isFiltered={hasFilters}
-              canWrite={canWrite}
-              columnsKey="orders"
-            />
-          </section>
-        )
+        <LooseOrdersView {...context} />
       )}
     </div>
+  );
+}
+
+function CreateButtons() {
+  return (
+    <div className="flex items-center gap-2">
+      <Button asChild variant="outline" className="touch-target">
+        <Link href="/orders/folders/new">
+          <FolderPlus className="size-4" aria-hidden />
+          Pedido
+        </Link>
+      </Button>
+      <Button asChild className="touch-target">
+        <Link href="/orders/new">
+          <Plus className="size-4" aria-hidden />
+          Nueva
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+/** ¿Hay algún filtro de la ORDEN puesto? */
+function isSearching(filters: CuttingOrderFilters): boolean {
+  return Boolean(
+    filters.search ||
+      filters.clientId ||
+      filters.status ||
+      filters.from ||
+      filters.to,
+  );
+}
+
+async function LooseOrdersView({
+  params,
+  filters,
+  page,
+  accumulate,
+  canWrite,
+}: ViewContext) {
+  /* Se acota a los tamaños del selector: cualquier otro valor en la URL se
+     ignora en vez de dejar que alguien pida 100 000 filas a mano. */
+  const pageSize = PAGE_SIZES.includes(Number(params.filas))
+    ? Number(params.filas)
+    : PAGE_SIZE;
+  const searching = isSearching(filters);
+
+  const where = cuttingOrderWhere({
+    ...filters,
+    /* Sin filtros, SÓLO las sueltas: las que están en un pedido se ven en su
+       pestaña. En cuanto se filtra por algo, se busca en todas —quien filtra
+       por cliente o por fecha quiere encontrar la orden, esté donde esté—. */
+    folderId: filters.folderId ?? (searching ? undefined : LOOSE_ORDERS),
+    /* SÓLO lo que ya está en el concentrado de la casa. Las de la otra planta
+       no son nuestras hasta que alguien las jala con Agregar; las de la casa
+       nacen agregadas, así que el filtro no les hace nada. */
+    adopted: true,
+  });
+
+  const [total, orders] = await Promise.all([
+    prisma.cuttingOrder.count({ where }),
+    prisma.cuttingOrder.findMany({
+      where,
+      /* Desempate por `createdAt` y no por `id`: la fecha se ancla al inicio
+         del día, así que todo lo capturado hoy queda empatado, y `cuid()` no
+         es cronológico. Sin esto lo más viejo del día sale hasta arriba. */
+      orderBy: [{ orderedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      skip: accumulate ? 0 : (page - 1) * pageSize,
+      take: accumulate ? Math.min(page * pageSize, 300) : pageSize,
+      include: {
+        client: { select: { name: true } },
+        material: { select: { name: true } },
+        folder: { select: { name: true } },
+        lines: { select: { orderedQuantity: true, cutQuantity: true } },
+        // Para el contador de comentarios internos de la tarjeta.
+        _count: { select: { comments: true } },
+      },
+    }),
+  ]);
+
+  const hasFilters = searching || Boolean(filters.folderId);
+
+  if (orders.length === 0) {
+    return (
+      <div className="flat-surface">
+        {/* Con filtros puestos, "aún no hay órdenes" haría creer que se
+            perdieron: lo que no hay es coincidencias. */}
+        <EmptyState
+          icon={ClipboardList}
+          title={hasFilters ? "Ninguna orden coincide" : "Aún no hay órdenes sueltas"}
+          description={emptyDescription(hasFilters, canWrite)}
+        />
+      </div>
+    );
+  }
+
+  // Sólo quien captura ve Enviar: a quien consulta no se le pregunta nada.
+  const pendingDispatch = canWrite
+    ? await new OrderDispatchRepository().findOrderIdsWithPendingDispatch(
+        orders.map((order) => order.id),
+      )
+    : new Set<string>();
+
+  return (
+    <OrderTable
+      orders={orders.map((order) => ({
+        ...order,
+        folderName: order.folder?.name ?? null,
+        hasPendingDispatch: pendingDispatch.has(order.id),
+      }))}
+      server={{
+        page,
+        totalPages: Math.ceil(total / pageSize) || 1,
+        total,
+        pageSize,
+      }}
+      // El pedido sólo se etiqueta al buscar, que es cuando aparecen
+      // mezcladas órdenes de dentro y de fuera de una carpeta.
+      showFolder={searching}
+      isFiltered={hasFilters}
+      canWrite={canWrite}
+      columnsKey="orders"
+    />
+  );
+}
+
+async function FoldersView({
+  params,
+  filters,
+  page,
+  accumulate,
+  canWrite,
+}: ViewContext) {
+  const showArchived = params.archived === "1";
+  const folderFilters = {
+    search: filters.search,
+    clientId: filters.clientId,
+    includeArchived: showArchived,
+    /* Mismo buscador que las órdenes: el pedido sale si su nombre coincide o
+       si alguna de sus órdenes coincide —la prenda, la PO, la tela—. */
+    orderSearch: filters.search
+      ? cuttingOrderWhere({ search: filters.search, adopted: true })
+      : undefined,
+    // Estado y fechas son de la orden: el pedido sale si alguna cumple.
+    orderFilter:
+      filters.status || filters.from || filters.to
+        ? cuttingOrderWhere({
+            status: filters.status,
+            from: filters.from,
+            to: filters.to,
+            dateField: filters.dateField,
+            adopted: true,
+          })
+        : undefined,
+  };
+
+  const repository = new OrderFolderRepository();
+  const [folders, total] = await Promise.all([
+    repository.findAllWithTotals({
+      ...folderFilters,
+      skip: accumulate ? 0 : (page - 1) * FOLDER_PAGE_SIZE,
+      limit: accumulate ? page * FOLDER_PAGE_SIZE : FOLDER_PAGE_SIZE,
+    }),
+    repository.countWithTotals(folderFilters),
+  ]);
+
+  return (
+    <FolderList
+      folders={folders}
+      page={page}
+      totalPages={Math.ceil(total / FOLDER_PAGE_SIZE) || 1}
+      total={total}
+      params={params}
+      isFiltered={isSearching(filters) || showArchived}
+      canWrite={canWrite}
+    />
   );
 }
 
