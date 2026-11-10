@@ -4,6 +4,7 @@ import { ArrowRight, ClipboardList, FolderPlus, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { OrderDispatchRepository } from "@/lib/repositories/order-dispatch.repository";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -142,6 +143,13 @@ export default async function OrdersPage({ searchParams }: PageProps) {
     new OrderFolderRepository().countWithTotals(folderFilters),
   ]);
 
+  // Sólo quien captura ve Enviar: a quien consulta no se le pregunta nada.
+  const pendingDispatch = canWrite
+    ? await new OrderDispatchRepository().findOrderIdsWithPendingDispatch(
+        orders.map((order) => order.id),
+      )
+    : new Set<string>();
+
   const totalPages = Math.ceil(total / pageSize) || 1;
   const hasFilters = isSearching || Boolean(filters.folderId);
   const isEmpty = orders.length === 0 && folders.length === 0;
@@ -236,6 +244,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
               orders={orders.map((order) => ({
                 ...order,
                 folderName: order.folder?.name ?? null,
+                hasPendingDispatch: pendingDispatch.has(order.id),
               }))}
               server={{ page, totalPages, total, pageSize }}
               // El pedido sólo se etiqueta al buscar, que es cuando aparecen

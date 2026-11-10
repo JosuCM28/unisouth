@@ -43,6 +43,13 @@ export interface OrderListEntry {
    * verde idéntico en cada renglón, que no informa nada.
    */
   addedAt?: Date | null;
+  /**
+   * Si tiene algo listo para marcar como enviado.
+   *
+   * Opcional y ausente = sí: una pantalla que no lo consulta sigue ofreciendo
+   * Enviar como antes, en vez de esconderlo sin razón.
+   */
+  hasPendingDispatch?: boolean;
 }
 
 /**
@@ -58,6 +65,19 @@ export function orderFabric(
   if (order.material) return order.material.name;
   const handwritten = order.cutFabricText?.trim();
   return handwritten ? handwritten : null;
+}
+
+/**
+ * ¿Se ofrece Enviar en esta orden?
+ *
+ * Una cancelada no manda nada, y una que ya envió todo sólo abriría una
+ * ventana sin nada que marcar. La tarjeta y la tabla preguntan aquí para no
+ * decidir cada una a su modo.
+ */
+export function canDispatchOrder(
+  order: Pick<OrderListEntry, "status" | "hasPendingDispatch">,
+): boolean {
+  return order.status !== "CANCELLED" && order.hasPendingDispatch !== false;
 }
 
 interface Props {
@@ -221,22 +241,25 @@ export function OrderListItem({
             {cut} cortadas
           </p>
         </div>
+      </div>
+      </div>
 
-        {/* Por encima de la capa del enlace, o el toque abriría la orden. */}
-        {canWrite && (
-          <div className="relative z-20 flex shrink-0 items-center gap-1">
-            {order.status !== "CANCELLED" && (
-              <OrderDispatchDialog orderId={order.id} orderCode={order.code} />
-            )}
-            <OrderDeleteButton
-              orderId={order.id}
-              orderCode={order.code}
-              cutQuantity={cut}
-            />
-          </div>
-        )}
-      </div>
-      </div>
+      {/* Los botones en su propio renglón al pie y no junto a los números: en
+          esa columna, que no se encoge, le robaban el ancho a la descripción
+          y al cliente y el celular los cortaba con "…". Por encima de la capa
+          del enlace, o el toque abriría la orden. */}
+      {canWrite && (
+        <div className="relative z-20 flex items-center justify-end gap-1 border-t border-border pt-2">
+          {canDispatchOrder(order) && (
+            <OrderDispatchDialog orderId={order.id} orderCode={order.code} />
+          )}
+          <OrderDeleteButton
+            orderId={order.id}
+            orderCode={order.code}
+            cutQuantity={cut}
+          />
+        </div>
+      )}
 
       {/* El semáforo del concentrado, en su propio renglón y por encima de la
           capa del enlace: lleva un botón, y dentro del área que navega el

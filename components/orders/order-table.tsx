@@ -18,6 +18,7 @@ import {
 import { OrderDeleteButton } from "./order-delete-button";
 import { OrderDispatchDialog } from "./order-dispatch-dialog";
 import {
+  canDispatchOrder,
   OrderListItem,
   orderFabric,
   type OrderListEntry,
@@ -321,7 +322,7 @@ export function OrderTable({
             enableSorting: false,
             cell: ({ row }: { row: { original: OrderTableRow } }) => (
               <div className="flex items-center justify-end gap-1">
-                {row.original.status !== "CANCELLED" && (
+                {canDispatchOrder(row.original) && (
                   <OrderDispatchDialog
                     orderId={row.original.id}
                     orderCode={row.original.code}

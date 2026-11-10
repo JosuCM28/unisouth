@@ -82,6 +82,63 @@ export class OrderDispatchRepository extends BaseRepository<
     });
   }
 
+  /**
+   * De estas órdenes, cuáles tienen algo LISTO para marcar como enviado.
+   *
+   * Es el mismo criterio que deja seleccionar un renglón en la ventana de
+   * Enviar: si aquí se contara distinto, el botón aparecería para abrir una
+   * ventana sin nada que marcar. Un vale en borrador no cuenta —la ventana lo
+   * bloquea—; al aplicarse, el botón vuelve solo.
+   *
+   * Dos consultas para toda la página, no dos por orden.
+   */
+  async findOrderIdsWithPendingDispatch(
+    orderIds: string[],
+  ): Promise<Set<string>> {
+    if (orderIds.length === 0) return new Set();
+
+    const [shipments, vouchers] = await Promise.all([
+      this.db.garmentShipment.findMany({
+        where: {
+          orderId: { in: orderIds },
+          dispatchedAt: null,
+          status: { not: "CANCELLED" },
+          OR: [
+            { documentId: null },
+            { document: { status: { not: "CANCELLED" } } },
+          ],
+        },
+        distinct: ["orderId"],
+        select: { orderId: true },
+      }),
+      this.db.inventoryDocument.findMany({
+        where: {
+          type: "ISSUE",
+          status: "APPLIED",
+          dispatchedAt: null,
+          cutLines: { some: {} },
+          OR: [
+            { cuttingOrderId: { in: orderIds } },
+            { sentBatches: { some: { orderId: { in: orderIds } } } },
+          ],
+        },
+        select: {
+          cuttingOrderId: true,
+          sentBatches: { select: { orderId: true } },
+        },
+      }),
+    ]);
+
+    const pending = new Set(shipments.map((row) => row.orderId));
+    for (const voucher of vouchers) {
+      if (voucher.cuttingOrderId) pending.add(voucher.cuttingOrderId);
+      for (const batch of voucher.sentBatches) pending.add(batch.orderId);
+    }
+
+    // Un vale de pedido completo trae cortes de órdenes fuera de esta página.
+    return new Set(orderIds.filter((id) => pending.has(id)));
+  }
+
   async findVouchers(orderId: string): Promise<DispatchVoucherRow[]> {
     return this.db.inventoryDocument.findMany({
       where: { ...orderVoucherWhere(orderId), status: { not: "CANCELLED" } },

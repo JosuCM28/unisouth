@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, ClipboardList, Pencil, Plus } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { OrderDispatchRepository } from "@/lib/repositories/order-dispatch.repository";
 import { OrderFolderRepository } from "@/lib/repositories/order-folder.repository";
 import { prisma } from "@/lib/prisma";
 import { cutBatchLabel } from "@/lib/constants/labels";
@@ -67,9 +68,14 @@ export default async function OrderFolderPage({ params }: PageProps) {
      capturar: a quien nada más consulta no se le pintan esos botones, y
      recorrer los cortes de todas las órdenes para no enseñar nada sería un
      viaje de más en la pantalla que más se abre. */
-  const send = canWrite
-    ? await buildSendContext(repository, id)
-    : null;
+  const [send, pendingDispatch] = canWrite
+    ? await Promise.all([
+        buildSendContext(repository, id),
+        new OrderDispatchRepository().findOrderIdsWithPendingDispatch(
+          folder.orders.map((order) => order.id),
+        ),
+      ])
+    : [null, new Set<string>()];
 
   /* Talla por talla y de TODAS las órdenes vivas del pedido. Netear aquí era
      el peor sitio para hacerlo: un pedido de veinte órdenes esconde el
@@ -282,6 +288,7 @@ export default async function OrderFolderPage({ params }: PageProps) {
           orders={folder.orders.map((order) => ({
             ...order,
             folderName: null,
+            hasPendingDispatch: pendingDispatch.has(order.id),
           }))}
           canWrite={canWrite}
         />
