@@ -194,6 +194,20 @@ export class WorkshopDeliveryService extends BaseService {
     return voucher ? toVoucherDetail(voucher) : null;
   }
 
+  /**
+   * La ficha que se abre desde el tablero. Igual que `detailForRole`, pero
+   * sin `null`: la ventana necesita un mensaje que enseñar, y una entrega de
+   * otro taller se contesta igual que una que no existe.
+   */
+  async requireDetailForRole(
+    role: string,
+    id: string,
+  ): Promise<WorkshopDeliveryDetail> {
+    const detail = await this.detailForRole(role, id);
+    if (!detail) throw new NotFoundError("la entrega");
+    return detail;
+  }
+
   /** La reimpresión: sólo su propio vale, y sólo mientras siga vigente. */
   async assertCanPrint(role: string, documentId: string): Promise<void> {
     const workshop = await this.repository.findWorkshopByRole(role);

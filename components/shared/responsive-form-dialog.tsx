@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useIsDesktop } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,12 @@ interface ResponsiveFormDialogProps {
    * propio que disparar, y `DialogTrigger asChild` sin hijo revienta.
    */
   trigger?: ReactNode;
+  /**
+   * Más ancho en escritorio. Para fichas de CONSULTA con tablas —la de una
+   * entrega trae sus cortes—; un formulario se queda angosto, que se llena
+   * mejor de arriba a abajo.
+   */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -46,6 +53,7 @@ export function ResponsiveFormDialog({
   title,
   description,
   trigger,
+  wide = false,
   children,
 }: ResponsiveFormDialogProps) {
   const isDesktop = useIsDesktop();
@@ -54,7 +62,12 @@ export function ResponsiveFormDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-        <DialogContent className="keyboard-aware-dialog max-h-[85dvh] overflow-y-auto sm:max-w-lg">
+        <DialogContent
+          className={cn(
+            "keyboard-aware-dialog max-h-[85dvh] overflow-y-auto",
+            wide ? "sm:max-w-3xl" : "sm:max-w-lg",
+          )}
+        >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description && (

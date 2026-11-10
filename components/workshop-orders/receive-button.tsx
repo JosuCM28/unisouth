@@ -26,11 +26,14 @@ export function ReceiveButton({
   code,
   pieces,
   bundles,
+  onReceived,
 }: {
   id: string;
   code: string;
   pieces: number;
   bundles: number;
+  /** Para quien lo pinta dentro de otra ventana y debe volver a leer la ficha. */
+  onReceived?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,6 +59,7 @@ export function ReceiveButton({
 
     toast.success("Entrega marcada como recibida");
     handleOpenChange(false);
+    onReceived?.();
     router.refresh();
   }
 

@@ -25,12 +25,24 @@ export function CancelledDelivery({ code }: { code: string }) {
 /** Una entrega vigente: qué se mandó, de qué orden y cómo confirmarla. */
 export function DeliveryDetail({
   delivery,
+  canReceive = true,
+  onReceived,
 }: {
   delivery: ActiveWorkshopDelivery;
+  /**
+   * Si se ofrece Recibir. ADMIN abre la ficha desde el tablero pero no
+   * confirma: eso le toca al taller, y el botón le rebotaría.
+   */
+  canReceive?: boolean;
+  onReceived?: () => void;
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <DeliveryHeader delivery={delivery} />
+      <DeliveryHeader
+        delivery={delivery}
+        canReceive={canReceive}
+        onReceived={onReceived}
+      />
       <DeliveryLines delivery={delivery} />
       <OrderData delivery={delivery} />
       <Notes delivery={delivery} />
@@ -61,7 +73,15 @@ function OrderCuts({ delivery }: { delivery: ActiveWorkshopDelivery }) {
   );
 }
 
-function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
+function DeliveryHeader({
+  delivery,
+  canReceive,
+  onReceived,
+}: {
+  delivery: ActiveWorkshopDelivery;
+  canReceive: boolean;
+  onReceived?: () => void;
+}) {
   return (
     <section className="flat-surface flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -90,12 +110,13 @@ function DeliveryHeader({ delivery }: { delivery: ActiveWorkshopDelivery }) {
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        {delivery.state === "PENDING" && delivery.dispatchedAt && (
+        {canReceive && delivery.state === "PENDING" && delivery.dispatchedAt && (
           <ReceiveButton
             id={delivery.id}
             code={delivery.code}
             pieces={delivery.pieces}
             bundles={delivery.bundles}
+            onReceived={onReceived}
           />
         )}
         {delivery.voucherId && (

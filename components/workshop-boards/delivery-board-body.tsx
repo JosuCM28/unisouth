@@ -12,6 +12,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { DeliveryFilter } from "@/components/workshop-orders/delivery-filter";
 import { DispatchNote } from "@/components/workshop-orders/dispatch-status";
 import { ReceiveButton } from "@/components/workshop-orders/receive-button";
+import {
+  BoardDeliveryDialog,
+  useBoardDelivery,
+} from "./board-delivery-dialog";
 import { BoardReportDialog } from "./board-report-dialog";
 
 interface Props {
@@ -51,6 +55,7 @@ export function DeliveryBoardBody({
   report,
 }: Props) {
   const [query, setQuery] = useState("");
+  const delivery = useBoardDelivery(report.boardKey);
   const groups = useMemo(
     () => groupRows(filterDeliveries(rows, query)),
     [rows, query],
@@ -83,7 +88,17 @@ export function DeliveryBoardBody({
         ))}
       </nav>
 
-      <BoardList rows={groups[tab]} tab={tab} query={query} isOwner={isOwner} />
+      <BoardList
+        rows={groups[tab]}
+        tab={tab}
+        query={query}
+        isOwner={isOwner}
+        onOpen={(row) => delivery.open({ id: row.id, code: row.code })}
+      />
+
+      {/* Una sola ventana para todo el tablero: cambia de entrega, no se
+          monta una por tarjeta. */}
+      <BoardDeliveryDialog delivery={delivery} isOwner={isOwner} />
     </>
   );
 }
@@ -93,17 +108,19 @@ function BoardList({
   tab,
   query,
   isOwner,
+  onOpen,
 }: {
   rows: WorkshopDeliveryRow[];
   tab: WorkshopBoardTab;
   query: string;
   isOwner: boolean;
+  onOpen: (row: WorkshopDeliveryRow) => void;
 }) {
   if (rows.length > 0) {
     return (
       <ul className="flex flex-col gap-2">
         {rows.map((row) => (
-          <BoardRow key={row.id} row={row} isOwner={isOwner} />
+          <BoardRow key={row.id} row={row} isOwner={isOwner} onOpen={onOpen} />
         ))}
       </ul>
     );
@@ -151,15 +168,26 @@ function groupRows(
 function BoardRow({
   row,
   isOwner,
+  onOpen,
 }: {
   row: WorkshopDeliveryRow;
   isOwner: boolean;
+  onOpen: (row: WorkshopDeliveryRow) => void;
 }) {
   return (
-    <li className="flat-surface flex flex-col gap-2 p-3">
+    <li className="flat-surface relative flex flex-col gap-2 p-3 transition-colors active:bg-accent">
+      {/* La tarjeta entera abre la ficha, como capa encima y no envolviéndola:
+          un <button> dentro de otro no es HTML válido, y Recibir tiene que
+          seguir respondiendo por su cuenta. */}
+      <button
+        type="button"
+        onClick={() => onOpen(row)}
+        className="absolute inset-0 z-10"
+        aria-label={`Ver la entrega ${row.code}`}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <DeliveryCode row={row} isOwner={isOwner} />
+          <p className="tabular text-sm font-medium">{row.code}</p>
           <p className="tabular text-sm">
             {row.orderReference} · {row.clientName}
           </p>
@@ -176,39 +204,21 @@ function BoardRow({
           <DispatchNote dispatchedAt={row.dispatchedAt} />
         </div>
 
+        {/* Por encima de la capa: confirmar no debe abrir la ficha. */}
         {isOwner && row.state === "PENDING" && row.dispatchedAt && (
-          <ReceiveButton
-            id={row.id}
-            code={row.code}
-            pieces={row.pieces}
-            bundles={row.bundles}
-          />
+          <div className="relative z-20">
+            <ReceiveButton
+              id={row.id}
+              code={row.code}
+              pieces={row.pieces}
+              bundles={row.bundles}
+            />
+          </div>
         )}
       </div>
 
       {row.state === "RECEIVED" && <ReceivedInfo row={row} />}
     </li>
-  );
-}
-
-function DeliveryCode({
-  row,
-  isOwner,
-}: {
-  row: WorkshopDeliveryRow;
-  isOwner: boolean;
-}) {
-  if (!isOwner) {
-    return <p className="tabular text-sm font-medium">{row.code}</p>;
-  }
-
-  return (
-    <Link
-      href={`/workshop-orders/${row.id}`}
-      className="tabular touch-target flex w-fit items-center text-sm font-medium underline"
-    >
-      {row.code}
-    </Link>
   );
 }
 
