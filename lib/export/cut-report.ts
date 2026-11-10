@@ -1,3 +1,5 @@
+import { toDateInputValue } from "@/lib/utils";
+
 /**
  * Las cuentas del reporte general de corte.
  *
@@ -119,8 +121,12 @@ const WEEKDAYS = [
  * o los viernes de un vistazo en vez de calcularlos.
  */
 export function weekdayName(date: Date): string {
-  /* `?? ""` y no un `!`: `getDay()` siempre cae en el arreglo, pero una fecha
-     inválida devuelve `NaN` y ahí el índice no existe. Vale más una celda en
-     blanco que un `undefined` impreso en la hoja. */
-  return WEEKDAYS[date.getDay()] ?? "";
+  /* El día EN LA FÁBRICA, no el del servidor (que corre en UTC): por el día
+     calendario de la fábrica, y no por `getDay()`, se sabe si fue lunes.
+
+     `?? ""` y no un `!`: una fecha inválida no da día y ahí el índice no
+     existe. Vale más una celda en blanco que un `undefined` en la hoja. */
+  const key = toDateInputValue(date);
+  if (!key) return "";
+  return WEEKDAYS[new Date(`${key}T12:00:00Z`).getUTCDay()] ?? "";
 }

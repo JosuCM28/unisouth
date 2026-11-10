@@ -1,4 +1,5 @@
 import { createZip } from "./zip";
+import { excelSerialDate } from "./excel-date";
 import { EXPORT_ROW_LIMIT } from "./limits";
 import { todayInputValue } from "@/lib/utils";
 
@@ -88,28 +89,6 @@ function columnName(index: number): string {
   }
 
   return name;
-}
-
-/**
- * Días desde 1900 con los que Excel representa una fecha.
- *
- * La base es el 30 de diciembre de 1899 y no el 1 de enero de 1900 porque
- * Excel cree que el 29 de febrero de 1900 existió —un error heredado de Lotus
- * 1-2-3 que conserva por compatibilidad—. Sin reproducirlo, todas las fechas
- * salen corridas un día.
- */
-function excelSerialDate(date: Date): number {
-  const epoch = Date.UTC(1899, 11, 30);
-  const utc = Date.UTC(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    date.getHours(),
-    date.getMinutes(),
-    date.getSeconds(),
-  );
-
-  return (utc - epoch) / 86_400_000;
 }
 
 /** Índices del `cellXfs` de abajo. */
@@ -740,3 +719,17 @@ export function toXlsxWithNotice<T>(
 
 /** Marca única de la fila de aviso. Se compara por identidad, no por forma. */
 const NOTICE_ROW = Object.freeze({ __notice: true });
+
+/*
+ * Las piezas que reusa `xlsx-workbook` para armar un libro de VARIAS hojas con
+ * gráficas. Se exportan en vez de copiarse: un libro con estilos distintos a
+ * los de las demás descargas sería el primer archivo que se ve diferente.
+ */
+export {
+  buildDocumentSheet as documentSheetXml,
+  buildSheet as tableSheetXml,
+  columnName,
+  escapeXml,
+  sheetName,
+  STYLES_XML,
+};

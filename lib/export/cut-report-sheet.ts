@@ -1,4 +1,5 @@
 import { REMNANT_RED_FROM, REMNANT_YELLOW_FROM } from "./cut-report";
+import { excelSerialDay } from "./excel-date";
 import { createZip } from "./zip";
 
 /**
@@ -145,20 +146,6 @@ function columnName(index: number): string {
   return name;
 }
 
-/**
- * Días desde 1900 con los que Excel representa una fecha.
- *
- * La base es el 30 de diciembre de 1899 porque Excel cree que el 29 de
- * febrero de 1900 existió, un error heredado de Lotus 1-2-3 que conserva por
- * compatibilidad. Sin reproducirlo, las fechas salen corridas un día.
- */
-function excelSerialDate(date: Date): number {
-  const epoch = Date.UTC(1899, 11, 30);
-  const utc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
-
-  return (utc - epoch) / 86_400_000;
-}
-
 /** El estilo del cuerpo para una columna, según su valor. */
 function bodyStyle(column: ReportColumn, value: ReportCell): number {
   if (column.trafficLight) return trafficLightStyle(value);
@@ -205,7 +192,7 @@ function renderCell(
   }
 
   if (value instanceof Date) {
-    return `<c r="${reference}" s="${style}"><v>${excelSerialDate(value)}</v></c>`;
+    return `<c r="${reference}" s="${style}"><v>${excelSerialDay(value)}</v></c>`;
   }
 
   if (typeof value === "number") {
