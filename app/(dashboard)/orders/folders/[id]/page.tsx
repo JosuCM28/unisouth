@@ -305,7 +305,11 @@ function folderSplitCuts(
   const cuts = buildFolderSplitCuts(orders, captured, cutBatchLabel);
   if (cuts.length > 0) return cuts;
 
-  return buildPlannedSplitCuts(orders.flatMap((order) => order.lines));
+  return buildPlannedSplitCuts(
+    orders.flatMap((order) =>
+      order.lines.map((line) => ({ ...line, orderCode: order.code })),
+    ),
+  );
 }
 
 /**

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Copy, Percent, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
+  SPLIT_TOLERANCE_PIECES as TOLERANCE_PIECES,
   splitBundles,
   type SplitBundle,
   type SplitGroup,
@@ -16,6 +17,11 @@ import {
 } from "./order-shipment-dialog";
 import type { CutTagChoice } from "./size-bundle-rows";
 import type { SplitCut } from "@/lib/folder-split-cuts";
+import {
+  describeOrders,
+  piecesByOrder,
+  type OrderPieces,
+} from "@/lib/split-order-breakdown";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -44,9 +50,6 @@ export type SplitShipping =
       workshops: { id: string; name: string }[];
       stages: { id: string; name: string }[];
     };
-
-/** Hasta cuántas piezas se tolera que el reparto se aparte del porcentaje. */
-const TOLERANCE_PIECES = 40;
 
 const DEFAULT_PERCENT = 40;
 
@@ -301,7 +304,7 @@ function SplitSummary({
         </span>{" "}
         pzas
         {!withinTolerance &&
-          ` (pasa de ${TOLERANCE_PIECES}: cada talla va completa a un solo taller y no se puede acercar más)`}
+          ` (pasa de ${TOLERANCE_PIECES}: se parte a lo más una orden y cada talla va completa a un solo taller, así que no se puede acercar más)`}
         .
       </p>
 
@@ -315,11 +318,13 @@ function SplitSummary({
             <SizeCell
               groups={size.first}
               pieces={size.firstPieces}
+              orders={piecesByOrder(size.firstBundles)}
               planned={planned}
             />
             <SizeCell
               groups={size.second}
               pieces={size.secondPieces}
+              orders={piecesByOrder(size.secondBundles)}
               planned={planned}
             />
           </li>
@@ -428,10 +433,13 @@ function SendSide({
 function SizeCell({
   groups,
   pieces,
+  orders,
   planned,
 }: {
   groups: SplitGroup[];
   pieces: number;
+  /** De qué orden es cada parte: la talla junta folios y el envío no. */
+  orders: OrderPieces[];
   /** Sobre lo pedido no hay bultos que enseñar: nadie ha amarrado nada. */
   planned: boolean;
 }) {
@@ -447,6 +455,11 @@ function SizeCell({
           {describeGroups(groups)}
         </span>
       )}
+      {orders.map((order) => (
+        <span key={order.orderCode} className="text-xs text-muted-foreground">
+          {order.orderCode}: {order.pieces}
+        </span>
+      ))}
     </span>
   );
 }
@@ -469,7 +482,7 @@ function buildMessage(
 
   for (const size of result.sizes) {
     lines.push(
-      `Talla ${size.sizeCode}: ${percent}% → ${sideText(size.firstPieces, size.first, planned)} · ${100 - percent}% → ${sideText(size.secondPieces, size.second, planned)}`,
+      `Talla ${size.sizeCode}: ${percent}% → ${sideText(size.firstPieces, size.first, size.firstBundles, planned)} · ${100 - percent}% → ${sideText(size.secondPieces, size.second, size.secondBundles, planned)}`,
     );
   }
 
@@ -479,10 +492,13 @@ function buildMessage(
 function sideText(
   pieces: number,
   groups: SplitGroup[],
+  bundles: SplitBundle[],
   planned: boolean,
 ): string {
-  if (planned) return String(pieces);
-  return `${pieces} (${describeGroups(groups) || "—"})`;
+  const orders = piecesByOrder(bundles);
+  const byOrder = orders.length > 0 ? ` [${describeOrders(orders)}]` : "";
+  if (planned) return `${pieces}${byOrder}`;
+  return `${pieces} (${describeGroups(groups) || "—"})${byOrder}`;
 }
 
 /** Los nombres de corte que comparten dos o más órdenes, en orden de aparición. */

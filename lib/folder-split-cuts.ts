@@ -34,7 +34,15 @@ export interface SplitCut {
  * nada, y por eso el panel no enseña esos bultos ni ofrece mandarlos.
  */
 export function buildPlannedSplitCuts(
-  lines: { orderedQuantity: number; size: { code: string } }[],
+  lines: {
+    orderedQuantity: number;
+    size: { code: string };
+    /**
+     * El folio de la orden del renglón. En un pedido la misma talla junta
+     * varias órdenes, y sin esto no hay cómo separar cuánto es de cada una.
+     */
+    orderCode?: string;
+  }[],
 ): SplitCut[] {
   const bundles = lines
     .filter((line) => line.orderedQuantity > 0)
@@ -42,6 +50,7 @@ export function buildPlannedSplitCuts(
       sizeCode: line.size.code,
       pieces: line.orderedQuantity,
       count: 1,
+      orderCode: line.orderCode,
     }));
 
   if (bundles.length === 0) return [];
