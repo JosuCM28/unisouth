@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Percent, Send } from "lucide-react";
+import { Copy, Percent, RotateCcw, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   SPLIT_TOLERANCE_PIECES as TOLERANCE_PIECES,
@@ -9,6 +9,7 @@ import {
   type SplitBundle,
   type SplitGroup,
   type SplitResult,
+  type SplitSide,
 } from "@/lib/workshop-split";
 import { FolderSplitShipmentDialog } from "./folder-split-shipment-dialog";
 import {
@@ -17,11 +18,8 @@ import {
 } from "./order-shipment-dialog";
 import type { CutTagChoice } from "./size-bundle-rows";
 import type { SplitCut } from "@/lib/folder-split-cuts";
-import {
-  describeOrders,
-  piecesByOrder,
-  type OrderPieces,
-} from "@/lib/split-order-breakdown";
+import { describeOrders, piecesByOrder } from "@/lib/split-order-breakdown";
+import { SplitSizeCell, describeGroups } from "./split-size-cell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -80,12 +78,21 @@ export function WorkshopSplitPanel({
     () => new Set(cuts.map((cut) => cut.id)),
   );
 
+  /* Las tallas pasadas a mano de un lado al otro. Se borran al cambiar el
+     porcentaje o los cortes: con otros números el cálculo propone otro
+     reparto, y encimarle movimientos hechos para el anterior lo deja raro. */
+  const [moves, setMoves] = useState<Map<string, SplitSide>>(() => new Map());
+
   const result = useMemo(() => {
     const bundles = cuts
       .filter((cut) => selected.has(cut.id))
       .flatMap((cut) => cut.bundles);
-    return splitBundles(bundles, percent);
-  }, [cuts, selected, percent]);
+    return splitBundles(bundles, percent, moves);
+  }, [cuts, selected, percent, moves]);
+
+  function move(key: string, to: SplitSide) {
+    setMoves((current) => new Map(current).set(key, to));
+  }
 
   if (cuts.length === 0) return null;
 
@@ -93,6 +100,7 @@ export function WorkshopSplitPanel({
   const planned = cuts.some((cut) => cut.planned);
 
   function toggle(id: string) {
+    setMoves(new Map());
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -106,6 +114,7 @@ export function WorkshopSplitPanel({
   const rounds = sharedRounds(cuts);
 
   function selectRound(round: string | null) {
+    setMoves(new Map());
     setSelected(
       new Set(
         cuts
@@ -118,6 +127,7 @@ export function WorkshopSplitPanel({
   function handlePercent(raw: string) {
     const value = Number(raw);
     if (Number.isNaN(value)) return;
+    setMoves(new Map());
     setPercent(Math.min(Math.max(Math.round(value), 0), 100));
   }
 
@@ -237,6 +247,9 @@ export function WorkshopSplitPanel({
             onCopy={handleCopy}
             shipping={planned ? undefined : shipping}
             planned={planned}
+            onMove={move}
+            adjusted={moves.size > 0}
+            onReset={() => setMoves(new Map())}
           />
         )}
       </div>
@@ -250,12 +263,19 @@ function SplitSummary({
   onCopy,
   shipping,
   planned,
+  onMove,
+  adjusted,
+  onReset,
 }: {
   result: SplitResult;
   percent: number;
   onCopy: () => void;
   shipping?: SplitShipping;
   planned: boolean;
+  onMove: (key: string, to: SplitSide) => void;
+  /** Si alguna talla se pasó a mano: el reparto ya no es sólo el calculado. */
+  adjusted: boolean;
+  onReset: () => void;
 }) {
   const firstBundles = result.sizes.flatMap((size) => size.firstBundles);
   const secondBundles = result.sizes.flatMap((size) => size.secondBundles);
@@ -303,9 +323,7 @@ function SplitSummary({
           {result.deviation}
         </span>{" "}
         pzas
-        {!withinTolerance &&
-          ` (pasa de ${TOLERANCE_PIECES}: se parte a lo más una orden y cada talla va completa a un solo taller, así que no se puede acercar más)`}
-        .
+        {deviationNote(withinTolerance, adjusted)}.
       </p>
 
       <ul className="flex flex-col">
@@ -315,31 +333,50 @@ function SplitSummary({
             className="grid grid-cols-[3.5rem_1fr_1fr] gap-2 border-t border-border py-1.5 text-sm"
           >
             <span className="tabular font-medium">{size.sizeCode}</span>
-            <SizeCell
+            <SplitSizeCell
+              sizeCode={size.sizeCode}
               groups={size.first}
               pieces={size.firstPieces}
-              orders={piecesByOrder(size.firstBundles)}
+              piles={size.firstPiles}
               planned={planned}
+              side="first"
+              onMove={onMove}
             />
-            <SizeCell
+            <SplitSizeCell
+              sizeCode={size.sizeCode}
               groups={size.second}
               pieces={size.secondPieces}
-              orders={piecesByOrder(size.secondBundles)}
+              piles={size.secondPiles}
               planned={planned}
+              side="second"
+              onMove={onMove}
             />
           </li>
         ))}
       </ul>
 
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onCopy}
-        className="touch-target w-full sm:w-auto sm:self-end"
-      >
-        <Copy className="size-4" aria-hidden />
-        Copiar reparto
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        {adjusted && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onReset}
+            className="touch-target w-full sm:w-auto"
+          >
+            <RotateCcw className="size-4" aria-hidden />
+            Volver al calculado
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCopy}
+          className="touch-target w-full sm:w-auto"
+        >
+          <Copy className="size-4" aria-hidden />
+          Copiar reparto
+        </Button>
+      </div>
     </div>
   );
 }
@@ -430,43 +467,14 @@ function SendSide({
   );
 }
 
-function SizeCell({
-  groups,
-  pieces,
-  orders,
-  planned,
-}: {
-  groups: SplitGroup[];
-  pieces: number;
-  /** De qué orden es cada parte: la talla junta folios y el envío no. */
-  orders: OrderPieces[];
-  /** Sobre lo pedido no hay bultos que enseñar: nadie ha amarrado nada. */
-  planned: boolean;
-}) {
-  if (groups.length === 0) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-
-  return (
-    <span className="tabular flex flex-col">
-      <span className="font-medium">{pieces}</span>
-      {!planned && (
-        <span className="text-xs text-muted-foreground">
-          {describeGroups(groups)}
-        </span>
-      )}
-      {orders.map((order) => (
-        <span key={order.orderCode} className="text-xs text-muted-foreground">
-          {order.orderCode}: {order.pieces}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-/** "2 × 60 + 1 × 50": los bultos, tal como se cuentan en la mesa. */
-function describeGroups(groups: SplitGroup[]): string {
-  return groups.map((group) => `${group.count}×${group.pieces}`).join(" + ");
+/**
+ * Por qué el reparto se aparta del porcentaje. Movido a mano ya no aplica la
+ * explicación del cálculo: la diferencia la decidió quien movió.
+ */
+function deviationNote(withinTolerance: boolean, adjusted: boolean): string {
+  if (adjusted) return " (con tallas pasadas a mano)";
+  if (withinTolerance) return "";
+  return ` (pasa de ${TOLERANCE_PIECES}: se parte a lo más una orden y cada talla va completa a un solo taller, así que no se puede acercar más)`;
 }
 
 /** El reparto como texto, para pegarlo en un mensaje o en el vale. */

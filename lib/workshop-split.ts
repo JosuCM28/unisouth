@@ -69,6 +69,23 @@ export interface SplitSize {
   secondBundles: SplitBundle[];
   firstPieces: number;
   secondPieces: number;
+  /** La talla de cada orden en cada lado: lo que se puede pasar al otro. */
+  firstPiles: SplitPile[];
+  secondPiles: SplitPile[];
+}
+
+/** De qué lado va algo: el del porcentaje o el resto. */
+export type SplitSide = "first" | "second";
+
+/**
+ * La talla de UNA orden en el reparto: lo mínimo que se mueve de lado. Va
+ * entera porque partirla mandaría a cada taller un pedazo de la corrida.
+ */
+export interface SplitPile {
+  /** Llave estable entre recálculos, para recordar que se movió a mano. */
+  key: string;
+  pieces: number;
+  bundles: SplitBundle[];
 }
 
 export interface SplitResult {
@@ -82,13 +99,7 @@ export interface SplitResult {
   deviation: number;
 }
 
-/**
- * Hasta cuántas piezas se tolera que el reparto se aparte del porcentaje.
- *
- * También decide si vale la pena partir una orden: si con órdenes completas ya
- * se queda dentro de esto, no se parte ninguna. Partir una orden de 2000 para
- * ganar 5 piezas de precisión mezcla más de lo que ayuda.
- */
+/** Hasta cuántas piezas se tolera que el reparto se aparte del porcentaje. */
 export const SPLIT_TOLERANCE_PIECES = 40;
 
 /**
@@ -106,6 +117,7 @@ interface Unit {
 
 /** Todos los bultos de una talla dentro de una orden: van juntos o no van. */
 interface SizePile {
+  key: string;
   sizeCode: string;
   units: Unit[];
   total: number;
@@ -121,17 +133,22 @@ interface OrderPile {
 /**
  * Reparte: `firstPercent` % al primer lado, el resto al segundo, con órdenes
  * completas y a lo más una orden partida por tallas.
+ *
+ * `moves` son las tallas que alguien pasó de lado a mano: mandan sobre lo
+ * calculado. El cálculo sólo ve números, y quien reparte sabe cosas que no
+ * están aquí —qué taller ya trae esa talla en la mesa, cuál le queda corta—.
  */
 export function splitBundles(
   bundles: SplitBundle[],
   firstPercent: number,
+  moves?: ReadonlyMap<string, SplitSide>,
 ): SplitResult {
   const ratio = Math.min(Math.max(firstPercent, 0), 100) / 100;
   const orders = groupByOrder(bundles);
   const grandTotal = orders.reduce((sum, order) => sum + order.total, 0);
   const exact = grandTotal * ratio;
 
-  const goesFirst = choosePiles(orders, exact);
+  const goesFirst = applyMoves(orders, choosePiles(orders, exact), moves);
   const sizes = buildSizes(orders, goesFirst);
 
   const firstPieces = sizes.reduce((sum, size) => sum + size.firstPieces, 0);
@@ -156,23 +173,57 @@ interface Plan {
 /**
  * Qué tallas-de-orden van al primer lado.
  *
- * Primero sólo órdenes completas. Si eso ya queda dentro de la tolerancia, se
- * acepta aunque partiendo una se acercara más. Si no, se prueba partir cada
- * orden —una a la vez— y gana la combinación más cercana al porcentaje.
+ * Primero sólo órdenes completas. Luego se prueba partir cada orden —una a la
+ * vez— para completar con sus tallas lo que le falte o le sobre a un lado, y
+ * gana la combinación más cercana al porcentaje. A igual distancia gana la de
+ * órdenes completas.
+ *
+ * No hay "ya está bastante cerca": si a un lado le faltan 14 piezas y la otra
+ * orden tiene tallas de 9 y de 3, se le pasan. Quien reparte quiere saldar el
+ * porcentaje, y para eso son esas tallas chicas.
  */
 function choosePiles(orders: OrderPile[], exact: number): Set<SizePile> {
   if (!fitsBudget(orders)) return greedyPlan(orders, exact).first;
 
   const whole = wholeOrdersPlan(orders, exact);
-  if (Math.abs(whole.sum - exact) <= SPLIT_TOLERANCE_PIECES) return whole.first;
+  // Con una sola orden no hay mezcla que cuidar: partirla es la única forma.
+  const mixWeight = orders.length > 1 ? MIX_WEIGHT : 0;
 
-  let best = whole;
+  let best = { ...whole, score: Math.abs(whole.sum - exact) };
   orders.forEach((_, index) => {
-    const plan = splitOrderPlan(orders, index, exact);
-    if (Math.abs(plan.sum - exact) < Math.abs(best.sum - exact)) best = plan;
+    const plan = splitOrderPlan(orders, index, exact, mixWeight);
+    if (plan.score < best.score) best = plan;
   });
 
   return best.first;
+}
+
+/**
+ * Cuánto pesa cada pieza de la orden partida que se manda al lado "ajeno".
+ *
+ * Sin esto el cálculo atinaba al porcentaje exacto partiendo una orden casi a
+ * la mitad. Lo que se quiere es una orden completa a un lado y, de la otra,
+ * sólo las tallas que le faltan. Con 0.5 una talla se pasa sólo si acerca al
+ * porcentaje más de la mitad de lo que mide: si faltan 14, la de 9 y la de 3
+ * sí entran; una de 20 no, porque no cabe.
+ */
+const MIX_WEIGHT = 0.5;
+
+/** Lo calculado, con las tallas que se movieron a mano en su nuevo lado. */
+function applyMoves(
+  orders: OrderPile[],
+  calculated: Set<SizePile>,
+  moves?: ReadonlyMap<string, SplitSide>,
+): Set<SizePile> {
+  if (!moves || moves.size === 0) return calculated;
+
+  const first = new Set(calculated);
+  for (const pile of orders.flatMap((order) => order.sizes)) {
+    const side = moves.get(pile.key);
+    if (side === "first") first.add(pile);
+    if (side === "second") first.delete(pile);
+  }
+  return first;
 }
 
 /** Si las búsquedas caben en el tope de trabajo. */
@@ -200,25 +251,33 @@ function wholeOrdersPlan(orders: OrderPile[], exact: number): Plan {
  * El mejor reparto partiendo la orden `splitIndex`: las demás van completas a
  * un lado o al otro, y las tallas de ésta completan lo que falte.
  */
-function splitOrderPlan(orders: OrderPile[], splitIndex: number, exact: number): Plan {
+function splitOrderPlan(
+  orders: OrderPile[],
+  splitIndex: number,
+  exact: number,
+  mixWeight: number,
+): Plan & { score: number } {
   const split = orders[splitIndex]!;
   const others = orders.filter((_, i) => i !== splitIndex);
 
   const otherTotals = others.map((order) => order.total);
   const wholeReach = reachSums(otherTotals);
+  const nearest = nearestTable(wholeReach.reachable);
   const sizeTotals = split.sizes.map((size) => size.total);
   const sizeReach = reachSums(sizeTotals);
-  const nearest = nearestTable(sizeReach.reachable);
 
+  // Se recorre lo que la orden partida puede aportar; para cada aporte, las
+  // órdenes completas que mejor completan. Lineal y no cuadrático.
   let bestWhole = 0;
   let bestPart = 0;
-  let bestGap = Infinity;
-  for (let w = 0; w < wholeReach.reachable.length; w++) {
-    if (!wholeReach.reachable[w]) continue;
-    const part = nearest.closest(exact - w);
-    const gap = Math.abs(w + part - exact);
-    if (gap < bestGap) {
-      bestGap = gap;
+  let bestScore = Infinity;
+  for (let part = 0; part < sizeReach.reachable.length; part++) {
+    if (!sizeReach.reachable[part]) continue;
+    const w = nearest.closest(exact - part);
+    const mixed = Math.min(part, split.total - part);
+    const score = Math.abs(w + part - exact) + mixed * mixWeight;
+    if (score < bestScore) {
+      bestScore = score;
       bestWhole = w;
       bestPart = part;
     }
@@ -233,6 +292,7 @@ function splitOrderPlan(orders: OrderPile[], splitIndex: number, exact: number):
       ...split.sizes.filter((_, i) => usedSizes[i]),
     ]),
     sum: bestWhole + bestPart,
+    score: bestScore,
   };
 }
 
@@ -384,6 +444,7 @@ function groupByOrder(bundles: SplitBundle[]): OrderPile[] {
       const piles = [...sizes.entries()]
         .sort(([a], [b]) => compareCodes(a, b))
         .map(([sizeCode, units]) => ({
+          key: `${key}|${sizeCode}`,
           sizeCode,
           units,
           total: units.reduce((sum, unit) => sum + unit.pieces, 0),
@@ -398,31 +459,39 @@ function groupByOrder(bundles: SplitBundle[]): OrderPile[] {
  * otro—, y el desglose por folio dice cuál es cuál.
  */
 function buildSizes(orders: OrderPile[], goesFirst: Set<SizePile>): SplitSize[] {
-  const bySize = new Map<string, { first: Unit[]; second: Unit[] }>();
+  const bySize = new Map<string, { first: SizePile[]; second: SizePile[] }>();
 
   for (const pile of orders.flatMap((order) => order.sizes)) {
     const row = bySize.get(pile.sizeCode) ?? { first: [], second: [] };
-    if (goesFirst.has(pile)) row.first.push(...pile.units);
-    else row.second.push(...pile.units);
+    if (goesFirst.has(pile)) row.first.push(pile);
+    else row.second.push(pile);
     bySize.set(pile.sizeCode, row);
   }
 
   return [...bySize.entries()]
     .sort(([a], [b]) => compareCodes(a, b))
     .map(([sizeCode, row]) => {
-      const firstPieces = sumUnits(row.first);
-      const secondPieces = sumUnits(row.second);
+      const first = row.first.flatMap((pile) => pile.units);
+      const second = row.second.flatMap((pile) => pile.units);
+      const firstPieces = sumUnits(first);
+      const secondPieces = sumUnits(second);
       return {
         sizeCode,
         total: firstPieces + secondPieces,
-        first: collapse(row.first.map((unit) => unit.pieces)),
-        second: collapse(row.second.map((unit) => unit.pieces)),
-        firstBundles: toBundles(row.first),
-        secondBundles: toBundles(row.second),
+        first: collapse(first.map((unit) => unit.pieces)),
+        second: collapse(second.map((unit) => unit.pieces)),
+        firstBundles: toBundles(first),
+        secondBundles: toBundles(second),
         firstPieces,
         secondPieces,
+        firstPiles: row.first.map(toPublicPile),
+        secondPiles: row.second.map(toPublicPile),
       };
     });
+}
+
+function toPublicPile(pile: SizePile): SplitPile {
+  return { key: pile.key, pieces: pile.total, bundles: toBundles(pile.units) };
 }
 
 function sumUnits(units: Unit[]): number {
