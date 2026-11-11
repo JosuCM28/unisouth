@@ -89,6 +89,14 @@ export interface PileFilters {
    */
   colorName?: string;
   shade?: string;
+  /**
+   * Tope de rollos a listar. Por omisión el de la hoja (`MAX_ROWS`).
+   *
+   * Lo sube la exportación del inventario del material: la hoja se pega a la
+   * estiba y no puede ser un reporte, pero el Excel y el PDF se mandan a quien
+   * no tiene la pila enfrente, y uno recortado a 200 le escondería rollos.
+   */
+  limit?: number;
 }
 
 /**
@@ -178,7 +186,7 @@ export async function getPileSheetData(
       // Retazos primero y luego FIFO: el mismo orden en que se deben surtir,
       // para que la hoja se lea igual que se trabaja la pila.
       orderBy: [{ isRemnant: "desc" }, { receivedAt: "asc" }, { id: "asc" }],
-      take: MAX_ROWS,
+      take: filters.limit ?? MAX_ROWS,
     }),
     prisma.lot.aggregate({
       where,

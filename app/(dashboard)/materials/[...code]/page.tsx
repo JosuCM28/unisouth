@@ -37,6 +37,7 @@ import { MaterialDailyReport } from "@/components/materials/material-daily-repor
 import { MaterialShadeOutbound } from "@/components/materials/material-shade-outbound";
 import { MaterialHistoryFilters } from "@/components/materials/material-history-filters";
 import { PileFilters } from "@/components/materials/pile-filters";
+import { MaterialExportButtons } from "@/components/materials/material-export-buttons";
 
 interface PageProps {
   /**
@@ -205,6 +206,7 @@ export default async function MaterialDetailPage({
                 Hoja de pila
               </a>
             </Button>
+            <MaterialExportButtons materialId={spec.id} />
           </div>
         }
       />
