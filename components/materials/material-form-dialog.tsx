@@ -38,7 +38,15 @@ import { Label } from "@/components/ui/label";
 
 interface MaterialFormDialogProps {
   material?: PlainMaterial;
-  trigger: ReactNode;
+  /** Opcional si se gobierna desde fuera con `open` / `onOpenChange`. */
+  trigger?: ReactNode;
+  /**
+   * Apertura controlada. La usa la recepción, que monta UN solo diálogo para
+   * todos sus renglones en vez de uno por renglón: con 80 rollos eran 80
+   * formularios vivos que frenaban la captura.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /**
    * Se avisa del material recién creado.
    *
@@ -60,8 +68,12 @@ export function MaterialFormDialog({
   material,
   trigger,
   onCreated,
+  open: controlledOpen,
+  onOpenChange,
 }: MaterialFormDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const isEditing = Boolean(material);
 
   const form = useForm<MaterialFormValues>({

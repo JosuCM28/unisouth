@@ -21,14 +21,26 @@ const FIELDS = Object.keys(helperFormSchema.shape) as (keyof HelperFormValues)[]
 
 interface Props {
   helper?: Helper;
-  trigger: ReactNode;
+  /** Opcional si se gobierna desde fuera con `open` / `onOpenChange`. */
+  trigger?: ReactNode;
+  /** Apertura controlada: la recepción monta UNO para todos sus renglones. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** Avisa del ayudante recién creado, para seleccionarlo en la recepción. */
   onCreated?: (helper: { id: string; name: string }) => void;
 }
 
-export function HelperFormDialog({ helper, trigger, onCreated }: Props) {
+export function HelperFormDialog({
+  helper,
+  trigger,
+  onCreated,
+  open: controlledOpen,
+  onOpenChange,
+}: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const isEditing = Boolean(helper);
 
   const { register, handleSubmit, setValue, watch, setError, reset, formState: { errors, isSubmitting } } =
