@@ -64,7 +64,6 @@ interface OrderSheet {
   cutNotes: string[];
   client: { name: string } | null;
   material: { code: string; name: string } | null;
-  productionRun: { code: string; name: string | null } | null;
   createdBy: { name: string } | null;
 }
 
@@ -100,7 +99,6 @@ export async function GET(
     include: {
       client: { select: { name: true } },
       material: { select: { code: true, name: true } },
-      productionRun: { select: { code: true, name: true } },
       createdBy: { select: { name: true } },
       lines: {
         orderBy: { position: "asc" },
@@ -156,12 +154,6 @@ function headerRows(order: OrderSheet): SheetRow[] {
       order.material ? `${order.material.code} · ${order.material.name}` : "—",
     ],
     ["Capturó", order.createdBy?.name ?? "—"],
-    [
-      "Producción",
-      order.productionRun
-        ? `${order.productionRun.code} · ${order.productionRun.name ?? ""}`
-        : "—",
-    ],
     ["Tela (a mano)", order.cutFabricText ?? "—"],
     ["Molde", order.cutPattern ?? "—"],
     ["Versión", order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : "—"],

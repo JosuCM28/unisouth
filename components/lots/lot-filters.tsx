@@ -79,7 +79,6 @@ export function LotFilters({
 
   const status = searchParams.get("status");
   const onlyRemnants = searchParams.get("onlyRemnants") === "true";
-  const onlyUnverified = searchParams.get("onlyUnverified") === "true";
   const includeCancelled = searchParams.get("includeCancelled") === "true";
   const arrivedWithin = searchParams.get("arrivedWithin");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -113,13 +112,6 @@ export function LotFilters({
           label="Retazos"
           active={onlyRemnants}
           onClick={() => setParam("onlyRemnants", onlyRemnants ? null : "true")}
-        />
-        <Chip
-          label="Sin medir"
-          active={onlyUnverified}
-          onClick={() =>
-            setParam("onlyUnverified", onlyUnverified ? null : "true")
-          }
         />
         {/* Los cancelados están fuera del listado diario; este chip los trae
             de vuelta cuando alguien va a buscar por qué se dio de baja uno. */}

@@ -81,8 +81,10 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href="/documents" className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground">
-        <ArrowLeft className="size-4" aria-hidden />Documentos
+      {/* La lista de documentos se retiró porque repetía Salidas: todos los
+          vales son salidas, así que "volver" lleva ahí. */}
+      <Link href="/issues" className="touch-target flex w-fit items-center gap-1.5 text-sm text-muted-foreground">
+        <ArrowLeft className="size-4" aria-hidden />Salidas
       </Link>
 
       <PageHeader

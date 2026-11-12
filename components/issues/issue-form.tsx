@@ -78,7 +78,6 @@ interface MaterialOption {
 export interface EditableIssue {
   id: string;
   clientId: string | null;
-  productionRunId: string | null;
   concept: string | null;
   reference: string | null;
   receivedBy: string | null;
@@ -126,7 +125,6 @@ interface Props {
   /** Folios disponibles, administrados en /cut-tags. */
   cutTags: CutTagOption[];
   clients: ClientOption[];
-  productionRuns: { id: string; code: string; name: string | null }[];
   /** Para dar de alta un rollo sin salirse del vale: dónde se acomodó. */
   locations: NewLotLocationOption[];
   /** Los talleres del catálogo, para ligar la salida de corte a uno. */
@@ -191,7 +189,6 @@ export function IssueForm({
   cutSizes,
   cutTags,
   clients,
-  productionRuns,
   locations,
   workshops,
   document,
@@ -204,9 +201,6 @@ export function IssueForm({
   const [clientId, setClientId] = useState(
     document?.clientId ??
       (document ? FACTORY_OWNER : (order?.clientId ?? "")),
-  );
-  const [productionRunId, setProductionRunId] = useState(
-    document?.productionRunId ?? "",
   );
   const [concept, setConcept] = useState(document?.concept ?? "");
   const [reference, setReference] = useState(
@@ -527,7 +521,6 @@ export function IssueForm({
       /* La liga con la orden se sella sólo al crear; `update` no la toca. */
       cuttingOrderId: order?.id,
       clientId: realClientId,
-      productionRunId: productionRunId || undefined,
       concept: concept || undefined,
       reference: reference || undefined,
       receivedBy: receivedBy || undefined,
@@ -867,27 +860,6 @@ export function IssueForm({
       <div className="flat-surface p-4">
         <FormSection title="Detalles del vale">
           <div className="flex flex-col gap-4">
-            <FormSelectField
-              id="issue-run"
-              label="Producción"
-              hint="Para qué corrida sale el material."
-            >
-              <SearchSelect
-                id="issue-run"
-                options={productionRuns.map((run) => ({
-                  value: run.id,
-                  label: run.name ?? run.code,
-                  hint: run.name ? run.code : undefined,
-                  keywords: run.code,
-                }))}
-                value={productionRunId}
-                onChange={setProductionRunId}
-                placeholder="Sin producción"
-                searchPlaceholder="Buscar producción…"
-                clearLabel="Sin producción"
-              />
-            </FormSelectField>
-
             <div className="flex flex-col gap-2">
               <Label htmlFor="issue-concept">Concepto</Label>
               <Input

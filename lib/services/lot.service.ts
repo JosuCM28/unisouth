@@ -53,7 +53,6 @@ export class LotService extends BaseService {
           clientId: input.clientId,
           locationId: input.locationId,
           receiptId: input.receiptId,
-          productionRunId: input.productionRunId,
 
           unit: input.unit,
           initialQuantity: input.quantity,
@@ -168,7 +167,6 @@ export class LotService extends BaseService {
         lotId: input.lotId,
         type: "ISSUE_PRODUCTION",
         quantity: input.quantity,
-        productionRunId: input.productionRunId,
         toLocationId: input.toLocationId,
         reason: input.reason,
       });

@@ -70,7 +70,6 @@ export interface EditableOrder {
   id: string;
   clientId: string | null;
   materialId: string | null;
-  productionRunId: string | null;
   folderId: string | null;
   description: string | null;
   reference: string | null;
@@ -87,7 +86,6 @@ export interface EditableOrder {
 interface Props {
   clients: OrderOption[];
   materials: OrderOption[];
-  productionRuns: OrderOption[];
   sizes: SizeOption[];
   tags: TagOption[];
   folders: OrderOption[];
@@ -133,7 +131,6 @@ interface Props {
 export function OrderForm({
   clients,
   materials,
-  productionRuns,
   sizes,
   tags,
   folders,
@@ -156,9 +153,6 @@ export function OrderForm({
     order?.folderId ?? defaults?.folderId ?? "",
   );
   const [materialId, setMaterialId] = useState(order?.materialId ?? "");
-  const [productionRunId, setProductionRunId] = useState(
-    order?.productionRunId ?? "",
-  );
   const [description, setDescription] = useState(order?.description ?? "");
   const [reference, setReference] = useState(order?.reference ?? "");
   const [clientPo, setClientPo] = useState(order?.clientPo ?? "");
@@ -188,7 +182,6 @@ export function OrderForm({
       clientId: order?.clientId ?? defaults?.clientId ?? "",
       folderId: order?.folderId ?? defaults?.folderId ?? "",
       materialId: order?.materialId ?? "",
-      productionRunId: order?.productionRunId ?? "",
       description: order?.description ?? "",
       reference: order?.reference ?? "",
       clientPo: order?.clientPo ?? "",
@@ -260,7 +253,6 @@ export function OrderForm({
       clientId,
       folderId,
       materialId,
-      productionRunId,
       description,
       reference,
       clientPo,
@@ -288,7 +280,6 @@ export function OrderForm({
     const payload = {
       clientId: clientId || undefined,
       materialId: materialId || undefined,
-      productionRunId: productionRunId || undefined,
       folderId: folderId || undefined,
       description: description || undefined,
       reference: reference || undefined,
@@ -639,22 +630,6 @@ export function OrderForm({
               />
             </div>
 
-            <FormSelectField id="order-run" label="Producción">
-              <SearchSelect
-                id="order-run"
-                options={productionRuns.map((run) => ({
-                  value: run.id,
-                  label: run.name,
-                  hint: run.hint,
-                }))}
-                value={productionRunId}
-                onChange={setProductionRunId}
-                placeholder="Sin producción"
-                searchPlaceholder="Buscar producción…"
-                clearLabel="Sin producción"
-              />
-            </FormSelectField>
-
             <div className="flex flex-col gap-2">
               <Label htmlFor="order-notes">Notas</Label>
               <Textarea
@@ -721,7 +696,6 @@ function snapshot(state: {
   clientId: string;
   folderId: string;
   materialId: string;
-  productionRunId: string;
   description: string;
   reference: string;
   clientPo: string;

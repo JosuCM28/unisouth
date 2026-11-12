@@ -22,7 +22,6 @@ import type { VoucherField } from "@/lib/vouchers/voucher-sheet";
 export const ORDER_SHEET_INCLUDE = {
   client: { select: { name: true } },
   material: { select: { code: true, name: true } },
-  productionRun: { select: { code: true, name: true } },
   createdBy: { select: { name: true } },
   lines: {
     orderBy: { position: "asc" },
@@ -129,12 +128,6 @@ function headerOf(order: SheetOrder): VoucherField[] {
     [
       "Material",
       order.material ? `${order.material.code} · ${order.material.name}` : null,
-    ],
-    [
-      "Producción",
-      order.productionRun
-        ? `${order.productionRun.code} · ${order.productionRun.name ?? ""}`
-        : null,
     ],
     ["Capturó", order.createdBy?.name],
     ["Tela (a mano)", order.cutFabricText],

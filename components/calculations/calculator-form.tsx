@@ -28,7 +28,7 @@ export interface ProductOption {
   id: string;
   code: string;
   name: string;
-  /** Ficha ACTIVE del producto; sin ella no se puede calcular. */
+  /** Ficha vigente del producto; sin ella no se puede calcular. */
   activeBomId: string | null;
 }
 
@@ -97,7 +97,7 @@ export function CalculatorForm({
     const sinFicha = lines.find((line) => !line.bomId);
     if (sinFicha) {
       toast.error(
-        "Uno de los productos no tiene ficha técnica activa. Actívala antes de calcular.",
+        "Uno de los productos no tiene ficha técnica. Captúrala antes de calcular.",
       );
       return;
     }
@@ -178,7 +178,7 @@ export function CalculatorForm({
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name}
-                        {!product.activeBomId && " (sin ficha activa)"}
+                        {!product.activeBomId && " (sin ficha)"}
                       </SelectItem>
                     ))}
                   </SelectContent>

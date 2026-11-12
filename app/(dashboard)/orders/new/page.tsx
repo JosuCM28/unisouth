@@ -88,7 +88,6 @@ export default async function NewOrderPage({ searchParams }: PageProps) {
       <OrderForm
         clients={options.clients}
         materials={options.materials}
-        productionRuns={options.productionRuns}
         sizes={options.sizes}
         tags={options.tags}
         folders={options.folders}
@@ -130,7 +129,6 @@ async function loadTemplate(id: string) {
     id: order.id,
     clientId: order.clientId,
     materialId: order.materialId,
-    productionRunId: order.productionRunId,
     folderId: order.folderId,
     description: order.description,
     /* La referencia NO se copia: es el número que trae el papel del cliente,

@@ -23,7 +23,6 @@ export interface LotSheetData {
   status: LotStatus;
 
   clientName: string | null;
-  productionRunName: string | null;
   locationName: string | null;
 
   unit: Unit;
@@ -32,7 +31,6 @@ export interface LotSheetData {
   actualWidthMm: number | null;
   actualWeightOz: number | null;
   measurementSource: MeasurementSource;
-  verified: boolean;
 
   receivedAt: Date;
   receiptCode: string | null;
@@ -53,7 +51,6 @@ const SHEET_INCLUDE = {
   },
   client: { select: { name: true } },
   location: { select: { code: true, name: true } },
-  productionRun: { select: { code: true, name: true } },
   helper: { select: { name: true } },
   createdBy: { select: { name: true } },
   receipt: {
@@ -93,11 +90,6 @@ function toSheetData(lot: LotWithRelations): LotSheetData {
     status: lot.status,
 
     clientName: lot.client?.name ?? null,
-    // El nombre de la producción incluye su folio: "PO-2026-01 · Overol gasera"
-    // identifica mejor que sólo el nombre cuando hay varias corridas parecidas.
-    productionRunName: lot.productionRun
-      ? `${lot.productionRun.code} · ${lot.productionRun.name}`
-      : null,
     locationName: lot.location
       ? `${lot.location.code} · ${lot.location.name}`
       : null,
@@ -108,7 +100,6 @@ function toSheetData(lot: LotWithRelations): LotSheetData {
     actualWidthMm: lot.actualWidthMm,
     actualWeightOz: lot.actualWeightOz ? Number(lot.actualWeightOz) : null,
     measurementSource: lot.measurementSource,
-    verified: lot.verified,
 
     receivedAt: lot.receivedAt,
     receiptCode: lot.receipt?.code ?? null,

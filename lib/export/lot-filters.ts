@@ -19,7 +19,6 @@ export interface LotSearchParams {
   shade?: string;
   status?: string;
   onlyRemnants?: string;
-  onlyUnverified?: string;
   includeCancelled?: string;
   arrivedWithin?: string;
 }
@@ -48,7 +47,6 @@ export function parseLotFilters(params: LotSearchParams): LotFilters {
         ? (params.status as LotStatus)
         : undefined,
     isRemnant: params.onlyRemnants === "true" ? true : undefined,
-    verified: params.onlyUnverified === "true" ? false : undefined,
     includeCancelled: params.includeCancelled === "true",
     arrivedWithinDays: parsePositiveInt(params.arrivedWithin),
   };
@@ -68,7 +66,6 @@ export function lotFiltersFromRequest(request: Request): LotFilters {
     shade: read("shade"),
     status: read("status"),
     onlyRemnants: read("onlyRemnants"),
-    onlyUnverified: read("onlyUnverified"),
     includeCancelled: read("includeCancelled"),
     arrivedWithin: read("arrivedWithin"),
   });

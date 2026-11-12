@@ -261,7 +261,6 @@ export class OrderFolderRepository extends BaseRepository<
         code: true,
         clientId: true,
         materialId: true,
-        productionRunId: true,
         description: true,
         reference: true,
         clientPo: true,

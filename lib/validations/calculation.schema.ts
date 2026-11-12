@@ -21,7 +21,6 @@ export type CalculationLineInput = z.infer<typeof calculationLineSchema>;
 
 export const calculationFormSchema = z.object({
   name: optionalText,
-  productionRunId: optionalCuid,
   clientId: optionalCuid,
 
   // Mermas y margen. Se COMPONEN, no se suman: 5% sobre 3% no es 8%.

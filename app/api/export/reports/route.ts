@@ -55,23 +55,10 @@ export async function GET(request: Request) {
     },
     {
       section: "Resumen",
-      concept: "Producciones activas",
-      detail: "Ahora mismo",
-      value: report.summary.activeRuns,
-    },
-    {
-      section: "Resumen",
       concept: "Rollos en bodega",
       detail: "Ocupando lugar",
       value: report.summary.lotsInWarehouse,
     },
-
-    ...report.ranking.map((row) => ({
-      section: "Producciones",
-      concept: row.productionRunName,
-      detail: row.clientName,
-      value: row.quantity,
-    })),
 
     ...report.byClient.map((row) => ({
       section: "Consumo por cliente",

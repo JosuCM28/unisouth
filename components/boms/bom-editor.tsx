@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Info, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { BomStatus, Unit } from "@prisma/client";
+import type { Unit } from "@prisma/client";
 import { createBomAction, updateBomAction } from "@/app/actions/bom.actions";
 import { UNIT_LABELS, UNIT_SHORT_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import type { MaterialOption } from "@/lib/repositories/material.repository";
@@ -42,7 +42,6 @@ interface BomEditorProps {
   bom?: {
     id: string;
     version: number;
-    status: BomStatus;
     globalWastePct: string;
     name: string | null;
     /** Si ya la usó un cálculo, editarla creará una versión nueva. */
@@ -67,7 +66,7 @@ export function BomEditor({
   // Editar una ficha ya usada NO la modifica: crea una v2. Se avisa antes
   // de que el usuario escriba, no después de guardar.
   const willVersion = Boolean(
-    bom && bom.status === "ACTIVE" && bom.usedByCalculations > 0,
+    bom && bom.usedByCalculations > 0,
   );
 
   const { register, control, handleSubmit, setValue, watch, reset,
@@ -106,7 +105,6 @@ export function BomEditor({
     const payload = {
       productId,
       name: values.name || undefined,
-      status: bom?.status ?? "DRAFT",
       globalWastePct: values.globalWastePct || 0,
       lines: values.lines
         .filter((line) => line.materialId && line.consumptionPerUnit)

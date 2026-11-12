@@ -37,7 +37,6 @@ const COLUMNS: XlsxColumn<MovementWithRelations>[] = [
   { header: "Unidad", value: (r) => UNIT_SHORT_LABELS[r.unit as Unit] },
   { header: "Saldo después", value: (r) => Number(r.balanceAfter), kind: "number" },
   { header: "Documento", value: (r) => r.document?.code ?? "" },
-  { header: "Producción", value: (r) => r.productionRun?.code ?? "" },
   { header: "De", value: (r) => r.fromLocation?.code ?? "" },
   { header: "A", value: (r) => r.toLocation?.code ?? "" },
   { header: "Motivo", value: (r) => r.reason ?? "", width: 34 },

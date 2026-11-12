@@ -46,7 +46,6 @@ const COLUMNS: XlsxColumn<Row>[] = [
   { header: "Tono", value: (r) => r.shade ?? "" },
   { header: "Lote proveedor", value: (r) => r.supplierLotNumber ?? "" },
   { header: "Retazo", value: (r) => (r.isRemnant ? "Sí" : "No") },
-  { header: "Medido", value: (r) => (r.verified ? "Sí" : "No") },
   { header: "Recibido", value: (r) => r.receivedAt, kind: "date" },
 ];
 

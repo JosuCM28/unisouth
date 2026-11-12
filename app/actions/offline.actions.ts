@@ -34,7 +34,7 @@ export async function syncOfflineIssueAction(input: unknown) {
   return executeAction(input, {
     schema: offlineIssueSchema,
     permission: "inventory:write",
-    revalidate: ["/documents", "/issues", "/lots", "/dashboard"],
+    revalidate: ["/issues", "/lots", "/dashboard"],
     successMessage: "Salida sin conexión aplicada",
     handler: ({ input, auditContext }) =>
       new DocumentService(auditContext).createAndApplyOffline(

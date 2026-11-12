@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BomStatus, Unit } from "@prisma/client";
+import { Unit } from "@prisma/client";
 import { cuidSchema, optionalCuid, optionalText, percentage } from "./common";
 
 /** Un renglón de la receta: qué material y cuánto por pieza. */
@@ -23,7 +23,6 @@ export type BomLineInput = z.infer<typeof bomLineSchema>;
 export const bomSchema = z.object({
   productId: cuidSchema,
   name: optionalText,
-  status: z.nativeEnum(BomStatus).default(BomStatus.DRAFT),
   /** Merma del proceso (tendido, puntas, trazo). Se aplica SOBRE la de línea. */
   globalWastePct: percentage.optional().default(0),
   notes: optionalText,

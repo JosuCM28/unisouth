@@ -55,7 +55,6 @@ export const NAV_ICONS = {
   plantOrders: Inbox,
   locations: MapPin,
   clients: Users,
-  productionRuns: Factory,
   receipts: Truck,
   partners: Factory,
   helpers: HardHat,

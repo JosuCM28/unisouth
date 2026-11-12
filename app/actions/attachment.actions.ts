@@ -1,9 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { executeAction } from "@/lib/core/action-handler";
-import { ForbiddenError, NotFoundError } from "@/lib/core/errors";
-import { canWriteOrderFiles } from "@/lib/core/order-files-access";
 import { removeAttachmentSchema } from "@/lib/validations/attachment.schema";
 import { AttachmentService } from "@/lib/services/attachment.service";
 
@@ -32,20 +29,7 @@ export async function removeAttachmentAction(input: unknown) {
     permission: "orders:browse",
     revalidate: ["/orders", "/plant-orders"],
     successMessage: "Archivo eliminado",
-    handler: async ({ input, auditContext, user }) => {
-      const attachment = await prisma.attachment.findUnique({
-        where: { id: input.id },
-        select: { cuttingOrder: { select: { origin: true } } },
-      });
-      if (!attachment?.cuttingOrder) {
-        throw new NotFoundError("el archivo", input.id);
-      }
-
-      if (!canWriteOrderFiles(user.role, attachment.cuttingOrder.origin)) {
-        throw new ForbiddenError();
-      }
-
-      return new AttachmentService(auditContext).remove(input.id);
-    },
+    handler: ({ input, auditContext, user }) =>
+      new AttachmentService(auditContext).removeAsRole(input.id, user.role),
   });
 }

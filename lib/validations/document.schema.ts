@@ -85,7 +85,6 @@ export const documentSchema = z.object({
   type: z.nativeEnum(DocumentType, { message: "Elige el tipo de documento" }),
   date: localDate.optional(),
   clientId: optionalCuid,
-  productionRunId: optionalCuid,
   /**
    * De qué orden de corte —y de qué corte suyo— nace el vale.
    *

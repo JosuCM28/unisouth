@@ -219,7 +219,6 @@ export default async function MaterialDetailPage({
         <p className="tabular mt-1 text-sm text-muted-foreground">
           {totals.lots} {totals.lots === 1 ? "rollo" : "rollos"} en bodega
           {totals.remnants > 0 && ` · ${totals.remnants} retazo(s)`}
-          {totals.unverified > 0 && ` · ${totals.unverified} sin verificar`}
         </p>
       </section>
 

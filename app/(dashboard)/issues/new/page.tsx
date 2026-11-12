@@ -64,7 +64,6 @@ export default async function NewIssuePage({ searchParams }: PageProps) {
         cutSizes={options.sizes}
         cutTags={options.cutTags}
         clients={options.clients}
-        productionRuns={options.productionRuns}
         locations={options.locations}
         workshops={options.workshops}
         order={order ?? undefined}

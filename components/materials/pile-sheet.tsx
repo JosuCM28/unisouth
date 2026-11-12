@@ -108,11 +108,6 @@ export function PileSheet({
           />
           <Row label="Guía" value={data.guideNumbers.join(", ")} tabular />
           <Row label="Proveedor" value={data.supplierNames.join(", ")} />
-          <Row
-            label="Sin verificar"
-            value={totals.unverified > 0 ? `${totals.unverified} rollo(s)` : null}
-            tabular
-          />
         </Section>
       </div>
 

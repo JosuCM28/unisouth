@@ -10,7 +10,7 @@ export async function updateNotificationChannelsAction(input: unknown) {
     schema: notificationChannelsSchema,
     permission: "notifications:write",
     // La ficha de la salida también: ahí se decide qué canales se ofrecen.
-    revalidate: ["/notifications", "/documents"],
+    revalidate: ["/notifications"],
     successMessage: "Canales actualizados",
     handler: ({ input, auditContext }) =>
       new NotificationSettingsService(auditContext).updateChannels(input),

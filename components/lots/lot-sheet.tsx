@@ -58,13 +58,6 @@ export function LotSheet({ lot, qrSvg }: { lot: LotSheetData; qrSvg: string }) {
 
       <Section title="Dueño y destino">
         <Row label="Cliente dueño" value={lot.clientName ?? "De la fábrica"} />
-        {/* La producción del catálogo sólo se pinta si el rollo la trae: el
-            dato que se usa a diario es el de texto libre del encabezado, y
-            dos renglones llamados "Producción" —uno de ellos vacío— confunden
-            a quien lee la hoja en el piso. */}
-        {lot.productionRunName && (
-          <Row label="Orden de producción" value={lot.productionRunName} />
-        )}
         <Row label="Ubicación" value={lot.locationName} tabular />
       </Section>
 

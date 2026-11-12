@@ -65,7 +65,6 @@ export default async function EditIssuePage({ params }: PageProps) {
     id: document.id,
     // El material propio viaja con el centinela: en la base es `null`.
     clientId: document.clientId ?? FACTORY_OWNER,
-    productionRunId: document.productionRunId,
     concept: document.concept,
     reference: document.reference,
     receivedBy: document.receivedBy,
@@ -133,7 +132,6 @@ export default async function EditIssuePage({ params }: PageProps) {
         cutSizes={options.sizes}
         cutTags={options.cutTags}
         clients={options.clients}
-        productionRuns={options.productionRuns}
         locations={options.locations}
         workshops={options.workshops}
         document={editable}

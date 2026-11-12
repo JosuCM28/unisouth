@@ -40,7 +40,6 @@ const lotFormSchema = z.object({
 
   locationId: z.string().optional(),
   clientId: z.string().optional(),
-  productionRunId: z.string().optional(),
   shade: z.string().optional(),
   supplierLotNumber: z.string().optional(),
   colorText: z.string().optional(),
@@ -60,7 +59,6 @@ interface LotFormSheetProps {
   materials: MaterialOption[];
   locations: { id: string; code: string; name: string }[];
   clients: { id: string; name: string }[];
-  productionRuns: { id: string; code: string; name: string }[];
   trigger: ReactNode;
 }
 
@@ -75,7 +73,6 @@ export function LotFormSheet({
   materials,
   locations,
   clients,
-  productionRuns,
   trigger,
 }: LotFormSheetProps) {
   const router = useRouter();
@@ -117,7 +114,6 @@ export function LotFormSheet({
       ...values,
       locationId: values.locationId || undefined,
       clientId: values.clientId || undefined,
-      productionRunId: values.productionRunId || undefined,
       shade: values.shade || undefined,
       supplierLotNumber: values.supplierLotNumber || undefined,
       colorText: values.colorText || undefined,
@@ -288,31 +284,6 @@ export function LotFormSheet({
             </Select>
           </FormSelectField>
 
-          {productionRuns.length > 0 && (
-            <FormSelectField id="productionRunId" label="Producción">
-              <Select
-                value={watch("productionRunId") || "none"}
-                onValueChange={(value) =>
-                  setValue("productionRunId", value === "none" ? "" : value)
-                }
-              >
-                <SelectTrigger
-                  id="productionRunId"
-                  className="touch-target w-full"
-                >
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {productionRuns.map((run) => (
-                    <SelectItem key={run.id} value={run.id}>
-                      <span className="tabular">{run.code}</span> · {run.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormSelectField>
-          )}
         </FormSection>
 
         <FormSection title="Identificación del rollo">
@@ -405,7 +376,6 @@ function emptyValues(): LotFormValues {
     unit: "",
     locationId: "",
     clientId: "",
-    productionRunId: "",
     shade: "",
     supplierLotNumber: "",
     colorText: "",

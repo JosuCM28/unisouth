@@ -129,7 +129,6 @@ export class CuttingOrderService extends BaseService {
           addedById: adopted ? this.context.userId : null,
           clientId: input.clientId,
           materialId: input.materialId,
-          productionRunId: input.productionRunId,
           folderId: input.folderId,
           description: input.description,
           reference: input.reference,
@@ -414,7 +413,6 @@ export class CuttingOrderService extends BaseService {
              manda sobre la tela a mano, la orden seguía mostrando la vieja. */
           clientId: input.clientId ?? null,
           materialId: input.materialId ?? null,
-          productionRunId: input.productionRunId ?? null,
           folderId: input.folderId ?? null,
           description: input.description ?? null,
           reference: input.reference ?? null,
@@ -1153,7 +1151,6 @@ export class CuttingOrderService extends BaseService {
         type: "ISSUE",
         date: new Date(),
         clientId: order.clientId ?? undefined,
-        productionRunId: order.productionRunId ?? undefined,
         /* La liga de verdad con la orden, aparte de la referencia de papel:
            es lo que después deja a la ficha decir "esta orden ya salió y el
            vale sigue en pie", y lo que impide mandar dos veces el mismo corte. */

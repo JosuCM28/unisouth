@@ -6,7 +6,6 @@ import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import { parseLotFilters, parsePositiveInt } from "@/lib/export/lot-filters";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
-import { ProductionRunRepository } from "@/lib/repositories/production-run.repository";
 import { toPlainObject } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
@@ -37,7 +36,6 @@ interface PageProps {
     shade?: string;
     status?: string;
     onlyRemnants?: string;
-    onlyUnverified?: string;
     includeCancelled?: string;
     arrivedWithin?: string;
     page?: string;
@@ -54,12 +52,11 @@ export default async function LotsPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
 
-  const [materials, locations, clients, productionRuns, filterOptions] =
+  const [materials, locations, clients, filterOptions] =
     await Promise.all([
       new MaterialRepository().findOptions(),
       new LocationRepository().findOptions(),
       new ClientRepository().findOptions(),
-      new ProductionRunRepository().findOptions(),
       // Colores y tonos que hay HOY en bodega, no el catálogo entero.
       new LotRepository().findFilterOptions(),
     ]);
@@ -74,7 +71,6 @@ export default async function LotsPage({ searchParams }: PageProps) {
             materials={materials}
             locations={locations}
             clients={clients}
-            productionRuns={productionRuns}
             trigger={
               <Button className="touch-target">
                 <Plus className="size-4" aria-hidden />

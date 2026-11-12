@@ -18,7 +18,7 @@ export async function returnOrderFabricAction(input: unknown) {
   return executeAction(input, {
     schema: returnFabricSchema,
     permission: "inventory:write",
-    revalidate: ["/orders", "/lots", "/documents", "/issues", "/dashboard"],
+    revalidate: ["/orders", "/lots", "/issues", "/dashboard"],
     successMessage: "Devolución registrada",
     handler: ({ input, auditContext }) =>
       new OrderFabricService(auditContext).returnFabric(input),
@@ -35,7 +35,7 @@ export async function issueFabricToOrdersAction(input: unknown) {
   return executeAction(input, {
     schema: issueToOrdersSchema,
     permission: "inventory:write",
-    revalidate: ["/orders", "/documents", "/issues", "/dashboard"],
+    revalidate: ["/orders", "/issues", "/dashboard"],
     successMessage: "Salidas guardadas en borrador",
     handler: ({ input, auditContext }) =>
       new OrderFabricService(auditContext).issueToOrders(input),

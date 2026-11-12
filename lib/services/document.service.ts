@@ -80,7 +80,6 @@ export class DocumentService extends BaseService {
           // Nace en borrador SIEMPRE: aplicar es un acto aparte y deliberado.
           status: "DRAFT",
           clientId: input.clientId,
-          productionRunId: input.productionRunId,
           /* De dónde nació. Se sella SÓLO al crear y `update` no lo toca: si
              corregir un vale pudiera cambiarle la orden, la ficha de la orden
              perdería de vista una entrega que sí salió por la puerta. */
@@ -222,7 +221,6 @@ export class DocumentService extends BaseService {
           date: new Date(),
           status: "DRAFT",
           clientId: source.clientId,
-          productionRunId: source.productionRunId,
           concept: source.concept,
           reference: source.reference,
           handedOverBy: source.handedOverBy,
@@ -308,7 +306,6 @@ export class DocumentService extends BaseService {
         data: {
           date: input.date ?? current.date,
           clientId: input.clientId,
-          productionRunId: input.productionRunId,
           concept: input.concept,
           reference: input.reference,
           handedOverBy: input.handedOverBy,
@@ -406,7 +403,6 @@ export class DocumentService extends BaseService {
           type: movementType,
           quantity: Number(line.quantity),
           documentId: document.id,
-          productionRunId: document.productionRunId ?? undefined,
           fromLocationId: line.fromLocationId ?? undefined,
           toLocationId: line.toLocationId ?? undefined,
           reason: document.concept ?? undefined,

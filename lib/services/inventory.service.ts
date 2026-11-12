@@ -180,7 +180,6 @@ export interface MovementRequest {
   quantity: number;
   reason?: string;
   documentId?: string;
-  productionRunId?: string;
   fromLocationId?: string;
   /** Si viene, el rollo queda en esta ubicación al terminar. */
   toLocationId?: string;
@@ -264,7 +263,6 @@ export class InventoryService {
         balanceBefore,
         balanceAfter,
         documentId: request.documentId,
-        productionRunId: request.productionRunId,
         fromLocationId: request.fromLocationId ?? lot.locationId,
         toLocationId: request.toLocationId,
         unitCost: request.unitCost,

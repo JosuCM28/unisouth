@@ -41,7 +41,6 @@ export interface LotFilters extends PaginationInput {
   clientId?: string;
   status?: LotStatus;
   isRemnant?: boolean;
-  verified?: boolean;
   /**
    * Los cancelados (WRITTEN_OFF) NO salen en el listado diario: el auxiliar
    * busca rollos que puede tomar, y ver bajas mezcladas con material vivo
@@ -235,7 +234,6 @@ export class LotRepository extends BaseRepository<
     }
 
     if (filters.isRemnant !== undefined) where.isRemnant = filters.isRemnant;
-    if (filters.verified !== undefined) where.verified = filters.verified;
 
     /* El color va en un AND propio y NO en `where.OR`.
        Ese OR ya lo ocupa el buscador de arriba; meter aquí otra rama lo
@@ -284,7 +282,6 @@ export class LotRepository extends BaseRepository<
         material: true,
         location: true,
         client: true,
-        productionRun: true,
         receipt: {
           include: {
             supplier: { select: { id: true, name: true } },
@@ -451,16 +448,6 @@ export class LotRepository extends BaseRepository<
   async countPhysicallyPresent(): Promise<number> {
     return this.db.lot.count({
       where: { status: { in: [...STATUSES_PHYSICALLY_PRESENT] } },
-    });
-  }
-
-  /** Metraje que nadie ha confirmado con cinta. */
-  async countUnverified(): Promise<number> {
-    return this.db.lot.count({
-      where: {
-        verified: false,
-        status: { in: [...STATUSES_PHYSICALLY_PRESENT] },
-      },
     });
   }
 

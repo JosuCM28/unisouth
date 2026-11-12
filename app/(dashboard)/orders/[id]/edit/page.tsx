@@ -41,7 +41,6 @@ export default async function EditOrderPage({ params }: PageProps) {
     id: order.id,
     clientId: order.clientId,
     materialId: order.materialId,
-    productionRunId: order.productionRunId,
     folderId: order.folderId,
     description: order.description,
     reference: order.reference,
@@ -95,7 +94,6 @@ export default async function EditOrderPage({ params }: PageProps) {
       <OrderForm
         clients={options.clients}
         materials={options.materials}
-        productionRuns={options.productionRuns}
         sizes={options.sizes}
         tags={options.tags}
         folders={options.folders}

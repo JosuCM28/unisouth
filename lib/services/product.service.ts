@@ -1,4 +1,5 @@
 import type { FinishedProduct, Size } from "@prisma/client";
+import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, DuplicateError } from "@/lib/core/errors";
 import type { ProductInput, SizeInput } from "@/lib/validations/product.schema";
 import { BaseService } from "./base.service";
@@ -6,10 +7,7 @@ import { BaseService } from "./base.service";
 export class ProductService extends BaseService {
   async create(input: ProductInput): Promise<FinishedProduct> {
     return this.transaction(async (tx) => {
-      const exists = await tx.finishedProduct.findFirst({
-        where: { code: input.code, deletedAt: null },
-      });
-      if (exists) throw new DuplicateError("el producto", "código", input.code, "code");
+      await this.assertCodeFree(tx, input.code);
 
       const product = await tx.finishedProduct.create({ data: input });
 
@@ -27,10 +25,7 @@ export class ProductService extends BaseService {
       const before = await tx.finishedProduct.findUnique({ where: { id } });
       if (!before) throw new BusinessRuleError("No se encontró el producto.");
 
-      const dup = await tx.finishedProduct.findFirst({
-        where: { code: input.code, deletedAt: null, id: { not: id } },
-      });
-      if (dup) throw new DuplicateError("el producto", "código", input.code, "code");
+      await this.assertCodeFree(tx, input.code, id);
 
       const product = await tx.finishedProduct.update({ where: { id }, data: input });
 
@@ -60,6 +55,32 @@ export class ProductService extends BaseService {
 
       return product;
     });
+  }
+
+  /**
+   * El código es único en la tabla aunque el producto esté dado de baja: la
+   * baja es lógica para que los cálculos viejos sigan leyéndolo. Sin esta
+   * revisión, reusar el código de uno dado de baja reventaba en la base con
+   * un error que el usuario no puede entender.
+   */
+  private async assertCodeFree(
+    tx: PrismaExecutor,
+    code: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const taken = await tx.finishedProduct.findFirst({
+      where: { code, ...(exceptId ? { id: { not: exceptId } } : {}) },
+      select: { deletedAt: true },
+    });
+    if (!taken) return;
+
+    if (taken.deletedAt) {
+      throw new BusinessRuleError(
+        `El código ${code} era de un producto dado de baja. Usa otro código.`,
+        "code",
+      );
+    }
+    throw new DuplicateError("el producto", "código", code, "code");
   }
 }
 

@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
-import { prisma } from "@/lib/prisma";
 import { cuidSchema, removeSchema } from "@/lib/validations/common";
 import {
   cancelGarmentShipmentSchema,
@@ -13,17 +12,18 @@ import {
   workshopSchema,
 } from "@/lib/validations/garment-shipment.schema";
 import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
+import { ProcessStageService } from "@/lib/services/process-stage.service";
 import { WorkshopDeliveryService } from "@/lib/services/workshop-delivery.service";
 
 /* La ficha de la orden es donde se ve el tablero, así que se revalida por id
    además de las listas: mandar un envío cambia justo la pantalla de la que se
    disparó.
 
-   `/issues` y `/documents` entran porque un envío LEVANTA SU VALE, y ese vale
-   vive en esas dos listas. Sin ellas, mandar al taller y entrar al registro de
-   salidas enseñaba la lista de antes: el vale existía en la base pero no se
+   `/issues` entra porque un envío LEVANTA SU VALE, y ese vale vive en esa
+   lista. Sin ella, mandar al taller y entrar al registro de salidas enseñaba
+   la lista de antes: el vale existía en la base pero no se
    veía, y parecía que el envío no había dejado rastro. */
-const REVALIDATE = ["/orders", "/dashboard", "/issues", "/documents"];
+const REVALIDATE = ["/orders", "/dashboard", "/issues"];
 
 export async function createGarmentShipmentAction(input: unknown) {
   return executeAction(input, {
@@ -77,9 +77,9 @@ export async function cancelGarmentShipmentAction(input: unknown) {
 }
 
 /* ── Catálogos ──────────────────────────────────────────────────────────────
-   Las etapas son un catálogo plano y sus acciones hablan con Prisma, igual que
-   el resto de los catálogos del sistema. Los talleres ya no: pueden traer la
-   cuenta con la que entra alguien, y eso tiene reglas y deja rastro. */
+   Talleres y etapas pasan por su servicio como todo lo demás. Los talleres
+   además pueden traer la cuenta con la que entra alguien, y eso tiene reglas
+   y deja rastro. */
 
 const CATALOG_REVALIDATE = ["/workshops", "/orders", "/workshop-orders"];
 
@@ -108,24 +108,14 @@ export async function updateWorkshopAction(input: unknown) {
   });
 }
 
-/** Baja lógica: un taller borrado dejaría envíos apuntando a la nada. */
 export async function removeWorkshopAction(input: unknown) {
   return executeAction(input, {
     schema: removeSchema,
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Taller dado de baja",
-    handler: ({ input }) =>
-      prisma.workshop.update({
-        where: { id: input.id },
-        // Suelta la cuenta: dado de baja no debe seguir apartando ese rol.
-        data: {
-          active: false,
-          deletedAt: new Date(),
-          accessRole: null,
-          accessSince: null,
-        },
-      }),
+    handler: ({ input, auditContext }) =>
+      new WorkshopDeliveryService(auditContext).removeWorkshop(input.id),
   });
 }
 
@@ -135,7 +125,8 @@ export async function createProcessStageAction(input: unknown) {
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa creada",
-    handler: ({ input }) => prisma.processStage.create({ data: input }),
+    handler: ({ input, auditContext }) =>
+      new ProcessStageService(auditContext).create(input),
   });
 }
 
@@ -145,8 +136,8 @@ export async function updateProcessStageAction(input: unknown) {
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa actualizada",
-    handler: ({ input }) =>
-      prisma.processStage.update({ where: { id: input.id }, data: input.data }),
+    handler: ({ input, auditContext }) =>
+      new ProcessStageService(auditContext).update(input.id, input.data),
   });
 }
 
@@ -156,10 +147,7 @@ export async function removeProcessStageAction(input: unknown) {
     permission: "production:write",
     revalidate: CATALOG_REVALIDATE,
     successMessage: "Etapa dada de baja",
-    handler: ({ input }) =>
-      prisma.processStage.update({
-        where: { id: input.id },
-        data: { active: false, deletedAt: new Date() },
-      }),
+    handler: ({ input, auditContext }) =>
+      new ProcessStageService(auditContext).remove(input.id),
   });
 }

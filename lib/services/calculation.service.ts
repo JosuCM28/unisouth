@@ -152,7 +152,6 @@ export class CalculationService extends BaseService {
           type: "SIMULATION",
           status: "DRAFT",
           clientId: input.clientId,
-          productionRunId: input.productionRunId,
           respectOwnership: input.respectOwnership,
           includeRemnants: input.includeRemnants,
           safetyFactorPct: input.safetyMarginPct,

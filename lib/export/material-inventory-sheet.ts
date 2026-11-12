@@ -143,5 +143,4 @@ const LOT_COLUMNS: XlsxColumn<PileLotRow>[] = [
   { header: "Cantidad", value: (r) => r.currentQuantity, kind: "number" },
   { header: "Unidad", value: (r) => UNIT_SHORT_LABELS[r.unit] },
   { header: "Recibido", value: (r) => r.receivedAt, kind: "date" },
-  { header: "Verificado", value: (r) => (r.verified ? "Sí" : "No") },
 ];

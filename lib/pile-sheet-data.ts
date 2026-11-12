@@ -16,7 +16,6 @@ export interface PileLotRow {
   currentQuantity: number;
   unit: Unit;
   receivedAt: Date;
-  verified: boolean;
 }
 
 /** Cuánto hay de un tono. Se agrupa porque mezclar tonos arruina el tendido. */
@@ -47,7 +46,6 @@ export interface PileSheetData {
     quantity: number;
     unit: Unit;
     remnants: number;
-    unverified: number;
   };
   shades: ShadeTotal[];
   /** Dueños y ubicaciones donde está repartida la pila. */
@@ -176,7 +174,6 @@ export async function getPileSheetData(
         currentQuantity: true,
         unit: true,
         receivedAt: true,
-        verified: true,
         location: { select: { code: true, name: true } },
         client: { select: { name: true } },
         receipt: {
@@ -212,7 +209,6 @@ export async function getPileSheetData(
     currentQuantity: Number(lot.currentQuantity),
     unit: lot.unit,
     receivedAt: lot.receivedAt,
-    verified: lot.verified,
   }));
 
   return {
@@ -228,7 +224,6 @@ export async function getPileSheetData(
       quantity: Number(aggregate._sum.currentQuantity ?? 0),
       unit: material.baseUnit,
       remnants: rows.filter((lot) => lot.isRemnant).length,
-      unverified: rows.filter((lot) => !lot.verified).length,
     },
     shades: groupByShade(rows),
     clientNames: unique(rows.map((lot) => lot.clientName)),

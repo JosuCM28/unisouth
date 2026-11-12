@@ -50,7 +50,7 @@ export default async function PrintReportPage({ searchParams }: PageProps) {
           </p>
         </header>
 
-        <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4">
+        <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 print:grid-cols-3">
           <Figure
             label="Salió a producción"
             value={formatQuantity(report.summary.totalConsumed)}
@@ -60,26 +60,10 @@ export default async function PrintReportPage({ searchParams }: PageProps) {
             value={formatQuantity(report.summary.totalReceived)}
           />
           <Figure
-            label="Producciones activas"
-            value={String(report.summary.activeRuns)}
-          />
-          <Figure
             label="Rollos en bodega"
             value={String(report.summary.lotsInWarehouse)}
           />
         </section>
-
-        <Section title="Producciones del periodo">
-          <Table
-            head={["Producción", "Cliente", "Consumo"]}
-            rows={report.ranking.map((row) => [
-              row.productionRunName,
-              row.clientName,
-              formatQuantity(row.quantity),
-            ])}
-            empty="Sin salidas a producción en el periodo."
-          />
-        </Section>
 
         <Section title="Consumo por cliente">
           <Table

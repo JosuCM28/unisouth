@@ -421,6 +421,20 @@ export class WorkshopDeliveryService extends BaseService {
     });
   }
 
+  /** Baja lógica: un taller borrado dejaría envíos apuntando a la nada. */
+  async removeWorkshop(id: string): Promise<Workshop> {
+    return this.db.workshop.update({
+      where: { id },
+      // Suelta la cuenta: dado de baja no debe seguir apartando ese rol.
+      data: {
+        active: false,
+        deletedAt: new Date(),
+        accessRole: null,
+        accessSince: null,
+      },
+    });
+  }
+
   /** Un rol, un taller: si no, cada uno vería las entregas del otro. */
   private async assertRoleFree(
     tx: PrismaExecutor,

@@ -136,7 +136,6 @@ export default async function OrderDetailPage({
     include: {
       client: { select: { name: true } },
       material: { select: { name: true, code: true } },
-      productionRun: { select: { code: true, name: true } },
       folder: { select: { id: true, code: true, name: true } },
       createdBy: { select: { name: true } },
       lines: {
@@ -1037,14 +1036,6 @@ export default async function OrderDetailPage({
             value={
               order.material
                 ? `${order.material.code} · ${order.material.name}`
-                : null
-            }
-          />
-          <Row
-            label="Producción"
-            value={
-              order.productionRun
-                ? `${order.productionRun.code} · ${order.productionRun.name}`
                 : null
             }
           />

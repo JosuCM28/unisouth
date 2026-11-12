@@ -472,7 +472,6 @@ export class OrderFolderService extends BaseService {
            aquí, porque un vale con tela de dos clientes rompe la regla de que
            nada se surte cruzado. */
         clientId: sharedValue(orders, (o) => o.clientId),
-        productionRunId: sharedValue(orders, (o) => o.productionRunId),
         // Ni orden ni corte sueltos: este vale es del PEDIDO, y `sentBatchIds`
         // es lo que después impide que esos cortes vuelvan a salir.
         cuttingOrderId: undefined,

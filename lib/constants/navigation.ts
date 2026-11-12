@@ -139,12 +139,6 @@ export const NAVIGATION: NavSection[] = [
         permission: "inventory:browse",
       },
       {
-        href: "/production-runs",
-        label: "Producciones",
-        icon: "productionRuns",
-        permission: "production:browse",
-      },
-      {
         href: "/partners",
         label: "Proveedores",
         icon: "partners",
@@ -209,12 +203,6 @@ export const NAVIGATION: NavSection[] = [
         label: "Movimientos",
         icon: "movements",
         permission: "reporting:read",
-      },
-      {
-        href: "/documents",
-        label: "Documentos",
-        icon: "documents",
-        permission: "inventory:browse",
       },
       {
         href: "/purchase-requests",

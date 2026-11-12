@@ -32,14 +32,6 @@ const OUTBOUND_TYPES = [
 const STALE_DAYS = 90;
 const FLOW_MONTHS = 6;
 
-export interface ProducedRankRow {
-  productionRunId: string;
-  productionRunName: string;
-  clientName: string;
-  quantity: number;
-  movements: number;
-}
-
 export interface ConsumptionByClientRow {
   clientId: string | null;
   clientName: string;
@@ -67,13 +59,11 @@ export interface ReportSummary {
   to: Date;
   totalConsumed: number;
   totalReceived: number;
-  activeRuns: number;
   lotsInWarehouse: number;
 }
 
 export interface ReportData {
   summary: ReportSummary;
-  ranking: ProducedRankRow[];
   byClient: ConsumptionByClientRow[];
   flow: FlowRow[];
   alerts: AlertRow[];
@@ -107,59 +97,14 @@ export class ReportService {
     const from = new Date();
     from.setDate(from.getDate() - days);
 
-    const [ranking, byClient, flow, alerts, summary] = await Promise.all([
-      this.getProducedRanking(from),
+    const [byClient, flow, alerts, summary] = await Promise.all([
       this.getConsumptionByClient(from),
       this.getFlow(),
       this.getAlerts(),
       this.getSummary(from),
     ]);
 
-    return { summary: { ...summary, from, to }, ranking, byClient, flow, alerts };
-  }
-
-  /**
-   * Cuánto material se fue a cada producción, de mayor a menor.
-   *
-   * De esta única lista salen "lo más producido", "lo menos" y el punto
-   * medio: son tres lecturas del mismo orden, y calcularlas por separado
-   * daría tres veces el mismo trabajo a Postgres.
-   */
-  private async getProducedRanking(from: Date): Promise<ProducedRankRow[]> {
-    const grouped = await prisma.movement.groupBy({
-      by: ["productionRunId"],
-      where: {
-        type: { in: [...CONSUMPTION_TYPES] },
-        createdAt: { gte: from },
-        productionRunId: { not: null },
-      },
-      _sum: { quantity: true },
-      _count: { _all: true },
-    });
-
-    if (grouped.length === 0) return [];
-
-    const runs = await prisma.productionRun.findMany({
-      where: { id: { in: grouped.map((row) => row.productionRunId as string) } },
-      select: { id: true, name: true, client: { select: { name: true } } },
-    });
-
-    const runById = new Map(runs.map((run) => [run.id, run]));
-
-    return grouped
-      .map((row) => {
-        const run = runById.get(row.productionRunId as string);
-        return {
-          productionRunId: row.productionRunId as string,
-          productionRunName: run?.name ?? "(producción borrada)",
-          clientName: run?.client.name ?? "—",
-          // Las salidas se guardan en negativo; se presentan en positivo
-          // porque "consumió -300 m" no se lee bien en una junta.
-          quantity: Math.abs(Number(row._sum.quantity ?? 0)),
-          movements: row._count._all,
-        };
-      })
-      .sort((a, b) => b.quantity - a.quantity);
+    return { summary: { ...summary, from, to }, byClient, flow, alerts };
   }
 
   /**
@@ -258,7 +203,7 @@ export class ReportService {
     const staleDate = new Date();
     staleDate.setDate(staleDate.getDate() - STALE_DAYS);
 
-    const [stale, remnants, unverified, blocked] = await Promise.all([
+    const [stale, remnants, blocked] = await Promise.all([
       prisma.lot.count({
         where: {
           status: PHYSICALLY_PRESENT_FILTER,
@@ -267,9 +212,6 @@ export class ReportService {
       }),
       prisma.lot.count({
         where: { isRemnant: true, status: PHYSICALLY_PRESENT_FILTER },
-      }),
-      prisma.lot.count({
-        where: { verified: false, status: PHYSICALLY_PRESENT_FILTER },
       }),
       prisma.lot.count({
         where: { isBlocked: true, status: PHYSICALLY_PRESENT_FILTER },
@@ -290,12 +232,6 @@ export class ReportService {
         detail: "Se ofrecen primero al surtir; si crecen, no se están usando.",
       },
       {
-        key: "unverified",
-        label: "Sin medir",
-        count: unverified,
-        detail: "El saldo es el de la etiqueta del proveedor, nadie lo midió.",
-      },
-      {
         key: "blocked",
         label: "Bloqueados",
         count: blocked,
@@ -307,7 +243,7 @@ export class ReportService {
   private async getSummary(
     from: Date,
   ): Promise<Omit<ReportSummary, "from" | "to">> {
-    const [consumed, received, activeRuns, lotsInWarehouse] = await Promise.all([
+    const [consumed, received, lotsInWarehouse] = await Promise.all([
       prisma.movement.aggregate({
         where: { type: { in: [...CONSUMPTION_TYPES] }, createdAt: { gte: from } },
         _sum: { quantity: true },
@@ -316,7 +252,6 @@ export class ReportService {
         where: { type: { in: [...INBOUND_TYPES] }, createdAt: { gte: from } },
         _sum: { quantity: true },
       }),
-      prisma.productionRun.count({ where: { status: "ACTIVE" } }),
       prisma.lot.count({
         where: { status: { in: [...STATUSES_PHYSICALLY_PRESENT] } },
       }),
@@ -325,7 +260,6 @@ export class ReportService {
     return {
       totalConsumed: Math.abs(Number(consumed._sum.quantity ?? 0)),
       totalReceived: Math.abs(Number(received._sum.quantity ?? 0)),
-      activeRuns,
       lotsInWarehouse,
     };
   }

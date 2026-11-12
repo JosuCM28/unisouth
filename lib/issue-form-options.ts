@@ -3,6 +3,7 @@ import { ClientRepository } from "@/lib/repositories/client.repository";
 import { LocationRepository } from "@/lib/repositories/location.repository";
 import { LotRepository } from "@/lib/repositories/lot.repository";
 import { MaterialRepository } from "@/lib/repositories/material.repository";
+import { ProductRepository } from "@/lib/repositories/product.repository";
 import type { IssueProductOption } from "@/components/issues/issue-from-calculation";
 
 /** Centinela del material propio: en la base es `clientId = null`. */
@@ -23,7 +24,6 @@ export async function getIssueFormOptions() {
     products,
     sizes,
     clients,
-    productionRuns,
     locations,
     workshops,
   ] = await Promise.all([
@@ -36,20 +36,8 @@ export async function getIssueFormOptions() {
         orderBy: [{ order: "asc" }, { name: "asc" }],
       }),
       new MaterialRepository().findOptions(),
-      prisma.finishedProduct.findMany({
-        where: { active: true, deletedAt: null },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          billsOfMaterials: {
-            where: { status: "ACTIVE" },
-            select: { id: true },
-            take: 1,
-          },
-        },
-        orderBy: { name: "asc" },
-      }),
+      // Con su ficha vigente: el mismo criterio que usa Cálculo.
+      new ProductRepository().findOptions(),
       prisma.size.findMany({
         where: { active: true },
         // El `group` separa la escala de letra (CH/M/G) de la numérica
@@ -59,13 +47,6 @@ export async function getIssueFormOptions() {
         orderBy: { order: "asc" },
       }),
       new ClientRepository().findOptions(),
-      prisma.productionRun.findMany({
-        // Una corrida cerrada ya no recibe material: ofrecerla sólo lleva a
-        // colgar el vale de la producción equivocada.
-        where: { status: { in: ["PLANNED", "ACTIVE"] } },
-        select: { id: true, code: true, name: true },
-        orderBy: { createdAt: "desc" },
-      }),
       // Para el alta de rollo desde el propio vale: dónde se acomodó lo que
       // acaba de llegar. Opcional, como en el alta de siempre.
       new LocationRepository().findOptions(),
@@ -77,12 +58,7 @@ export async function getIssueFormOptions() {
       }),
     ]);
 
-  const productOptions: IssueProductOption[] = products.map((product) => ({
-    id: product.id,
-    code: product.code,
-    name: product.name,
-    activeBomId: product.billsOfMaterials[0]?.id ?? null,
-  }));
+  const productOptions: IssueProductOption[] = products;
 
   /* Se ofrece el CATÁLOGO COMPLETO de dueños y materiales, y cada uno dice
      cuántos rollos surtibles tiene hoy.
@@ -157,7 +133,6 @@ export async function getIssueFormOptions() {
     products: productOptions,
     sizes,
     cutTags,
-    productionRuns,
     locations,
     workshops: workshops.map((workshop) => ({
       id: workshop.id,

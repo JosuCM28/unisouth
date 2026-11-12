@@ -1,5 +1,6 @@
 import type { Attachment } from "@prisma/client";
-import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { BusinessRuleError, ForbiddenError, NotFoundError } from "@/lib/core/errors";
+import { canWriteOrderFiles } from "@/lib/core/order-files-access";
 import {
   deleteFileByKey,
   isSupportedDocument,
@@ -147,6 +148,29 @@ export class AttachmentService extends BaseService {
 
       return attachment;
     });
+  }
+
+  /**
+   * Quita la foto, pero sólo si este rol puede tocar los archivos de la orden.
+   *
+   * La revisión vive aquí y no en la action porque necesita leer el origen de
+   * la orden, y la action no habla con la base. La regla de acceso en sí sigue
+   * siendo `canWriteOrderFiles`, la misma que usan las rutas de subida.
+   */
+  async removeAsRole(id: string, role: string): Promise<Attachment> {
+    const attachment = await this.db.attachment.findUnique({
+      where: { id },
+      select: { cuttingOrder: { select: { origin: true } } },
+    });
+    if (!attachment?.cuttingOrder) {
+      throw new NotFoundError("el archivo", id);
+    }
+
+    if (!canWriteOrderFiles(role, attachment.cuttingOrder.origin)) {
+      throw new ForbiddenError();
+    }
+
+    return this.remove(id);
   }
 
   /**

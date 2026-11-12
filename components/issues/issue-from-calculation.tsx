@@ -23,7 +23,7 @@ export interface IssueProductOption {
   id: string;
   code: string;
   name: string;
-  /** Sin ficha ACTIVE no hay nada que explotar. */
+  /** Sin ficha técnica no hay nada que explotar. */
   activeBomId: string | null;
 }
 
@@ -117,7 +117,7 @@ export function IssueFromCalculation({
         {missingBom && (
           <p className="flex items-start gap-2 border border-state-reserved bg-state-reserved-muted p-2 text-xs">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            Este producto no tiene ficha técnica activa. Captúrala primero o
+            Este producto no tiene ficha técnica. Captúrala primero o
             agrega los renglones a mano.
           </p>
         )}

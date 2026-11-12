@@ -23,7 +23,6 @@ export const createLotSchema = z.object({
   clientId: optionalCuid,
   locationId: optionalCuid,
   receiptId: optionalCuid,
-  productionRunId: optionalCuid,
 
   supplierLotNumber: optionalText,
   /// Partida de tintura. Distinta del lote del proveedor: dos tonos en un
@@ -60,7 +59,6 @@ export type CreateLotInput = z.infer<typeof createLotSchema>;
 export const cutLotSchema = z.object({
   lotId: cuidSchema,
   quantity: positiveQuantity,
-  productionRunId: optionalCuid,
   toLocationId: optionalCuid,
   reason: optionalText,
 });

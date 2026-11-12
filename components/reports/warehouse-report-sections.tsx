@@ -3,7 +3,6 @@ import { ReportService } from "@/lib/services/report.service";
 import { formatDate, formatQuantity } from "@/lib/utils";
 import { BarChart } from "./bar-chart";
 import { FlowChart } from "./flow-chart";
-import { ProductionRanking } from "./production-ranking";
 import { Block, Kpi } from "./report-block";
 
 /** La pestaña Almacén: material que entra, sale y se queda parado. */
@@ -12,8 +11,8 @@ export async function WarehouseReportSections({ days }: { days: number }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Las cuatro cifras de arriba: lo que se mira primero al abrir. */}
-      <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      {/* Las tres cifras de arriba: lo que se mira primero al abrir. */}
+      <section className="grid grid-cols-2 gap-2 lg:grid-cols-3">
         <Kpi
           label="Salió a producción"
           value={formatQuantity(report.summary.totalConsumed)}
@@ -25,23 +24,11 @@ export async function WarehouseReportSections({ days }: { days: number }) {
           hint="En el periodo"
         />
         <Kpi
-          label="Producciones activas"
-          value={String(report.summary.activeRuns)}
-          hint="Ahora mismo"
-        />
-        <Kpi
           label="Rollos en bodega"
           value={String(report.summary.lotsInWarehouse)}
           hint="Ocupando lugar"
         />
       </section>
-
-      <Block
-        title="Producciones del periodo"
-        subtitle="Cuánto material se llevó cada una"
-      >
-        <ProductionRanking rows={report.ranking} />
-      </Block>
 
       <Block
         title="Consumo por cliente"

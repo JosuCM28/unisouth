@@ -90,7 +90,6 @@ export default async function PlantOrderPage({ params }: PageProps) {
     id: order.id,
     clientId: order.clientId,
     materialId: order.materialId,
-    productionRunId: order.productionRunId,
     folderId: order.folderId,
     description: order.description,
     reference: order.reference,
@@ -161,7 +160,6 @@ export default async function PlantOrderPage({ params }: PageProps) {
           order={editable}
           clients={options.clients}
           materials={options.materials}
-          productionRuns={options.productionRuns}
           sizes={options.sizes}
           tags={options.tags}
           folders={[]}

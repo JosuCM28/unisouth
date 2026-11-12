@@ -203,7 +203,6 @@ export class GarmentShipmentService extends BaseService {
         reference: string | null;
         clientPo: string | null;
         clientId: string | null;
-        productionRunId: string | null;
         materialId: string | null;
         description: string | null;
         cutFabricText: string | null;
@@ -237,7 +236,6 @@ export class GarmentShipmentService extends BaseService {
       type: "ISSUE",
       date: input.sentAt,
       clientId: order.clientId ?? undefined,
-      productionRunId: order.productionRunId ?? undefined,
       /* A propósito SIN la liga a la orden, aunque este vale sea suyo: el
          envío ya la trae por su propio camino (`GarmentShipment.orderId`) y
          la ficha lo pinta en "En talleres". Ligarlo también por aquí haría

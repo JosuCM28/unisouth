@@ -14,7 +14,6 @@ import type {
   MeasurementSource,
   MovementDirection,
   MovementType,
-  ProductionRunStatus,
   PurchaseRequestStatus,
   Sensitivity,
   StandingRuleTopic,
@@ -343,22 +342,6 @@ export function unitSelectGroups(): {
 
   return { common, rest };
 }
-
-export const PRODUCTION_RUN_STATUS_LABELS: Record<ProductionRunStatus, string> = {
-  PLANNED: "Planeada",
-  ACTIVE: "Activa",
-  PAUSED: "Pausada",
-  CLOSED: "Cerrada",
-  CANCELLED: "Cancelada",
-};
-
-export const PRODUCTION_RUN_STATUS_STYLES: Record<ProductionRunStatus, string> = {
-  PLANNED: "bg-muted text-muted-foreground border border-border",
-  ACTIVE: "bg-state-available text-state-available-foreground",
-  PAUSED: "bg-state-reserved text-state-reserved-foreground",
-  CLOSED: "bg-muted text-muted-foreground border border-border",
-  CANCELLED: "bg-state-defective text-state-defective-foreground",
-};
 
 export const PURCHASE_STATUS_LABELS: Record<PurchaseRequestStatus, string> = {
   DRAFT: "Borrador",

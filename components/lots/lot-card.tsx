@@ -75,12 +75,6 @@ export function LotCard({ lot }: { lot: LotCardData }) {
         )}
         {lot.shade && <Chip icon={Palette} label={lot.shade} tabular />}
         {lot.client && <Chip icon={User} label={lot.client.name} />}
-
-        {!lot.verified && (
-          <span className="rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
-            Sin medir
-          </span>
-        )}
       </div>
 
       {/* Llegada y procedencia. Van abajo y en una línea aparte: no sirven

@@ -6,10 +6,9 @@ import { cuidSchema } from "@/lib/validations/common";
 import { bomSchema } from "@/lib/validations/bom.schema";
 import { BomService } from "@/lib/services/bom.service";
 
-const REVALIDATE = ["/boms", "/products", "/calculations"];
+const REVALIDATE = ["/products", "/calculations", "/issues"];
 
 const updateBomSchema = z.object({ id: cuidSchema, data: bomSchema });
-const activateBomSchema = z.object({ id: cuidSchema });
 
 export async function createBomAction(input: unknown) {
   return executeAction(input, {
@@ -27,13 +26,5 @@ export async function updateBomAction(input: unknown) {
   return executeAction(input, {
     schema: updateBomSchema, permission: "bom:write", revalidate: REVALIDATE,
     handler: ({ input, auditContext }) => new BomService(auditContext).update(input.id, input.data),
-  });
-}
-
-export async function activateBomAction(input: unknown) {
-  return executeAction(input, {
-    schema: activateBomSchema, permission: "bom:write", revalidate: REVALIDATE,
-    successMessage: "Ficha activada",
-    handler: ({ input, auditContext }) => new BomService(auditContext).activate(input.id),
   });
 }

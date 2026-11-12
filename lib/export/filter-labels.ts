@@ -29,7 +29,6 @@ export function describeLotFilters(params: LotSearchParams): string[] {
   }
 
   if (params.onlyRemnants === "true") parts.push("sólo retazos");
-  if (params.onlyUnverified === "true") parts.push("sólo sin medir");
   if (params.includeCancelled === "true") parts.push("incluye cancelados");
 
   if (params.arrivedWithin) {

@@ -93,7 +93,6 @@ export default async function LotDetailPage({ params }: PageProps) {
           )}
           {lot.shade && <Chip label={`Tono ${lot.shade}`} />}
           {lot.client && <Chip label={lot.client.name} />}
-          {!lot.verified && <Chip label="Sin medir" />}
         </div>
 
         {/* Un rollo cancelado se anuncia arriba y con el motivo: es lo primero

@@ -161,15 +161,15 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ),
 
   /* Es quien MUEVE EL MATERIAL, y nada más: recibe, acomoda, surte y
-     documenta. Su menú son trece destinos —Tablero, Inventario, Escanear,
+     documenta. Su menú son doce destinos —Tablero, Inventario, Escanear,
      Tareas, Materiales, Prendas, Ubicaciones, Clientes, Proveedores,
-     Recepciones, Salidas, Órdenes y Documentos— y dentro de ellos puede todo:
+     Recepciones, Salidas y Órdenes— y dentro de ellos puede todo:
      dar de alta rollos, cortar, recontar, ajustar y mantener los catálogos
      que se eligen al capturar.
 
      Lo que NO tiene y por qué:
      · `production:browse/write` — no decide cómo se hace la prenda. Fichas
-                        técnicas, tallas, folios, talleres, corridas, reglas y
+                        técnicas, tallas, folios, talleres, reglas y
                         bodegas son del lado de producción.
      · `reporting:read` — el kárdex global y los reportes son supervisión. El
                         historial del rollo que tiene en la mano lo sigue

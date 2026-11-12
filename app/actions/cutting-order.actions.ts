@@ -226,7 +226,7 @@ export async function sendOrderToIssueAction(input: unknown) {
   return executeAction(input, {
     schema: sendToIssueSchema,
     permission: "inventory:write",
-    revalidate: [...REVALIDATE, "/issues", "/documents"],
+    revalidate: [...REVALIDATE, "/issues"],
     handler: ({ input, auditContext }) =>
       new CuttingOrderService(auditContext).sendToIssue(input.id, input.batchId),
   });

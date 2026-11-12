@@ -24,7 +24,6 @@ import { contrastText, formatQuantity } from "@/lib/utils";
 export const VOUCHER_SHEET_INCLUDE = {
   createdBy: { select: { name: true } },
   cancelledBy: { select: { name: true } },
-  productionRun: { select: { code: true, name: true } },
   // La empresa dueña se lee del vale, no de los rollos: una salida de puros
   // cortes no lleva rollos de los que deducirla.
   client: { select: { name: true } },
@@ -233,11 +232,8 @@ function headerOf(document: VoucherDocument, hasCuts: boolean): VoucherField[] {
 
 /** El pie: contexto administrativo, no lo que se coteja con el bulto. */
 function footerOf(document: VoucherDocument): VoucherField[] {
-  const run = document.productionRun;
-
   return fields([
     ["Concepto", document.concept],
-    ["Producción", run ? `${run.code} · ${run.name}` : null],
     ["Elaboró", document.createdBy?.name],
   ]);
 }

@@ -17,7 +17,6 @@ const MOVEMENT_INCLUDE = {
   lot: { select: { id: true, code: true, shade: true } },
   material: { select: { id: true, code: true, name: true } },
   document: { select: { id: true, code: true } },
-  productionRun: { select: { id: true, code: true } },
   fromLocation: { select: { code: true } },
   toLocation: { select: { code: true } },
 } as const;
@@ -27,7 +26,6 @@ export interface MovementFilters extends PaginationInput {
   type?: MovementType;
   materialId?: string;
   lotId?: string;
-  productionRunId?: string;
   from?: Date;
   to?: Date;
   /** Busca por folio de movimiento, de rollo o por motivo. */
@@ -38,7 +36,6 @@ export interface MovementWithRelations extends Movement {
   lot: { id: string; code: string; shade: string | null };
   material: { id: string; code: string; name: string };
   document: { id: string; code: string } | null;
-  productionRun: { id: string; code: string } | null;
   fromLocation: { code: string } | null;
   toLocation: { code: string } | null;
 }
@@ -108,9 +105,6 @@ export class MovementRepository extends BaseRepository<
     if (filters.type) where.type = filters.type;
     if (filters.materialId) where.materialId = filters.materialId;
     if (filters.lotId) where.lotId = filters.lotId;
-    if (filters.productionRunId) {
-      where.productionRunId = filters.productionRunId;
-    }
 
     if (filters.from || filters.to) {
       where.createdAt = {

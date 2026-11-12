@@ -156,7 +156,6 @@ export async function explodeForIssueAction(input: unknown) {
         // El cálculo queda guardado como simulación con nombre propio: deja
         // el rastro de con qué números se armó esta salida.
         name: "Explosión para salida",
-        productionRunId: undefined,
         notes: undefined,
         clientId: input.clientId,
         // La merma ya viene dentro de la ficha técnica, línea por línea.

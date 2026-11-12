@@ -18,7 +18,7 @@ const REVALIDATE = ["/orders", "/dashboard"];
    salidas y documentos. Sin revalidarlas, el auxiliar entra al registro justo
    después y ve la lista de antes: el vale existe en la base pero no se ve, y
    parece que el botón no hizo nada. */
-const SEND_REVALIDATE = [...REVALIDATE, "/issues", "/documents"];
+const SEND_REVALIDATE = [...REVALIDATE, "/issues"];
 
 const idSchema = z.object({ id: cuidSchema });
 const updateSchema = z.object({ id: cuidSchema, data: orderFolderSchema });
