@@ -20,6 +20,22 @@ const closingMeters = optionalNumber.refine(
   "No pueden ser metros negativos",
 );
 
+/**
+ * Una parte de la talla: cuántas piezas son de un PO del cliente.
+ *
+ * El PO es opcional a propósito: la cantidad se sabe antes de que llegue el
+ * papel del PO, y si se exigiera, el auxiliar inventaría uno o dejaría la
+ * cantidad fuera. Sin PO la parte se guarda igual y el packing list la junta
+ * en "SIN PO" hasta que alguien lo complete.
+ */
+export const cuttingOrderLinePoSchema = z.object({
+  clientPo: optionalText,
+  quantity: z.coerce
+    .number({ message: "Escribe cuántas piezas" })
+    .int("Las piezas se cuentan enteras")
+    .positive("Deben ser más de cero"),
+});
+
 /** Un renglón: una talla y cuántas piezas pidieron de ella. */
 export const cuttingOrderLineSchema = z.object({
   /* Sólo viene en un renglón que YA existe en la base. Ahora que una talla se
@@ -35,8 +51,23 @@ export const cuttingOrderLineSchema = z.object({
   tagId: optionalCuid,
   /** El PO del cliente al que pertenece esta talla. Se puede repetir. */
   clientPo: optionalText,
+  /* El reparto de la talla entre los PO. Vacío equivale a una sola parte con
+     la cantidad completa y el `clientPo` de arriba: así una captura que no
+     sabe del desglose (la de antes, la sin conexión) sigue siendo válida. */
+  poSplits: z.array(cuttingOrderLinePoSchema).optional().default([]),
   notes: optionalText,
-});
+}).refine(
+  /* La cantidad pedida y el desglose no pueden contradecirse: si lo hicieran,
+     el packing list y el avance de corte medirían contra números distintos. */
+  (line) =>
+    line.poSplits.length === 0 ||
+    line.poSplits.reduce((sum, split) => sum + split.quantity, 0) ===
+      line.orderedQuantity,
+  {
+    message: "La suma de los PO no cuadra con la cantidad pedida",
+    path: ["poSplits"],
+  },
+);
 
 export const cuttingOrderSchema = z.object({
   clientId: optionalCuid,

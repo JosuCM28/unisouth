@@ -14,12 +14,13 @@ import {
   type CutSourceLine,
 } from "@/lib/cut-lines";
 import { cutBatchLabel } from "@/lib/constants/labels";
-import { mergeClientPos } from "@/lib/orders/client-po";
+import { lineSplits, mergeClientPos } from "@/lib/orders/client-po";
 import type {
   AdoptPlantOrderInput,
   BatchProgressInput,
   CuttingBatchInput,
   CuttingOrderInput,
+  CuttingOrderLineInput,
   CuttingProgressInput,
   OrderCommentInput,
   PlantOrderInput,
@@ -77,7 +78,27 @@ function statusFromProgress(cut: number, pending: number) {
  * talla.
  */
 function orderClientPo(input: CuttingOrderInput): string | undefined {
-  return mergeClientPos(input.lines.map((line) => line.clientPo)) ?? input.clientPo;
+  return mergeClientPos(input.lines.map(lineClientPo)) ?? input.clientPo;
+}
+
+/**
+ * El PO que se guarda en la talla: la lista de los de su desglose.
+ *
+ * Se arma aquí y no se toma del formulario por la misma razón que el de la
+ * orden: si la talla y sus partes dijeran PO distintos, nadie sabría cuál
+ * creer el día del packing list.
+ */
+function lineClientPo(line: CuttingOrderLineInput): string | undefined {
+  return mergeClientPos(lineSplits(line).map((split) => split.clientPo));
+}
+
+/** Las partes de la talla listas para el `create` anidado de Prisma. */
+function splitRows(line: CuttingOrderLineInput) {
+  return lineSplits(line).map((split, index) => ({
+    clientPo: split.clientPo,
+    quantity: split.quantity,
+    position: index,
+  }));
 }
 
 /**
@@ -162,9 +183,10 @@ export class CuttingOrderService extends BaseService {
               sizeId: line.sizeId,
               orderedQuantity: line.orderedQuantity,
               tagId: line.tagId,
-              clientPo: line.clientPo,
+              clientPo: lineClientPo(line),
               notes: line.notes,
               position: index,
+              poSplits: { create: splitRows(line) },
             })),
           },
         },
@@ -394,9 +416,13 @@ export class CuttingOrderService extends BaseService {
               orderedQuantity: line.orderedQuantity,
               // Mismo `?? null` que el encabezado: quitar el folio debe quitarlo.
               tagId: line.tagId ?? null,
-              clientPo: line.clientPo ?? null,
+              clientPo: lineClientPo(line) ?? null,
               notes: line.notes ?? null,
               position: index,
+              /* El desglose se reemplaza entero: no tiene historial propio
+                 (el avance cuelga de la talla, no del PO), así que no hay
+                 nada que conservar fila por fila. */
+              poSplits: { deleteMany: {}, create: splitRows(line) },
             },
           });
           continue;
@@ -408,9 +434,10 @@ export class CuttingOrderService extends BaseService {
             sizeId: line.sizeId,
             orderedQuantity: line.orderedQuantity,
             tagId: line.tagId,
-            clientPo: line.clientPo,
+            clientPo: lineClientPo(line),
             notes: line.notes,
             position: index,
+            poSplits: { create: splitRows(line) },
           },
         });
       }

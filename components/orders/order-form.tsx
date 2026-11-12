@@ -32,6 +32,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { mergeClientPos } from "@/lib/orders/client-po";
+import {
+  emptySplit,
+  splitsTotal,
+  type PoSplitDraft,
+} from "@/lib/orders/po-split-drafts";
+import { LinePoSplits } from "./line-po-splits";
 
 export interface OrderOption {
   id: string;
@@ -60,10 +66,11 @@ interface LineDraft {
      de los dos" al guardar una corrección. */
   id?: string;
   sizeId: string;
-  orderedQuantity: string;
   tagId: string;
-  /** El PO del cliente al que pertenece esta talla. Se puede repetir. */
-  clientPo: string;
+  /* Cuántas piezas de la talla son de cada PO; siempre al menos una parte.
+     La cantidad pedida NO se guarda aparte: es la suma de las partes, y dos
+     números que deben cuadrar acaban, tarde o temprano, sin cuadrar. */
+  splits: PoSplitDraft[];
   notes: string;
   /** Ya tiene avance capturado: no se puede quitar sin perder su historial. */
   locked?: boolean;
@@ -181,7 +188,9 @@ export function OrderForm({
   /* El PO del encabezado sale de las tallas en cuanto alguna trae el suyo;
      si ninguna lo trae, se sigue capturando a mano. El servidor vuelve a
      armarlo al guardar: esto es sólo para que se vea mientras se captura. */
-  const linesClientPo = mergeClientPos(lines.map((line) => line.clientPo));
+  const linesClientPo = mergeClientPos(
+    lines.flatMap((line) => line.splits.map((split) => split.clientPo)),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* Foto de la orden tal como se abrió, para no preguntar por nada al
@@ -210,9 +219,8 @@ export function OrderForm({
       {
         key: crypto.randomUUID(),
         sizeId: "",
-        orderedQuantity: "",
         tagId: "",
-        clientPo: "",
+        splits: [emptySplit()],
         notes: "",
       },
     ]);
@@ -249,10 +257,7 @@ export function OrderForm({
     keywords: size.group ?? undefined,
   }));
 
-  const total = lines.reduce(
-    (sum, line) => sum + (Number(line.orderedQuantity) || 0),
-    0,
-  );
+  const total = lines.reduce((sum, line) => sum + splitsTotal(line.splits), 0);
 
   /* Trabajo que se perdería al salir. Se compara contra lo que se cargó para
      que abrir una orden y cerrarla sin tocarla no dispare la pregunta. La
@@ -277,11 +282,18 @@ export function OrderForm({
 
   async function handleSubmit() {
     const valid = lines.filter(
-      (line) => line.sizeId && Number(line.orderedQuantity) > 0,
+      (line) => line.sizeId && splitsTotal(line.splits) > 0,
     );
 
     if (valid.length === 0) {
       toast.error("Agrega al menos una talla con cantidad.");
+      return;
+    }
+
+    /* Un PO escrito sin piezas no se puede tirar en silencio como una fila
+       vacía: alguien lo tecleó, y perderlo sería perder a qué PO va algo. */
+    if (valid.some((line) => line.splits.some(isPoWithoutQuantity))) {
+      toast.error("Hay un PO sin piezas. Escribe cuántas son o quítalo.");
       return;
     }
 
@@ -310,9 +322,15 @@ export function OrderForm({
       lines: valid.map((line) => ({
         id: line.id,
         sizeId: line.sizeId,
-        orderedQuantity: Number(line.orderedQuantity),
+        orderedQuantity: splitsTotal(line.splits),
         tagId: line.tagId || undefined,
-        clientPo: line.clientPo || undefined,
+        // Las partes en blanco (sin PO ni piezas) no son nada: se descartan.
+        poSplits: line.splits
+          .filter((split) => Number(split.quantity) > 0)
+          .map((split) => ({
+            clientPo: split.clientPo || undefined,
+            quantity: Number(split.quantity),
+          })),
         notes: line.notes || undefined,
       })),
     };
@@ -490,15 +508,9 @@ export function OrderForm({
                   <span className="text-xs text-muted-foreground">
                     Cantidad pedida
                   </span>
-                  <Input
-                    inputMode="numeric"
-                    value={line.orderedQuantity}
-                    onChange={(event) =>
-                      updateLine(line.key, {
-                        orderedQuantity: event.target.value,
-                      })
-                    }
-                    className="tabular touch-target text-right"
+                  <LineQuantityInput
+                    splits={line.splits}
+                    onChange={(splits) => updateLine(line.key, { splits })}
                   />
                 </label>
 
@@ -536,17 +548,10 @@ export function OrderForm({
 
               {/* También en modo planta: el packing list se arma por PO sin
                   importar en qué planta nació la orden. */}
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">PO CLIENTE</span>
-                <Input
-                  value={line.clientPo}
-                  onChange={(event) =>
-                    updateLine(line.key, { clientPo: event.target.value })
-                  }
-                  placeholder="Opcional"
-                  className="tabular touch-target uppercase"
-                />
-              </label>
+              <LinePoSplits
+                splits={line.splits}
+                onChange={(splits) => updateLine(line.key, { splits })}
+              />
 
               <Input
                 value={line.notes}
@@ -719,6 +724,49 @@ function submit({
   return createCuttingOrderAction(payload);
 }
 
+/** Una parte con PO escrito pero sin piezas: no se puede guardar. */
+function isPoWithoutQuantity(split: PoSplitDraft): boolean {
+  return split.clientPo.trim() !== "" && !(Number(split.quantity) > 0);
+}
+
+/**
+ * La cantidad pedida de la talla.
+ *
+ * Con una sola parte se teclea aquí, como siempre, y se escribe en esa parte.
+ * Repartida en varios PO se vuelve de sólo lectura y enseña la suma: el
+ * número se corrige en el PO que está mal, no aquí, para que nunca dejen de
+ * cuadrar.
+ */
+function LineQuantityInput({
+  splits,
+  onChange,
+}: {
+  splits: PoSplitDraft[];
+  onChange: (splits: PoSplitDraft[]) => void;
+}) {
+  if (splits.length > 1) {
+    return (
+      <Input
+        value={splitsTotal(splits)}
+        readOnly
+        className="tabular touch-target bg-muted text-right"
+      />
+    );
+  }
+
+  const [only] = splits;
+  return (
+    <Input
+      inputMode="numeric"
+      value={only?.quantity ?? ""}
+      onChange={(event) =>
+        onChange([{ ...(only ?? emptySplit()), quantity: event.target.value }])
+      }
+      className="tabular touch-target text-right"
+    />
+  );
+}
+
 /**
  * Foto comparable de la orden.
  *
@@ -745,7 +793,7 @@ function snapshot(state: {
     ...state,
     lines: state.lines.map((line) => [
       line.sizeId,
-      line.orderedQuantity,
+      line.splits.map((split) => [split.clientPo, split.quantity]),
       line.tagId,
       line.notes,
     ]),

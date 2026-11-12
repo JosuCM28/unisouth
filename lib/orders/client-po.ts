@@ -30,3 +30,30 @@ export function mergeClientPos(
   if (seen.size === 0) return undefined;
   return [...seen].join(", ");
 }
+
+/** Una parte de la talla tal como se guarda: PO (o ninguno) y piezas. */
+export interface LinePoSplit {
+  clientPo: string | undefined;
+  quantity: number;
+}
+
+/**
+ * Las partes de una talla, siempre al menos una.
+ *
+ * Si la captura no trae desglose, la talla entera es UNA parte con su PO de
+ * siempre. Así toda talla guardada tiene desglose y el packing list nunca
+ * tiene que preguntar "¿y ésta de dónde saco la cantidad?".
+ */
+export function lineSplits(line: {
+  orderedQuantity: number;
+  clientPo?: string;
+  poSplits: { clientPo?: string; quantity: number }[];
+}): LinePoSplit[] {
+  if (line.poSplits.length === 0) {
+    return [{ clientPo: line.clientPo, quantity: line.orderedQuantity }];
+  }
+  return line.poSplits.map((split) => ({
+    clientPo: split.clientPo,
+    quantity: split.quantity,
+  }));
+}

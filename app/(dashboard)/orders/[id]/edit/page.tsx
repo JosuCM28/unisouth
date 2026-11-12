@@ -1,3 +1,4 @@
+import { splitDraftsFromLine } from "@/lib/orders/po-split-drafts";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -25,7 +26,10 @@ export default async function EditOrderPage({ params }: PageProps) {
     include: {
       lines: {
         orderBy: { position: "asc" },
-        include: { _count: { select: { progress: true } } },
+        include: {
+          _count: { select: { progress: true } },
+          poSplits: { orderBy: { position: "asc" } },
+        },
       },
     },
   });
@@ -65,9 +69,8 @@ export default async function EditOrderPage({ params }: PageProps) {
       key: line.id,
       id: line.id,
       sizeId: line.sizeId,
-      orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
-      clientPo: line.clientPo ?? "",
+      splits: splitDraftsFromLine(line),
       notes: line.notes ?? "",
       // Con avance capturado no se puede quitar ni cambiar de talla: se
       // perdería el historial de lo ya cortado.

@@ -1860,10 +1860,31 @@ model CuttingOrderLine {
   position Int     @default(0)
 
   progress CuttingProgress[]
+  poSplits CuttingOrderLinePo[]
 
   @@index([orderId])
   @@index([sizeId])
   @@map("cutting_order_lines")
+}
+
+/// How one size's ordered pieces split across the client's purchase orders.
+///
+/// The sum of `quantity` is the line's `orderedQuantity`, and only
+/// CuttingOrderService writes these rows. A row without `clientPo` is normal:
+/// the quantity is known before the PO arrives, and the packing list groups
+/// those under "SIN PO" until someone fills it in.
+model CuttingOrderLinePo {
+  id     String           @id @default(cuid())
+  lineId String
+  line   CuttingOrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  clientPo String?
+  quantity Int
+  position Int     @default(0)
+
+  @@index([lineId])
+  @@index([clientPo])
+  @@map("cutting_order_line_pos")
 }
 
 /// LOG of what came off the cutting table, one row per bundle.

@@ -1,3 +1,4 @@
+import { splitDraftsFromLine } from "@/lib/orders/po-split-drafts";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -52,7 +53,10 @@ export default async function PlantOrderPage({ params }: PageProps) {
         folder: { select: { name: true } },
         lines: {
           orderBy: { position: "asc" },
-          include: { _count: { select: { progress: true } } },
+          include: {
+            _count: { select: { progress: true } },
+            poSplits: { orderBy: { position: "asc" } },
+          },
         },
       },
     }),
@@ -112,9 +116,8 @@ export default async function PlantOrderPage({ params }: PageProps) {
       key: line.id,
       id: line.id,
       sizeId: line.sizeId,
-      orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
-      clientPo: line.clientPo ?? "",
+      splits: splitDraftsFromLine(line),
       notes: line.notes ?? "",
       // Con avance capturado la talla no se quita: se perdería su historial.
       locked: line._count.progress > 0,

@@ -1,3 +1,4 @@
+import { splitDraftsFromLine } from "@/lib/orders/po-split-drafts";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Copy } from "lucide-react";
@@ -116,7 +117,12 @@ export default async function NewOrderPage({ searchParams }: PageProps) {
 async function loadTemplate(id: string) {
   const order = await prisma.cuttingOrder.findUnique({
     where: { id },
-    include: { lines: { orderBy: { position: "asc" } } },
+    include: {
+      lines: {
+        orderBy: { position: "asc" },
+        include: { poSplits: { orderBy: { position: "asc" } } },
+      },
+    },
   });
 
   if (!order) return null;
@@ -158,9 +164,8 @@ async function loadTemplate(id: string) {
          Tampoco viaja `locked`: la orden nueva no tiene avance que proteger. */
       key: crypto.randomUUID(),
       sizeId: line.sizeId,
-      orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
-      clientPo: line.clientPo ?? "",
+      splits: splitDraftsFromLine(line),
       notes: line.notes ?? "",
     })),
   };
