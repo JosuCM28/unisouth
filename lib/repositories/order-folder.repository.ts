@@ -270,8 +270,6 @@ export class OrderFolderRepository extends BaseRepository<
            vale es cómo terminan diciendo cosas distintas. */
         cutFabricText: true,
         cutPattern: true,
-        cutVersion: true,
-        cutVersionNotes: true,
         cutNotes: true,
         lines: {
           orderBy: { position: "asc" },

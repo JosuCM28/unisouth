@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { mergeClientPos } from "@/lib/orders/client-po";
 
 export interface OrderOption {
   id: string;
@@ -61,6 +62,8 @@ interface LineDraft {
   sizeId: string;
   orderedQuantity: string;
   tagId: string;
+  /** El PO del cliente al que pertenece esta talla. Se puede repetir. */
+  clientPo: string;
   notes: string;
   /** Ya tiene avance capturado: no se puede quitar sin perder su historial. */
   locked?: boolean;
@@ -85,7 +88,6 @@ export interface EditableOrder {
 
 interface Props {
   clients: OrderOption[];
-  materials: OrderOption[];
   sizes: SizeOption[];
   tags: TagOption[];
   folders: OrderOption[];
@@ -130,7 +132,6 @@ interface Props {
  */
 export function OrderForm({
   clients,
-  materials,
   sizes,
   tags,
   folders,
@@ -152,7 +153,11 @@ export function OrderForm({
   const [folderId, setFolderId] = useState(
     order?.folderId ?? defaults?.folderId ?? "",
   );
-  const [materialId, setMaterialId] = useState(order?.materialId ?? "");
+  /* El material del catálogo ya no se captura: el formulario usa la tela
+     escrita a mano. Se conserva y se reenvía tal cual porque editar manda
+     todos los campos y uno vacío se BORRA; sin esto, corregir cualquier dato
+     de una orden vieja le quitaba su material. */
+  const [materialId] = useState(order?.materialId ?? "");
   const [description, setDescription] = useState(order?.description ?? "");
   const [reference, setReference] = useState(order?.reference ?? "");
   const [clientPo, setClientPo] = useState(order?.clientPo ?? "");
@@ -173,6 +178,10 @@ export function OrderForm({
     order?.cutClosing ?? EMPTY_ORDER_CUT_CLOSING,
   );
   const [lines, setLines] = useState<LineDraft[]>(order?.lines ?? []);
+  /* El PO del encabezado sale de las tallas en cuanto alguna trae el suyo;
+     si ninguna lo trae, se sigue capturando a mano. El servidor vuelve a
+     armarlo al guardar: esto es sólo para que se vea mientras se captura. */
+  const linesClientPo = mergeClientPos(lines.map((line) => line.clientPo));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* Foto de la orden tal como se abrió, para no preguntar por nada al
@@ -203,6 +212,7 @@ export function OrderForm({
         sizeId: "",
         orderedQuantity: "",
         tagId: "",
+        clientPo: "",
         notes: "",
       },
     ]);
@@ -289,8 +299,6 @@ export function OrderForm({
       notes: notes || undefined,
       cutFabricText: cutHeader.cutFabricText || undefined,
       cutPattern: cutHeader.cutPattern || undefined,
-      cutVersion: cutHeader.cutVersion || undefined,
-      cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
       clientPo: clientPo || undefined,
       /* Van como texto: Zod los convierte. Mandar `Number("")` desde aquí
@@ -304,6 +312,7 @@ export function OrderForm({
         sizeId: line.sizeId,
         orderedQuantity: Number(line.orderedQuantity),
         tagId: line.tagId || undefined,
+        clientPo: line.clientPo || undefined,
         notes: line.notes || undefined,
       })),
     };
@@ -391,22 +400,20 @@ export function OrderForm({
           />
         </FormSelectField>
 
-        <FormSelectField id="order-material" label="Material">
-          <SearchSelect
-            id="order-material"
-            options={materials.map((material) => ({
-              value: material.id,
-              label: material.name,
-              hint: material.hint,
-              keywords: material.hint,
-            }))}
-            value={materialId}
-            onChange={setMaterialId}
-            placeholder="Sin material"
-            searchPlaceholder="Buscar material…"
-            clearLabel="Sin material"
+        {/* Escrito a mano y no del catálogo: el pedido no puede esperar a que
+            alguien dé de alta la tela, y así se captura en casi todas. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="order-fabric-text">Material</Label>
+          <Input
+            id="order-fabric-text"
+            placeholder="Gabardina azul marino"
+            value={cutHeader.cutFabricText}
+            onChange={(event) =>
+              setCutHeader({ ...cutHeader, cutFabricText: event.target.value })
+            }
+            className="touch-target"
           />
-        </FormSelectField>
+        </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="order-description">Descripción</Label>
@@ -415,6 +422,19 @@ export function OrderForm({
             placeholder="Blusa manga larga"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
+            className="touch-target"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="order-cut-pattern">Molde</Label>
+          <Input
+            id="order-cut-pattern"
+            placeholder="Opcional"
+            value={cutHeader.cutPattern}
+            onChange={(event) =>
+              setCutHeader({ ...cutHeader, cutPattern: event.target.value })
+            }
             className="touch-target"
           />
         </div>
@@ -514,6 +534,20 @@ export function OrderForm({
                 </div>
               </div>
 
+              {/* También en modo planta: el packing list se arma por PO sin
+                  importar en qué planta nació la orden. */}
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">PO CLIENTE</span>
+                <Input
+                  value={line.clientPo}
+                  onChange={(event) =>
+                    updateLine(line.key, { clientPo: event.target.value })
+                  }
+                  placeholder="Opcional"
+                  className="tabular touch-target uppercase"
+                />
+              </label>
+
               <Input
                 value={line.notes}
                 onChange={(event) =>
@@ -537,13 +571,12 @@ export function OrderForm({
         </Button>
       </div>
 
-      {/* El encabezado del corte va DESPUÉS de las tallas y plegado: no es
-          obligatorio para dar de alta la orden, pero es lo que evita
-          recapturarlo todo cuando la orden se manda a salidas. */}
+      {/* Las notas van DESPUÉS de las tallas y plegadas: no hacen falta para
+          dar de alta la orden, pero viajan al vale y evitan recapturarlas. */}
       <div className="flat-surface p-4">
         <FormSection
-          title="Encabezado del corte"
-          description="Molde, versión y notas del taller. Viajan al vale cuando mandes esta orden a salidas."
+          title="Notas del corte"
+          description="Indicaciones para el taller. Viajan al vale cuando mandes esta orden a salidas."
         >
           <OrderCutHeader value={cutHeader} onChange={setCutHeader} />
         </FormSection>
@@ -579,21 +612,22 @@ export function OrderForm({
               />
             </div>
 
-            {/* El PO no se pinta en modo planta, igual que el cierre: es el
-                papel con el que el cliente le da seguimiento al pedido de la
-                casa, y allá abajo no lo tienen. */}
-            {!isPlant && (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="order-client-po">PO CLIENTE</Label>
-                <Input
-                  id="order-client-po"
-                  placeholder="Opcional"
-                  value={clientPo}
-                  onChange={(event) => setClientPo(event.target.value)}
-                  className="touch-target"
-                />
-              </div>
-            )}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="order-client-po">PO CLIENTE</Label>
+              <Input
+                id="order-client-po"
+                placeholder="Opcional"
+                value={linesClientPo ?? clientPo}
+                onChange={(event) => setClientPo(event.target.value)}
+                readOnly={Boolean(linesClientPo)}
+                className="touch-target read-only:bg-muted"
+              />
+              {linesClientPo && (
+                <p className="text-xs text-muted-foreground">
+                  Se arma con los PO de las tallas.
+                </p>
+              )}
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">

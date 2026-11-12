@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import {
-  CUT_TAG_COLORS, CUT_TAG_LABELS, CUT_VERSION_LABELS,
+  CUT_TAG_COLORS, CUT_TAG_LABELS,
   DOCUMENT_STATUS_LABELS, DOCUMENT_STATUS_STYLES,
   DOCUMENT_TYPE_LABELS, UNIT_SHORT_LABELS,
 } from "@/lib/constants/labels";
@@ -164,18 +164,6 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               value={document.cutFabric?.name ?? document.cutFabricText}
             />
             <HeaderItem label="Molde" value={document.cutPattern} />
-            <HeaderItem
-              label="Versión"
-              value={
-                document.cutVersion
-                  ? CUT_VERSION_LABELS[document.cutVersion]
-                  : null
-              }
-            />
-            <HeaderItem
-              label="De la versión"
-              value={document.cutVersionNotes}
-            />
           </dl>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">

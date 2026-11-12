@@ -93,8 +93,7 @@ export default async function PlantOrderPage({ params }: PageProps) {
     folderId: order.folderId,
     description: order.description,
     reference: order.reference,
-    // El PO no se pinta en esta variante; el servicio conserva el de la base.
-    clientPo: null,
+    clientPo: order.clientPo,
     orderedAt: toDateInputValue(order.orderedAt),
     dueDate: order.dueDate ? toDateInputValue(order.dueDate) : null,
     deliveryPlace: order.deliveryPlace,
@@ -102,8 +101,6 @@ export default async function PlantOrderPage({ params }: PageProps) {
     cutHeader: {
       cutFabricText: order.cutFabricText ?? "",
       cutPattern: order.cutPattern ?? "",
-      cutVersion: order.cutVersion ?? "",
-      cutVersionNotes: order.cutVersionNotes ?? "",
       cutNotes: order.cutNotes,
     },
     /* El cierre viaja vacío porque esta variante no lo pinta. El servicio lo
@@ -117,6 +114,7 @@ export default async function PlantOrderPage({ params }: PageProps) {
       sizeId: line.sizeId,
       orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
+      clientPo: line.clientPo ?? "",
       notes: line.notes ?? "",
       // Con avance capturado la talla no se quita: se perdería su historial.
       locked: line._count.progress > 0,
@@ -159,7 +157,6 @@ export default async function PlantOrderPage({ params }: PageProps) {
           variant="plant"
           order={editable}
           clients={options.clients}
-          materials={options.materials}
           sizes={options.sizes}
           tags={options.tags}
           folders={[]}

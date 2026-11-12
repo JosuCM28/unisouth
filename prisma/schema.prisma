@@ -1851,6 +1851,11 @@ model CuttingOrderLine {
   tagId  String?
   cutTag CutTagOption? @relation(fields: [tagId], references: [id])
 
+  /// The client's purchase order this size belongs to. Several sizes share
+  /// one, and the order's own `clientPo` is the distinct list of these. Kept
+  /// per size because the packing list is built per PO.
+  clientPo String?
+
   notes    String?
   position Int     @default(0)
 

@@ -2,7 +2,6 @@ import type { CutTag, DocumentType, Prisma } from "@prisma/client";
 import {
   CUT_TAG_COLORS,
   CUT_TAG_LABELS,
-  CUT_VERSION_LABELS,
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   UNIT_SHORT_LABELS,
@@ -210,7 +209,6 @@ function headerOf(document: VoucherDocument, hasCuts: boolean): VoucherField[] {
   const hasCutData = Boolean(
     document.cutDescription ||
       document.cutPattern ||
-      document.cutVersion ||
       fabric,
   );
   if (!hasCuts && !hasCutData) return [];
@@ -222,11 +220,6 @@ function headerOf(document: VoucherDocument, hasCuts: boolean): VoucherField[] {
     ["PO cliente", document.clientPo],
     ["Tela", fabric],
     ["Molde", document.cutPattern],
-    [
-      "Versión",
-      document.cutVersion ? CUT_VERSION_LABELS[document.cutVersion] : null,
-    ],
-    ["De la versión", document.cutVersionNotes],
   ]);
 }
 

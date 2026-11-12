@@ -232,8 +232,6 @@ export class DocumentService extends BaseService {
           cutFabricId: source.cutFabricId,
           cutFabricText: source.cutFabricText,
           cutPattern: source.cutPattern,
-          cutVersion: source.cutVersion,
-          cutVersionNotes: source.cutVersionNotes,
           cutNotes: source.cutNotes,
           createdById: this.context.userId,
           lines: {
@@ -535,8 +533,6 @@ function cutHeaderData(input: DocumentInput) {
     cutFabricId: input.cutFabricId,
     cutFabricText: input.cutFabricText,
     cutPattern: input.cutPattern,
-    cutVersion: input.cutVersion,
-    cutVersionNotes: input.cutVersionNotes,
     cutNotes: input.cutNotes ?? [],
   };
 }

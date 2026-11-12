@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { bundlePieces } from "@/lib/bundles";
 import {
-  CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
   cutBatchLabel,
 } from "@/lib/constants/labels";
@@ -132,8 +131,6 @@ function headerOf(order: SheetOrder): VoucherField[] {
     ["Capturó", order.createdBy?.name],
     ["Tela (a mano)", order.cutFabricText],
     ["Molde", order.cutPattern],
-    ["Versión", order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null],
-    ["Cambios de la versión", order.cutVersionNotes],
   ];
 
   return fields.flatMap(([label, value]) => (value ? [{ label, value }] : []));

@@ -18,7 +18,6 @@ import { roleHasPermission } from "@/lib/constants/roles";
 import { loadVoucherDeliveryOptions } from "@/lib/vouchers/voucher-delivery-options";
 import { sumBundlePieces } from "@/lib/bundles";
 import {
-  CUT_VERSION_LABELS,
   cutBatchLabel,
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
@@ -428,8 +427,6 @@ export default async function OrderDetailPage({
   const hasCutHeader = Boolean(
     order.cutFabricText ||
       order.cutPattern ||
-      order.cutVersion ||
-      order.cutVersionNotes ||
       order.cutNotes.length > 0,
   );
 
@@ -992,16 +989,6 @@ export default async function OrderDetailPage({
           <dl className="grid gap-x-8 sm:grid-cols-2">
             <Row label="Tela (a mano)" value={order.cutFabricText} />
             <Row label="Molde" value={order.cutPattern} />
-            <Row
-              label="Versión"
-              value={
-                order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null
-              }
-            />
-            <Row
-              label="Descripción de la versión"
-              value={order.cutVersionNotes}
-            />
           </dl>
 
           {order.cutNotes.length > 0 && (

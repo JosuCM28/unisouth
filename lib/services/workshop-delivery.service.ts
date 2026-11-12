@@ -1,6 +1,5 @@
 import type { Workshop } from "@prisma/client";
 import { sumBundlePieces } from "@/lib/bundles";
-import { CUT_VERSION_LABELS } from "@/lib/constants/labels";
 import type { WorkshopDeliveryState } from "@/lib/constants/workshop-access";
 import {
   BusinessRuleError,
@@ -96,8 +95,6 @@ export interface ActiveWorkshopDelivery {
     notes: string | null;
     fabric: string | null;
     pattern: string | null;
-    version: string | null;
-    versionNotes: string | null;
     cutNotes: string[];
   };
   cuts: DeliveryCut[];
@@ -617,8 +614,6 @@ function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail 
         ? `${row.cutFabric.code} · ${row.cutFabric.name}`
         : row.cutFabricText,
       pattern: row.cutPattern,
-      version: row.cutVersion ? CUT_VERSION_LABELS[row.cutVersion] : null,
-      versionNotes: row.cutVersionNotes,
       cutNotes: row.cutNotes,
     },
     cuts: row.cuttingOrder ? toCuts(row.cuttingOrder, row.cuttingBatchId) : [],
@@ -673,8 +668,6 @@ function toOrderView(
     notes: order.notes,
     fabric: fabricOf(order),
     pattern: order.cutPattern,
-    version: order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : null,
-    versionNotes: order.cutVersionNotes,
     cutNotes: order.cutNotes,
   };
 }

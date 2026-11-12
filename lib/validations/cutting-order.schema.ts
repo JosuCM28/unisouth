@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { CutVersion } from "@prisma/client";
 import {
   cuidSchema,
   localDate,
@@ -34,6 +33,8 @@ export const cuttingOrderLineSchema = z.object({
     .int("Las piezas se cuentan enteras")
     .positive("Deben ser más de cero"),
   tagId: optionalCuid,
+  /** El PO del cliente al que pertenece esta talla. Se puede repetir. */
+  clientPo: optionalText,
   notes: optionalText,
 });
 
@@ -58,11 +59,6 @@ export const cuttingOrderSchema = z.object({
      sólo van los campos que faltaban para no recapturarlos en la salida. */
   cutFabricText: optionalText,
   cutPattern: optionalText,
-  cutVersion: z
-    .union([z.nativeEnum(CutVersion), z.literal("")])
-    .optional()
-    .transform((value) => (value ? value : undefined)),
-  cutVersionNotes: optionalText,
   /* Los renglones vacíos se tiran aquí y no en el componente: una nota en
      blanco saldría impresa como "3." sin texto, y en el taller eso se lee
      como una instrucción que se borró. */
@@ -107,12 +103,12 @@ export type CuttingOrderLineInput = z.infer<typeof cuttingOrderLineSchema>;
  * El cierre del corte fuera: son los metros que se miden cuando SE LEVANTA LA
  * MESA, y la mesa está aquí. Allá no tienen cómo saberlos.
  *
- * El PO del cliente fuera: es el papel con el que el cliente le da
- * seguimiento al pedido de la casa, y allá abajo no lo tienen.
+ * El PO del cliente SÍ entra, por talla y en el encabezado: la otra planta
+ * también lo captura, porque el packing list se arma por PO sin importar en
+ * qué planta se dio de alta la orden.
  */
 export const plantOrderSchema = cuttingOrderSchema.omit({
   folderId: true,
-  clientPo: true,
   metersDelivered: true,
   metersSpread: true,
   smallRemnant: true,

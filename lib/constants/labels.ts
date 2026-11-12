@@ -2,7 +2,6 @@ import type {
   GarmentShipmentStatus,
   AuditAction,
   CutTag,
-  CutVersion,
   CutEditRequestStatus,
   CuttingOrderOrigin,
   CuttingOrderStatus,
@@ -432,22 +431,6 @@ export const CUT_EDIT_REQUEST_STATUS_STYLES: Record<
   APPROVED: "bg-state-available text-state-available-foreground",
   REJECTED: "bg-state-defective text-state-defective-foreground",
   USED: "bg-muted text-muted-foreground border border-border",
-};
-
-/**
- * La versión del molde con la que se corta.
- *
- * "Único" no es ausencia de versión: es la declaración de que ese molde no
- * tiene variantes, y en la hoja impresa se lee distinto a dejar el renglón en
- * blanco por olvido.
- */
-export const CUT_VERSION_LABELS: Record<CutVersion, string> = {
-  UNIQUE: "Único",
-  V1: "Versión 1",
-  V2: "Versión 2",
-  V3: "Versión 3",
-  V4: "Versión 4",
-  V5: "Versión 5",
 };
 
 /** Las tres columnas del tablero de tareas. */

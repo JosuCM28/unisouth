@@ -1,8 +1,6 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import type { CutVersion } from "@prisma/client";
-import { CUT_VERSION_LABELS } from "@/lib/constants/labels";
 import { FormSelectField } from "@/components/shared/form-field";
 import { SearchSelect } from "@/components/shared/search-select";
 import { Button } from "@/components/ui/button";
@@ -30,8 +28,6 @@ export interface CutHeaderDraft {
   cutFabricId: string;
   cutFabricText: string;
   cutPattern: string;
-  cutVersion: string;
-  cutVersionNotes: string;
   /** Notas del pie, en el orden en que se imprimen numeradas. */
   cutNotes: string[];
 }
@@ -42,14 +38,8 @@ export const EMPTY_CUT_HEADER: CutHeaderDraft = {
   cutFabricId: "",
   cutFabricText: "",
   cutPattern: "",
-  cutVersion: "",
-  cutVersionNotes: "",
   cutNotes: [],
 };
-
-const VERSION_OPTIONS = (Object.keys(CUT_VERSION_LABELS) as CutVersion[]).map(
-  (version) => ({ value: version, label: CUT_VERSION_LABELS[version] }),
-);
 
 interface Props {
   fabrics: CutFabricOption[];
@@ -140,38 +130,13 @@ export function IssueCutHeader({ fabrics, value, onChange }: Props) {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cut-pattern">Molde</Label>
-          <Input
-            id="cut-pattern"
-            placeholder="Opcional"
-            value={value.cutPattern}
-            onChange={(event) => patch({ cutPattern: event.target.value })}
-            className="touch-target"
-          />
-        </div>
-
-        <FormSelectField id="cut-version" label="Versión">
-          <SearchSelect
-            id="cut-version"
-            options={VERSION_OPTIONS}
-            value={value.cutVersion}
-            onChange={(version) => patch({ cutVersion: version })}
-            placeholder="Sin versión"
-            searchPlaceholder="Buscar versión…"
-            clearLabel="Sin versión"
-          />
-        </FormSelectField>
-      </div>
-
       <div className="flex flex-col gap-2">
-        <Label htmlFor="cut-version-notes">Descripción de la versión</Label>
+        <Label htmlFor="cut-pattern">Molde</Label>
         <Input
-          id="cut-version-notes"
-          placeholder="Qué cambia respecto a la anterior"
-          value={value.cutVersionNotes}
-          onChange={(event) => patch({ cutVersionNotes: event.target.value })}
+          id="cut-pattern"
+          placeholder="Opcional"
+          value={value.cutPattern}
+          onChange={(event) => patch({ cutPattern: event.target.value })}
           className="touch-target"
         />
       </div>

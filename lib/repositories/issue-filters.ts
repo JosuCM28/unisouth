@@ -161,7 +161,6 @@ function matchesTerm(term: string): Prisma.InventoryDocumentWhereInput[] {
     { cutDescription: contains },
     { cutFabricText: contains },
     { cutPattern: contains },
-    { cutVersionNotes: contains },
     { notes: contains },
     { handedOverBy: contains },
     { receivedBy: contains },

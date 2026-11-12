@@ -52,8 +52,6 @@ export default async function EditOrderPage({ params }: PageProps) {
     cutHeader: {
       cutFabricText: order.cutFabricText ?? "",
       cutPattern: order.cutPattern ?? "",
-      cutVersion: order.cutVersion ?? "",
-      cutVersionNotes: order.cutVersionNotes ?? "",
       cutNotes: order.cutNotes,
     },
     cutClosing: {
@@ -69,6 +67,7 @@ export default async function EditOrderPage({ params }: PageProps) {
       sizeId: line.sizeId,
       orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
+      clientPo: line.clientPo ?? "",
       notes: line.notes ?? "",
       // Con avance capturado no se puede quitar ni cambiar de talla: se
       // perdería el historial de lo ya cortado.
@@ -93,7 +92,6 @@ export default async function EditOrderPage({ params }: PageProps) {
 
       <OrderForm
         clients={options.clients}
-        materials={options.materials}
         sizes={options.sizes}
         tags={options.tags}
         folders={options.folders}

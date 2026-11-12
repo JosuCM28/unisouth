@@ -1,4 +1,4 @@
-import type { CutVersion, GarmentShipment } from "@prisma/client";
+import type { GarmentShipment } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
@@ -207,8 +207,6 @@ export class GarmentShipmentService extends BaseService {
         description: string | null;
         cutFabricText: string | null;
         cutPattern: string | null;
-        cutVersion: CutVersion | null;
-        cutVersionNotes: string | null;
         cutNotes: string[];
       };
       lines: {
@@ -281,8 +279,6 @@ export class GarmentShipmentService extends BaseService {
       cutFabricId: order.materialId ?? undefined,
       cutFabricText: order.cutFabricText ?? undefined,
       cutPattern: order.cutPattern ?? undefined,
-      cutVersion: order.cutVersion ?? undefined,
-      cutVersionNotes: order.cutVersionNotes ?? undefined,
       cutNotes,
     });
   }

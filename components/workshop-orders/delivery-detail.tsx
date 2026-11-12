@@ -219,8 +219,6 @@ function OrderData({ delivery }: { delivery: ActiveWorkshopDelivery }) {
         <Row label="Prenda" value={order.description} />
         <Row label="Tela" value={order.fabric} />
         <Row label="Molde" value={order.pattern} />
-        <Row label="Versión" value={order.version} />
-        <Row label="Notas de versión" value={order.versionNotes} />
         <Row
           label="Entrega"
           value={order.dueDate ? formatDate(order.dueDate) : null}

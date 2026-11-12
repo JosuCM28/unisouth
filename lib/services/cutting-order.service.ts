@@ -14,6 +14,7 @@ import {
   type CutSourceLine,
 } from "@/lib/cut-lines";
 import { cutBatchLabel } from "@/lib/constants/labels";
+import { mergeClientPos } from "@/lib/orders/client-po";
 import type {
   AdoptPlantOrderInput,
   BatchProgressInput,
@@ -67,6 +68,19 @@ function statusFromProgress(cut: number, pending: number) {
 }
 
 /**
+ * El PO CLIENTE que se guarda en la orden.
+ *
+ * Si alguna talla trae PO, manda la lista de las tallas sin repetidos y se
+ * ignora lo que venga en el encabezado: el servidor no confía en que el
+ * formulario lo haya armado bien. Si ninguna trae, se respeta el capturado a
+ * mano, que es como vienen las órdenes de antes de que existiera el PO por
+ * talla.
+ */
+function orderClientPo(input: CuttingOrderInput): string | undefined {
+  return mergeClientPos(input.lines.map((line) => line.clientPo)) ?? input.clientPo;
+}
+
+/**
  * Órdenes de corte: qué pidió el cliente y cómo va el corte.
  *
  * El pedido se captura una vez y NO se toca: es la referencia contra la que se
@@ -90,13 +104,12 @@ export class CuttingOrderService extends BaseService {
     return this.createOrder(
       {
         ...input,
-        /* Los cinco campos que el formulario de planta no captura, dichos en
+        /* Los cuatro campos que el formulario de planta no captura, dichos en
            voz alta. El tipo los exige presentes aunque valgan `undefined`, y
            eso resulta ser lo correcto: si mañana se agrega un campo de la
            casa, esto deja de compilar y obliga a decidir qué hace la otra
            planta con él, en vez de heredarlo en silencio. */
         folderId: undefined,
-        clientPo: undefined,
         metersDelivered: undefined,
         metersSpread: undefined,
         smallRemnant: undefined,
@@ -132,15 +145,13 @@ export class CuttingOrderService extends BaseService {
           folderId: input.folderId,
           description: input.description,
           reference: input.reference,
-          clientPo: input.clientPo,
+          clientPo: orderClientPo(input),
           orderedAt: input.orderedAt ?? new Date(),
           dueDate: input.dueDate,
           deliveryPlace: input.deliveryPlace,
           notes: input.notes,
           cutFabricText: input.cutFabricText,
           cutPattern: input.cutPattern,
-          cutVersion: input.cutVersion,
-          cutVersionNotes: input.cutVersionNotes,
           cutNotes: input.cutNotes,
           metersDelivered: input.metersDelivered,
           metersSpread: input.metersSpread,
@@ -151,6 +162,7 @@ export class CuttingOrderService extends BaseService {
               sizeId: line.sizeId,
               orderedQuantity: line.orderedQuantity,
               tagId: line.tagId,
+              clientPo: line.clientPo,
               notes: line.notes,
               position: index,
             })),
@@ -194,7 +206,6 @@ export class CuttingOrderService extends BaseService {
         origin: true,
         code: true,
         folderId: true,
-        clientPo: true,
         metersDelivered: true,
         metersSpread: true,
         smallRemnant: true,
@@ -211,7 +222,6 @@ export class CuttingOrderService extends BaseService {
     return this.update(id, {
       ...input,
       folderId: current.folderId ?? undefined,
-      clientPo: current.clientPo ?? undefined,
       metersDelivered: decimalToNumber(current.metersDelivered),
       metersSpread: decimalToNumber(current.metersSpread),
       smallRemnant: decimalToNumber(current.smallRemnant),
@@ -384,6 +394,7 @@ export class CuttingOrderService extends BaseService {
               orderedQuantity: line.orderedQuantity,
               // Mismo `?? null` que el encabezado: quitar el folio debe quitarlo.
               tagId: line.tagId ?? null,
+              clientPo: line.clientPo ?? null,
               notes: line.notes ?? null,
               position: index,
             },
@@ -397,6 +408,7 @@ export class CuttingOrderService extends BaseService {
             sizeId: line.sizeId,
             orderedQuantity: line.orderedQuantity,
             tagId: line.tagId,
+            clientPo: line.clientPo,
             notes: line.notes,
             position: index,
           },
@@ -416,7 +428,7 @@ export class CuttingOrderService extends BaseService {
           folderId: input.folderId ?? null,
           description: input.description ?? null,
           reference: input.reference ?? null,
-          clientPo: input.clientPo ?? null,
+          clientPo: orderClientPo(input) ?? null,
           orderedAt: input.orderedAt ?? current.orderedAt,
           dueDate: input.dueDate ?? null,
           deliveryPlace: input.deliveryPlace ?? null,
@@ -426,8 +438,6 @@ export class CuttingOrderService extends BaseService {
              dato viejo en una orden que el usuario acaba de limpiar. */
           cutFabricText: input.cutFabricText ?? null,
           cutPattern: input.cutPattern ?? null,
-          cutVersion: input.cutVersion ?? null,
-          cutVersionNotes: input.cutVersionNotes ?? null,
           cutNotes: input.cutNotes,
           /* El cierre del corte, con el mismo `?? null`: estos tres se
              capturan en pasadas distintas —la orden se da de alta hoy y los
@@ -1180,8 +1190,6 @@ export class CuttingOrderService extends BaseService {
         cutFabricId: order.materialId ?? undefined,
         cutFabricText: order.cutFabricText ?? undefined,
         cutPattern: order.cutPattern ?? undefined,
-        cutVersion: order.cutVersion ?? undefined,
-        cutVersionNotes: order.cutVersionNotes ?? undefined,
         cutNotes: order.cutNotes,
       });
 

@@ -7,16 +7,11 @@ import { prisma } from "@/lib/prisma";
  * ficha— y duplicarlo garantizaría que un día ofrezcan cosas distintas.
  */
 export async function getOrderFormOptions() {
-  const [clients, materials, sizes, tags, folders] =
+  const [clients, sizes, tags, folders] =
     await Promise.all([
     prisma.client.findMany({
       where: { deletedAt: null, active: true },
       select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.material.findMany({
-      where: { deletedAt: null, active: true },
-      select: { id: true, name: true, code: true },
       orderBy: { name: "asc" },
     }),
     prisma.size.findMany({
@@ -45,11 +40,6 @@ export async function getOrderFormOptions() {
 
   return {
     clients: clients.map((c) => ({ id: c.id, name: c.name })),
-    materials: materials.map((m) => ({
-      id: m.id,
-      name: m.name,
-      hint: m.code,
-    })),
     sizes,
     tags,
     folders: folders.map((folder) => ({

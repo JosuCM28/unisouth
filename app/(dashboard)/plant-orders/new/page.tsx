@@ -46,7 +46,6 @@ export default async function NewPlantOrderPage() {
       <OrderForm
         variant="plant"
         clients={options.clients}
-        materials={options.materials}
         sizes={options.sizes}
         tags={options.tags}
         /* El selector de pedido no se pinta en esta variante, pero la prop es

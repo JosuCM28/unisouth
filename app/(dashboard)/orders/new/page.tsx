@@ -87,7 +87,6 @@ export default async function NewOrderPage({ searchParams }: PageProps) {
 
       <OrderForm
         clients={options.clients}
-        materials={options.materials}
         sizes={options.sizes}
         tags={options.tags}
         folders={options.folders}
@@ -147,8 +146,6 @@ async function loadTemplate(id: string) {
     cutHeader: {
       cutFabricText: order.cutFabricText ?? "",
       cutPattern: order.cutPattern ?? "",
-      cutVersion: order.cutVersion ?? "",
-      cutVersionNotes: order.cutVersionNotes ?? "",
       cutNotes: order.cutNotes,
     },
     /* El cierre NO se copia: son los metros de AQUELLA mesa. Arrastrarlos a
@@ -163,6 +160,7 @@ async function loadTemplate(id: string) {
       sizeId: line.sizeId,
       orderedQuantity: String(line.orderedQuantity),
       tagId: line.tagId ?? "",
+      clientPo: line.clientPo ?? "",
       notes: line.notes ?? "",
     })),
   };

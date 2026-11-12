@@ -498,8 +498,6 @@ export class OrderFolderService extends BaseService {
         cutFabricId: sharedValue(orders, (o) => o.materialId),
         cutFabricText: sharedValue(orders, (o) => o.cutFabricText),
         cutPattern: sharedValue(orders, (o) => o.cutPattern),
-        cutVersion: sharedValue(orders, (o) => o.cutVersion),
-        cutVersionNotes: sharedValue(orders, (o) => o.cutVersionNotes),
         cutNotes: folderCutNotes(orders),
       });
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CutVersion, DocumentType, Unit } from "@prisma/client";
+import { DocumentType, Unit } from "@prisma/client";
 import { cuidSchema, optionalCuid, optionalText, positiveQuantity, requiredText, localDate } from "./common";
 
 export const documentLineSchema = z.object({
@@ -59,11 +59,6 @@ export const cutHeaderSchema = z.object({
   /** La tela escrita a mano, para lo que no existe como material. */
   cutFabricText: optionalText,
   cutPattern: optionalText,
-  cutVersion: z
-    .union([z.nativeEnum(CutVersion), z.literal("")])
-    .optional()
-    .transform((value) => (value ? value : undefined)),
-  cutVersionNotes: optionalText,
   /**
    * Las notas del pie, numeradas en la hoja ("va sin serigrafiar").
    *

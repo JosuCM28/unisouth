@@ -533,8 +533,6 @@ export function IssueForm({
       cutFabricId: cutHeader.cutFabricId || undefined,
       cutFabricText: cutHeader.cutFabricText || undefined,
       cutPattern: cutHeader.cutPattern || undefined,
-      cutVersion: cutHeader.cutVersion || undefined,
-      cutVersionNotes: cutHeader.cutVersionNotes || undefined,
       cutNotes: cutHeader.cutNotes,
       lines: validLines.map((line) => ({
         lotId: line.lotId,

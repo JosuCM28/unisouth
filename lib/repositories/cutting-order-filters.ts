@@ -130,7 +130,6 @@ export function cuttingOrderWhere(
           { notes: contains },
           { cutFabricText: contains },
           { cutPattern: contains },
-          { cutVersionNotes: contains },
           { client: { name: contains } },
           { material: { name: contains } },
           { material: { code: contains } },

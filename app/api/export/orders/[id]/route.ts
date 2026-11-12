@@ -1,4 +1,4 @@
-import type { CutVersion, CuttingOrderStatus } from "@prisma/client";
+import type { CuttingOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { enforceRateLimit, EXPORT_LIMIT } from "@/lib/core/rate-limit";
@@ -8,7 +8,6 @@ import {
   type SheetRow,
 } from "@/lib/export/xlsx";
 import {
-  CUT_VERSION_LABELS,
   CUTTING_ORDER_STATUS_LABELS,
   cutBatchLabel,
 } from "@/lib/constants/labels";
@@ -59,8 +58,6 @@ interface OrderSheet {
   notes: string | null;
   cutFabricText: string | null;
   cutPattern: string | null;
-  cutVersion: CutVersion | null;
-  cutVersionNotes: string | null;
   cutNotes: string[];
   client: { name: string } | null;
   material: { code: string; name: string } | null;
@@ -156,8 +153,6 @@ function headerRows(order: OrderSheet): SheetRow[] {
     ["Capturó", order.createdBy?.name ?? "—"],
     ["Tela (a mano)", order.cutFabricText ?? "—"],
     ["Molde", order.cutPattern ?? "—"],
-    ["Versión", order.cutVersion ? CUT_VERSION_LABELS[order.cutVersion] : "—"],
-    ["Cambios de la versión", order.cutVersionNotes ?? "—"],
   ];
 
   /* De dos en dos, para que se lean en dos columnas como en el papel. El

@@ -76,8 +76,6 @@ export default async function EditIssuePage({ params }: PageProps) {
       cutFabricId: document.cutFabricId ?? "",
       cutFabricText: document.cutFabricText ?? "",
       cutPattern: document.cutPattern ?? "",
-      cutVersion: document.cutVersion ?? "",
-      cutVersionNotes: document.cutVersionNotes ?? "",
       cutNotes: document.cutNotes,
     },
     lines: document.lines.map((line) => ({
