@@ -9,17 +9,17 @@
  * (congela la interfaz al escribir) y tiene un techo de ~5 MB compartido con
  * todo lo demás. IndexedDB es asíncrono y aguanta miles de capturas.
  *
- * Se usa la API nativa, sin librería: son cuatro operaciones sobre un solo
- * almacén y el CLAUDE.md prohíbe sumar dependencias sin acordarlo.
+ * Vive en la misma base que la copia sin conexión (ver db.ts), y por eso usa
+ * Dexie igual que ella. La forma de cada registro y el nombre de la tabla no
+ * cambiaron: lo que ya estaba encolado antes de pasar a Dexie se sigue
+ * leyendo y mandando igual.
  *
  * ORDEN: la cola es FIFO estricta por `seq`. Importa porque las
  * capturas pueden depender entre sí —un material dado de alta offline y un
  * rollo de ese material capturado después— y mandarlas al revés falla.
  */
 
-const DB_NAME = "unisouth-offline";
-const DB_VERSION = 1;
-const STORE = "pending";
+import { isOfflineDbAvailable, offlineDb } from "./db";
 
 /** Tipos de captura que se pueden encolar. Ver lib/offline/kinds.ts. */
 export type QueueKind =
@@ -27,7 +27,8 @@ export type QueueKind =
   | "material.create"
   | "product.create"
   | "client.create"
-  | "location.create";
+  | "location.create"
+  | "issue.create";
 
 export interface QueuedItem {
   /** Identificador local. NO es el folio: el folio lo asigna el servidor. */
@@ -52,139 +53,61 @@ export interface QueuedItem {
   attempts: number;
   /** Último error de envío, si lo hubo. Se muestra en la lista. */
   lastError?: string;
+  /**
+   * Folio provisional (`TMP-…`) de lo que en papel necesita un número desde
+   * ya: la salida se firma en el andén aunque no haya señal. NO es el folio
+   * real; ése lo asigna el servidor al subirla y queda en la tabla `synced`.
+   */
+  localCode?: string;
 }
 
-/**
- * Conexión perezosa y compartida.
- *
- * Abrir IndexedDB es asíncrono y se llama en cada operación; sin esta caché
- * se abriría una conexión por captura.
- */
-let connection: Promise<IDBDatabase> | null = null;
-
-function openDatabase(): Promise<IDBDatabase> {
-  if (connection) return connection;
-
-  connection = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: "id" });
-        // El índice es lo que permite leer en orden de captura sin ordenar
-        // en memoria. Va sobre `seq` y no sobre `createdAt` porque dos
-        // capturas seguidas comparten milisegundo y el desempate por id
-        // rompía el orden. Ver el comentario de `seq`.
-        store.createIndex("seq", "seq");
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-  // Si falla la apertura se olvida la promesa rechazada: el siguiente intento
-  // vuelve a probar en vez de arrastrar el fallo para siempre.
-  connection.catch(() => {
-    connection = null;
-  });
-
-  return connection;
-}
-
-function runTransaction<T>(
-  mode: IDBTransactionMode,
-  operation: (store: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> {
-  return openDatabase().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(STORE, mode);
-        const request = operation(transaction.objectStore(STORE));
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      }),
-  );
-}
-
-/**
- * ¿Se puede usar la cola aquí?
- *
- * En el servidor no existe `indexedDB`, y algunos navegadores lo bloquean en
- * modo privado. Sin esta guarda, el render del servidor reventaría.
- */
+/** ¿Se puede usar la cola aquí? Ver isOfflineDbAvailable. */
 export function isQueueAvailable(): boolean {
-  return typeof indexedDB !== "undefined";
+  return isOfflineDbAvailable();
 }
 
 /**
- * Siguiente posición de la fila.
+ * Encola una captura con la siguiente posición de la fila.
  *
- * Se arranca desde el máximo que ya haya guardado: si no, al recargar la
- * página el contador volvería a cero y las capturas nuevas se colarían
- * ANTES de las que ya estaban esperando.
+ * Leer el máximo y escribir el nuevo van en la MISMA transacción de
+ * escritura: así dos altas seguidas —o dos pestañas— no pueden tomar el
+ * mismo número, y al recargar la página el contador sigue desde lo que ya
+ * estaba esperando en vez de volver a cero y colarse antes.
  */
-let nextSeq: Promise<number> | null = null;
-
-async function claimSeq(): Promise<number> {
-  if (!nextSeq) {
-    nextSeq = listPending().then((items) =>
-      items.reduce((max, item) => Math.max(max, item.seq ?? 0), 0),
-    );
-  }
-
-  const current = await nextSeq;
-  const claimed = current + 1;
-
-  // Se guarda ya resuelto para que dos altas seguidas no reciban el mismo
-  // número: la segunda espera esta promesa, no otra lectura de la base.
-  nextSeq = Promise.resolve(claimed);
-
-  return claimed;
-}
-
 export async function enqueue(
   item: Omit<QueuedItem, "id" | "createdAt" | "seq" | "attempts">,
 ): Promise<QueuedItem> {
-  const record: QueuedItem = {
-    ...item,
-    id: crypto.randomUUID(),
-    createdAt: Date.now(),
-    seq: await claimSeq(),
-    attempts: 0,
-  };
+  const db = offlineDb();
 
-  await runTransaction("readwrite", (store) => store.add(record));
-  return record;
+  return db.transaction("rw", db.pending, async () => {
+    const last = await db.pending.orderBy("seq").last();
+
+    const record: QueuedItem = {
+      ...item,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      seq: (last?.seq ?? 0) + 1,
+      attempts: 0,
+    };
+
+    await db.pending.add(record);
+    return record;
+  });
 }
 
 /** Todas las pendientes, de la más vieja a la más nueva. */
 export async function listPending(): Promise<QueuedItem[]> {
   if (!isQueueAvailable()) return [];
-
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const request = db
-      .transaction(STORE, "readonly")
-      .objectStore(STORE)
-      .index("seq")
-      .getAll();
-
-    request.onsuccess = () => resolve(request.result as QueuedItem[]);
-    request.onerror = () => reject(request.error);
-  });
+  return offlineDb().pending.orderBy("seq").toArray();
 }
 
 export async function countPending(): Promise<number> {
   if (!isQueueAvailable()) return 0;
-  return runTransaction("readonly", (store) => store.count());
+  return offlineDb().pending.count();
 }
 
 export async function removeItem(id: string): Promise<void> {
-  await runTransaction("readwrite", (store) => store.delete(id));
+  await offlineDb().pending.delete(id);
 }
 
 /**
@@ -193,24 +116,16 @@ export async function removeItem(id: string): Promise<void> {
  * El contador sirve para dos cosas: mostrarle al usuario que ya se intentó, y
  * distinguir un fallo pasajero de red de una captura que el servidor rechaza
  * una y otra vez.
+ *
+ * Si la captura ya se mandó y se borró entretanto, `modify` no encuentra
+ * nada y no hace nada: no se resucita.
  */
 export async function markAttempt(id: string, error: string): Promise<void> {
-  const db = await openDatabase();
-
-  await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readwrite");
-    const store = transaction.objectStore(STORE);
-    const read = store.get(id);
-
-    read.onsuccess = () => {
-      const current = read.result as QueuedItem | undefined;
-      // Pudo haberse enviado y borrado entre la lectura y esta escritura.
-      if (!current) return resolve();
-
-      store.put({ ...current, attempts: current.attempts + 1, lastError: error });
-      resolve();
-    };
-
-    read.onerror = () => reject(read.error);
-  });
+  await offlineDb()
+    .pending.where("id")
+    .equals(id)
+    .modify((item) => {
+      item.attempts += 1;
+      item.lastError = error;
+    });
 }

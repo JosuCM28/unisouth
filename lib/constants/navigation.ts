@@ -277,8 +277,9 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     /* Hasta abajo y en su propia sección: no es parte de la operación del
-       almacén, y como `user:manage` sólo lo trae ADMIN, para todos los demás
-       roles la sección entera desaparece —ni siquiera ven el encabezado. */
+       almacén, y casi todo cuelga de llaves que sólo trae ADMIN, así que para
+       los demás roles la sección entera desaparece. La excepción es Almacén,
+       que ve aquí sólo "Datos sin conexión": la copia va en su celular. */
     label: "Administración",
     items: [
       {
@@ -293,6 +294,13 @@ export const NAVIGATION: NavSection[] = [
         label: "Notificaciones",
         icon: "notifications",
         permission: "notifications:write",
+      },
+      {
+        // La copia de la base en el navegador, para trabajar sin internet.
+        href: "/offline-data",
+        label: "Datos sin conexión",
+        icon: "offline",
+        permission: "offline:manage",
       },
       {
         // Quién pide corregir los cortes de una orden ya terminada.

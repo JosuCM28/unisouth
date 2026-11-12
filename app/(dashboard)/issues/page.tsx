@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Layers, Plus } from "lucide-react";
+import { CloudOff, Layers, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getIssueSummaries } from "@/lib/issue-summary";
 import { shipmentReceipt, voucherReceipt } from "@/lib/workshop-delivery";
@@ -156,6 +156,13 @@ export default async function IssuesPage({ searchParams }: PageProps) {
         description="Material que se entregó a producción"
         action={
           <div className="flex flex-wrap gap-2">
+            {/* Sobre la copia local: abre y guarda aunque no haya señal. */}
+            <Button asChild variant="outline" className="touch-target">
+              <Link href="/issues/offline">
+                <CloudOff className="size-4" aria-hidden />
+                Sin conexión
+              </Link>
+            </Button>
             <Button asChild variant="outline" className="touch-target">
               <Link href="/issues/multi">
                 <Layers className="size-4" aria-hidden />

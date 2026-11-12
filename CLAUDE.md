@@ -241,7 +241,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | Rol | Qué puede |
 |---|---|
 | `ADMIN` | Todo, incluido usuarios y configuración |
-| `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos. Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
+| `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos, más **Datos sin conexión** (la copia de la base en su celular). Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | **La OTRA PLANTA. Dos pantallas: Órdenes · Órdenes de planta.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. No recorre el almacén, no corre cálculos y no ve auditoría |
@@ -312,6 +312,7 @@ Nueve capacidades separan lo anterior:
 | `production:browse` / `production:write` | El marco de **cómo** se produce: fichas, tallas, folios, talleres, corridas, reglas y bodegas |
 | `reporting:read` | Mirar hacia atrás sobre el almacén completo: kárdex global y reportes |
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
+| `offline:manage` | La **copia de la base en el navegador** para trabajar sin internet: bajarla, ver lo pendiente de subir y borrarla. ADMIN y WAREHOUSE. Sólo dice "puede usar la copia": cada tabla se sigue cobrando con la llave de su pantalla (`OFFLINE_TABLE_PERMISSIONS`), así que nunca enseña más de lo que el rol ya ve en línea. Subir una salida offline pide `inventory:write`, igual que en línea |
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
 | `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas |
 

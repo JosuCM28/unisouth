@@ -35,7 +35,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Documentos",
     "Requisiciones", "Reportes", "Auditoría",
     "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
-    "Usuarios", "Notificaciones", "Solicitudes de edición",
+    "Usuarios", "Notificaciones", "Datos sin conexión", "Solicitudes de edición",
   ],
 
   /* Mueve el material, y nada más. Ésta es la lista que se acordó y la razón
@@ -45,6 +45,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Tareas",
     "Materiales", "Prendas", "Ubicaciones", "Clientes", "Proveedores",
     "Recepciones", "Salidas", "Órdenes", "Documentos",
+    "Datos sin conexión",
   ],
 
   // Como Sólo lectura, más captura de cortes y el catálogo de Prendas.

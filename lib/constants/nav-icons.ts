@@ -5,6 +5,7 @@ import {
   Boxes,
   Building2,
   Calculator,
+  CloudOff,
   ChartColumn,
   ClipboardList,
   Factory,
@@ -70,6 +71,7 @@ export const NAV_ICONS = {
   accounts: UserCog,
   notifications: Bell,
   editRequests: LockOpen,
+  offline: CloudOff,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

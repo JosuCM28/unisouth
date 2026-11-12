@@ -1,6 +1,7 @@
 "use client";
 
 import type { ActionResult } from "@/lib/core/result";
+import { offlineDb } from "./db";
 import { QUEUE_KINDS } from "./kinds";
 import {
   enqueue,
@@ -53,6 +54,7 @@ export async function submitOrQueue<T>(
   kind: QueueKind,
   payload: unknown,
   summary: string,
+  localCode?: string,
 ): Promise<SubmitOutcome<T>> {
   try {
     const result = (await QUEUE_KINDS[kind].send(payload)) as ActionResult<T>;
@@ -81,9 +83,43 @@ export async function submitOrQueue<T>(
       };
     }
 
-    const item = await enqueue({ kind, payload, summary });
+    const item = await enqueue({ kind, payload, summary, localCode });
     return { status: "queued", item };
   }
+}
+
+/**
+ * Deja el puente entre el folio TMP y el real de una captura que acaba de
+ * subir. Sólo para las que llevan folio provisional: un alta de material no
+ * se firmó en papel con ningún número.
+ */
+const SYNCED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function recordSynced(item: QueuedItem, data: unknown): Promise<void> {
+  if (!item.localCode) return;
+
+  const db = offlineDb();
+
+  // Pasado un mes nadie busca ya un TMP: para entonces el vale de papel ya
+  // se archivó con su folio real. Sin poda la tabla crecería para siempre.
+  await db.synced.where("syncedAt").below(Date.now() - SYNCED_RETENTION_MS).delete();
+
+  await db.synced.put({
+    id: item.id,
+    kind: item.kind,
+    localCode: item.localCode,
+    serverCode: serverCodeOf(data),
+    summary: item.summary,
+    syncedAt: Date.now(),
+  });
+}
+
+/** El folio que devolvió el servidor. Toda alta con folio trae `code`. */
+function serverCodeOf(data: unknown): string {
+  if (data && typeof data === "object" && "code" in data) {
+    return String(data.code);
+  }
+  return "—";
 }
 
 export interface FlushReport {
@@ -115,6 +151,7 @@ export async function flushQueue(): Promise<FlushReport> {
       const result = await QUEUE_KINDS[item.kind].send(item.payload);
 
       if (result.success) {
+        await recordSynced(item, result.data);
         await removeItem(item.id);
         report.sent += 1;
         continue;

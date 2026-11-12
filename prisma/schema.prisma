@@ -850,6 +850,12 @@ model InventoryDocument {
   cancelledAt        DateTime?
   cancellationReason String?
 
+  /// Identificador que el celular le pone a una salida capturada SIN
+  /// internet. Único para que reenviarla —se cayó la señal antes de que
+  /// llegara la respuesta— devuelva la misma salida en vez de descontar el
+  /// rollo dos veces. Las salidas capturadas en línea lo dejan vacío.
+  offlineId String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

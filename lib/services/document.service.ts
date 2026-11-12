@@ -1,4 +1,4 @@
-import type { DocumentType, InventoryDocument, MovementType } from "@prisma/client";
+import { Prisma, type DocumentType, type InventoryDocument, type MovementType } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
 import type { DocumentInput } from "@/lib/validations/document.schema";
 import { BaseService } from "./base.service";
@@ -64,7 +64,10 @@ export class DocumentService extends BaseService {
     return new InventoryService(this.context);
   }
 
-  async create(input: DocumentInput): Promise<InventoryDocument> {
+  async create(
+    input: DocumentInput,
+    options: { offlineId?: string } = {},
+  ): Promise<InventoryDocument> {
     return this.transaction(async (tx) => {
       const series = SERIES_BY_TYPE[input.type];
       const code = await this.sequencesWith(tx).next(series.key, series.prefix, 4);
@@ -97,6 +100,7 @@ export class DocumentService extends BaseService {
           workshopId: input.workshopId,
           notes: input.notes,
           ...cutHeaderData(input),
+          offlineId: options.offlineId,
           createdById: this.context.userId,
           lines: {
             create: input.lines.map((line, index) => ({
@@ -135,6 +139,50 @@ export class DocumentService extends BaseService {
 
       return document;
     });
+  }
+
+  /**
+   * Sube una salida capturada SIN internet: la crea y la aplica de un jalón.
+   *
+   * Juntas y en UNA transacción porque quien la capturó ya entregó el
+   * material: dejarla en borrador haría que el saldo siguiera mostrando tela
+   * que ya no está. Si algún rollo ya no alcanza —otro lo cortó mientras no
+   * había señal— `apply` lanza, se revierte TODO, incluido el folio, y la
+   * salida se queda en el celular marcada para corregirse. Nunca queda un
+   * borrador a medias en el servidor ni un saldo negativo.
+   *
+   * IDEMPOTENTE por `offlineId`: si la señal se cayó después de aplicar pero
+   * antes de que llegara la respuesta, el celular la reenvía. Sin esta
+   * revisión se descontaría el rollo dos veces.
+   */
+  async createAndApplyOffline(
+    input: DocumentInput,
+    offlineId: string,
+  ): Promise<InventoryDocument> {
+    const existing = await this.findByOfflineId(offlineId);
+    if (existing) return existing;
+
+    try {
+      return await this.transaction(async (tx) => {
+        // Una instancia atada a la transacción: así `create` y `apply` no
+        // abren cada uno la suya y se confirman o revierten juntas.
+        const scoped = new DocumentService(this.context, tx);
+        const document = await scoped.create(input, { offlineId });
+        return scoped.apply(document.id);
+      });
+    } catch (error) {
+      // Dos reenvíos de la misma salida llegaron a la vez y el otro ganó la
+      // carrera: la llave única frenó el duplicado. Se devuelve la del otro.
+      const winner = isUniqueViolation(error)
+        ? await this.findByOfflineId(offlineId)
+        : null;
+      if (winner) return winner;
+      throw error;
+    }
+  }
+
+  private findByOfflineId(offlineId: string): Promise<InventoryDocument | null> {
+    return this.db.inventoryDocument.findUnique({ where: { offlineId } });
   }
 
   /**
@@ -495,4 +543,9 @@ function cutHeaderData(input: DocumentInput) {
     cutVersionNotes: input.cutVersionNotes,
     cutNotes: input.cutNotes ?? [],
   };
+}
+
+/** ¿Prisma rechazó la escritura por una llave única repetida? */
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

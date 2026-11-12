@@ -126,6 +126,13 @@ export const PERMISSIONS = [
      vale al aplicarlo —eso cuelga de `inventory:write`— pero no decidir a
      quién le llega. */
   "notifications:write",
+  /* La copia de la base en el navegador para trabajar sin internet: bajarla,
+     ver qué quedó pendiente de subir y borrarla del equipo. La llevan
+     ADMIN y WAREHOUSE. Esta llave dice "puede usar la copia", NO "puede ver todas las
+     tablas": cada tabla se sigue cobrando con la llave de su pantalla (ver
+     OFFLINE_TABLE_PERMISSIONS), así que dársela a otro rol nunca le enseña
+     más de lo que ya ve en línea. */
+  "offline:manage",
   /* Las entregas que le mandaron a UN taller: verlas, reimprimir su vale y
      confirmar que llegaron. Qué taller es lo decide el rol de quien entra, y
      el filtro por taller se aplica en el servidor en cada lectura. */
@@ -186,6 +193,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "garments:browse",
     "inventory:adjust",
     "catalog:write",
+    /* Es quien trabaja sin señal en el piso, así que es quien necesita la
+       copia en su celular. No le enseña nada nuevo: cada tabla se sigue
+       cobrando con la llave de su pantalla en línea. */
+    "offline:manage",
   ],
 
   /* Igual que Sólo lectura —mira las órdenes de corte completas y nada

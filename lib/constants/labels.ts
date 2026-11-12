@@ -33,6 +33,8 @@ import type {
 } from "./workshop-access";
 import type { UserStatus } from "./user-status";
 import type { NotificationChannel } from "@/lib/validations/notification-settings.schema";
+import type { OfflineTable } from "./offline-tables";
+import type { QueueKind } from "@/lib/offline/queue";
 
 /** Las pestañas de la pantalla de Órdenes. */
 export const ORDER_VIEW_LABELS: Record<OrderView, string> = {
@@ -611,4 +613,29 @@ export const USER_STATUS_STYLES: Record<UserStatus, string> = {
 export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = {
   whatsapp: "WhatsApp",
   email: "correo",
+};
+
+/** Las tablas de la copia sin internet, como se nombran en pantalla. */
+export const OFFLINE_TABLE_LABELS: Record<OfflineTable, string> = {
+  materials: "Materiales",
+  sizes: "Tallas",
+  cutTags: "Folios",
+  workshops: "Talleres",
+  locations: "Ubicaciones",
+  clients: "Clientes",
+  suppliers: "Proveedores",
+  lots: "Inventario de rollos",
+  receipts: "Recepciones",
+  issues: "Salidas",
+  orders: "Órdenes",
+};
+
+/** Los tipos de captura de la cola sin conexión, como se nombran en pantalla. */
+export const QUEUE_KIND_LABELS: Record<QueueKind, string> = {
+  "lot.create": "Rollo",
+  "material.create": "Material",
+  "product.create": "Producto",
+  "client.create": "Cliente",
+  "location.create": "Ubicación",
+  "issue.create": "Salida",
 };
