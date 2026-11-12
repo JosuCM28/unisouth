@@ -80,6 +80,16 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(async () => {
+        // Primero la gemela que trabaja sobre la copia: una pantalla del
+        // servidor guardada de otro día enseña saldos viejos y, al tocar
+        // cualquier cosa, vuelve a intentar la red y recarga en bucle.
+        const offlineScreen = offlineScreenFor(url.pathname);
+        if (offlineScreen) {
+          // ignoreSearch: `/lots/offline?material=…` se guardó sin el filtro.
+          const screen = await caches.match(offlineScreen, { ignoreSearch: true });
+          if (screen) return screen;
+        }
+
         const cached = await caches.match(request);
         if (cached) return cached;
 
@@ -89,6 +99,31 @@ self.addEventListener("fetch", (event) => {
       }),
   );
 });
+
+/**
+ * Las pantallas que abren sin red y a cuál se manda cada pantalla del
+ * servidor que tiene gemela. Se repiten de lib/constants/offline-routes.ts:
+ * el service worker no es un módulo y no puede importarlas.
+ */
+const OFFLINE_SCREENS = [
+  "/offline-data",
+  "/issues/offline",
+  "/lots/offline",
+  "/materials/offline",
+  "/orders/offline",
+];
+const OFFLINE_ALTERNATES = {
+  "/lots": "/lots/offline",
+  "/materials": "/materials/offline",
+  "/orders": "/orders/offline",
+  "/issues": "/issues/offline",
+  "/issues/new": "/issues/offline",
+};
+
+function offlineScreenFor(pathname) {
+  if (OFFLINE_SCREENS.includes(pathname)) return pathname;
+  return OFFLINE_ALTERNATES[pathname] ?? null;
+}
 
 /**
  * Caché primero para el código de la app. Sólo se guarda lo que llegó bien:

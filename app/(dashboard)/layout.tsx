@@ -5,6 +5,7 @@ import { DesktopBar } from "@/components/layout/desktop-bar";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { OfflineIndicator } from "@/components/layout/offline-indicator";
+import { OfflineNavigationGuard } from "@/components/layout/offline-navigation-guard";
 import { SidebarProvider } from "@/components/layout/sidebar-state";
 import { isSidebarOpen, SIDEBAR_COOKIE } from "@/lib/constants/sidebar";
 import { getCurrentUser } from "@/lib/core/session";
@@ -55,6 +56,9 @@ export default async function DashboardLayout({
 
         {/* Sólo aparece si hay capturas sin enviar o se cayó la red. */}
         <OfflineIndicator />
+
+        {/* Sin señal, que tocar un enlace no recargue la app de vuelta al inicio. */}
+        <OfflineNavigationGuard />
       </div>
     </SidebarProvider>
   );

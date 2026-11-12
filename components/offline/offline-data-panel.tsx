@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Loader2, PackageMinus, RefreshCw } from "lucide-react";
+import { Boxes, ClipboardList, Layers, Loader2, PackageMinus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { OfflineTable } from "@/lib/constants/offline-tables";
 import { OFFLINE_TABLE_LABELS } from "@/lib/constants/labels";
@@ -92,6 +92,27 @@ export function OfflineDataPanel({ tables }: { tables: OfflineTable[] }) {
           <Link href="/issues/offline">
             <PackageMinus className="size-4" aria-hidden />
             Salida sin conexión
+          </Link>
+        </Button>
+
+        {/* Lo que se consulta sin señal. Con red el guardia de navegación no
+            interviene y son enlaces normales. */}
+        <Button asChild variant="outline" className="touch-target">
+          <Link href="/lots/offline">
+            <Boxes className="size-4" aria-hidden />
+            Inventario
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="touch-target">
+          <Link href="/materials/offline">
+            <Layers className="size-4" aria-hidden />
+            Materiales
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="touch-target">
+          <Link href="/orders/offline">
+            <ClipboardList className="size-4" aria-hidden />
+            Órdenes
           </Link>
         </Button>
 

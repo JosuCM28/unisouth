@@ -1,5 +1,7 @@
 "use client";
 
+import { OFFLINE_SCREENS } from "@/lib/constants/offline-routes";
+
 /**
  * Deja guardadas en el navegador las pantallas que deben abrir sin señal.
  *
@@ -16,9 +18,6 @@
  */
 const PAGE_CACHE = "unisouth-v1";
 const STATIC_CACHE = "unisouth-static-v1";
-
-/** Las pantallas que trabajan sobre la copia local. */
-export const OFFLINE_SCREENS = ["/offline-data", "/issues/offline"];
 
 const ASSET_PATTERN = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
 
