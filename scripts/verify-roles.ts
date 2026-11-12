@@ -67,7 +67,10 @@ const ESPERADO: Record<Role, string[]> = {
      Sin `inventory:browse` ni `production:browse` no recorre el almacén, y
      sin `inventory:write` tampoco toca nada dentro de Órdenes: ahí entra a
      mirar, igual que Sólo lectura. */
-  MANAGEMENT: ["Órdenes", "Órdenes de planta"],
+  MANAGEMENT: [
+    "Órdenes", "Órdenes de planta",
+    "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
+  ],
 
   /* Un solo destino: entra a mirar cómo va un pedido y de ahí no se mueve.
      Dentro de Órdenes tampoco puede tocar nada, porque no lleva

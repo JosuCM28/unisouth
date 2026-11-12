@@ -244,7 +244,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos, más **Datos sin conexión** (la copia de la base en su celular). Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
-| `MANAGEMENT` | **La OTRA PLANTA. Dos pantallas: Órdenes · Órdenes de planta.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. No recorre el almacén, no corre cálculos y no ve auditoría |
+| `MANAGEMENT` | **La OTRA PLANTA. Seis pantallas: Órdenes · Órdenes de planta · los cuatro tableros de taller.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. Los tableros de taller los ve en sólo lectura, como ADMIN: no confirma entregas porque eso le toca al taller. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 | `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` · `WORKSHOP_ALLENDE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
 
@@ -314,7 +314,7 @@ Nueve capacidades separan lo anterior:
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
 | `offline:manage` | La **copia de la base en el navegador** para trabajar sin internet: bajarla, ver lo pendiente de subir y borrarla. ADMIN y WAREHOUSE. Sólo dice "puede usar la copia": cada tabla se sigue cobrando con la llave de su pantalla (`OFFLINE_TABLE_PERMISSIONS`), así que nunca enseña más de lo que el rol ya ve en línea. Subir una salida offline pide `inventory:write`, igual que en línea |
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
-| `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas |
+| `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN y la otra planta (`MANAGEMENT`) llevan las cuatro en sólo lectura: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access` |
 
 **Los talleres con cuenta.** El taller del catálogo se liga a su rol en
 **Talleres → Cuenta de acceso** (`Workshop.accessRole`, único). Qué taller ve
@@ -332,7 +332,7 @@ lleva ese campo: ya le llega por su envío, y con los dos lo vería duplicado.
 
 El tablero de cada taller separa sus entregas en **Por recibir** y **Recibidas**.
 Al recibir puede dejar una nota opcional, que la casa lee junto al estado. ADMIN
-ve los tableros pero no confirma: eso le toca al taller.
+y la otra planta ven los tableros pero no confirman: eso le toca al taller.
 
 Capturar un envío no es que haya salido: el corte puede seguir en la planta. El
 botón **Enviar** de Órdenes marca qué sale hoy (`dispatchedAt` y quién) y sólo

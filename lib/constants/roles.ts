@@ -222,7 +222,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "purchase:approve",
   ],
 
-  /* DOS destinos: Órdenes y Órdenes de planta. Nada más.
+  /* SEIS destinos: Órdenes, Órdenes de planta y los cuatro tableros de
+     taller. Nada más.
 
      Es el rol de la OTRA PLANTA. Mira cómo van los pedidos de la casa igual
      que Sólo lectura —las pantallas de ver piden `orders:browse` y las de
@@ -241,8 +242,22 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
      administra el almacén. Si colgara de la misma llave con la que captura,
      se agregaría solo.
 
-     Tampoco lleva `audit:read`: la bitácora queda sólo en ADMIN. */
-  MANAGEMENT: ["orders:browse", "plant-orders:browse", "plant-orders:write"],
+     Tampoco lleva `audit:read`: la bitácora queda sólo en ADMIN.
+
+     Los cuatro tableros de taller, en SÓLO LECTURA: ve qué se le mandó a
+     cada taller y si ya lo confirmó, como ADMIN. No puede confirmar nada por
+     dos candados: el botón sólo se pinta al taller dueño del tablero
+     (`isOwner`), y la acción de recibir pide `workshop-orders:access`, que
+     este rol no lleva. */
+  MANAGEMENT: [
+    "orders:browse",
+    "plant-orders:browse",
+    "plant-orders:write",
+    "workshop-board:acatlan",
+    "workshop-board:sitex",
+    "workshop-board:broderie",
+    "workshop-board:allende",
+  ],
 
   /* Una sola pantalla: las órdenes de corte, y de ahí no se mueve.
 
