@@ -6,7 +6,11 @@ import { createMaterialAction } from "@/app/actions/material.actions";
 import { createProductAction } from "@/app/actions/product.actions";
 import { createClientAction } from "@/app/actions/client.actions";
 import { createLocationAction } from "@/app/actions/location.actions";
-import { syncOfflineIssueAction } from "@/app/actions/offline.actions";
+import {
+  syncOfflineCutAction,
+  syncOfflineIssueAction,
+  syncOfflineShipmentAction,
+} from "@/app/actions/offline.actions";
 import { QUEUE_KIND_LABELS } from "@/lib/constants/labels";
 import type { QueueKind } from "./queue";
 
@@ -17,7 +21,8 @@ import type { QueueKind } from "./queue";
  * agregar una entrada aquí, sin tocar el reenviador. Misma idea que
  * MOVEMENT_STRATEGIES en el inventario.
  *
- * Altas, y UNA excepción que mueve saldo: la salida sin conexión. Recuentos
+ * Altas, cortes y envíos a taller de una orden, y UNA excepción que mueve
+ * saldo: la salida sin conexión. Recuentos
  * y traspasos siguen sin encolarse. La salida sí se puede porque al subirla
  * no se manda "a ciegas": `createAndApplyOffline` vuelve a bloquear cada
  * rollo y, si ya no alcanza, rechaza la salida entera y no descuenta nada.
@@ -38,4 +43,6 @@ export const QUEUE_KINDS: Record<QueueKind, QueueKindConfig> = {
   "client.create": { send: createClientAction, label: QUEUE_KIND_LABELS["client.create"] },
   "location.create": { send: createLocationAction, label: QUEUE_KIND_LABELS["location.create"] },
   "issue.create": { send: syncOfflineIssueAction, label: QUEUE_KIND_LABELS["issue.create"] },
+  "cut.create": { send: syncOfflineCutAction, label: QUEUE_KIND_LABELS["cut.create"] },
+  "shipment.create": { send: syncOfflineShipmentAction, label: QUEUE_KIND_LABELS["shipment.create"] },
 };

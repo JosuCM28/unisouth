@@ -6,10 +6,12 @@ import {
   CUTTING_ORDER_STATUS_LABELS,
   CUTTING_ORDER_STATUS_STYLES,
 } from "@/lib/constants/labels";
+import { pendingByOrder, pendingOf } from "@/lib/offline/pending-orders";
 import type { OfflineIssue, OfflineOrder } from "@/lib/offline/snapshot.types";
 import { cn } from "@/lib/utils";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { byId, useOfflineTable } from "@/hooks/use-offline-table";
-import { OfflineOrderDetail } from "./offline-order-detail";
+import { OfflineOrderDetail, type OfflineOrderAbilities } from "./offline-order-detail";
 import { MAX_RESULTS, matches, normalizeTerm, OfflineSearchField } from "./offline-search-field";
 import {
   OfflineLoading, OfflineSnapshotMissing, OfflineSnapshotNotice,
@@ -20,19 +22,31 @@ import {
  *
  * La copia sólo trae las vivas: una orden terminada ya no se consulta en el
  * piso, y bajarlas todas llenaría el celular de historia.
+ *
+ * Desde aquí se captura sin señal lo del día —corte, envío a taller, salida
+ * de tela—. Cada captura queda en la cola con folio TMP y la ficha la enseña
+ * "por subir" hasta que el servidor le pone su folio real.
  */
-export function OfflineOrdersView() {
+export function OfflineOrdersView({ abilities }: { abilities: OfflineOrderAbilities }) {
   const orders = useOfflineTable("orders");
   const clients = useOfflineTable("clients");
   const sizes = useOfflineTable("sizes");
   const tags = useOfflineTable("cutTags");
   const issues = useOfflineTable("issues");
+  const workshops = useOfflineTable("workshops");
+  const stages = useOfflineTable("stages");
+  const { items } = useOfflineQueue();
   const [search, setSearch] = useState("");
 
   const clientById = useMemo(() => byId(clients.records), [clients.records]);
   const sizeById = useMemo(() => byId(sizes.records), [sizes.records]);
   const tagById = useMemo(() => byId(tags.records), [tags.records]);
   const issuesByOrder = useMemo(() => groupIssues(issues.records), [issues.records]);
+  const pending = useMemo(() => pendingByOrder(items), [items]);
+  const sortedStages = useMemo(
+    () => [...stages.records].sort((a, b) => a.position - b.position),
+    [stages.records],
+  );
 
   const filtered = useMemo(() => {
     const term = normalizeTerm(search);
@@ -62,21 +76,29 @@ export function OfflineOrdersView() {
       />
 
       <ul className="flex flex-col gap-2">
-        {filtered.slice(0, MAX_RESULTS).map((order) => (
-          <OrderRow
-            key={order.id}
-            order={order}
-            clientName={order.clientId ? clientById.get(order.clientId)?.name : undefined}
-            detail={
-              <OfflineOrderDetail
-                order={order}
-                sizes={sizeById}
-                tags={tagById}
-                issues={issuesByOrder.get(order.id) ?? []}
-              />
-            }
-          />
-        ))}
+        {filtered.slice(0, MAX_RESULTS).map((order) => {
+          const orderPending = pendingOf(pending, order.id);
+          return (
+            <OrderRow
+              key={order.id}
+              order={order}
+              clientName={order.clientId ? clientById.get(order.clientId)?.name : undefined}
+              pendingCount={orderPending.items.length}
+              detail={
+                <OfflineOrderDetail
+                  order={order}
+                  sizes={sizeById}
+                  tags={tagById}
+                  workshops={workshops.records}
+                  stages={sortedStages}
+                  issues={issuesByOrder.get(order.id) ?? []}
+                  pending={orderPending}
+                  abilities={abilities}
+                />
+              }
+            />
+          );
+        })}
         {filtered.length === 0 && (
           <li className="px-3 py-6 text-center text-sm text-muted-foreground">
             Ninguna orden abierta con esa búsqueda en la copia.
@@ -90,10 +112,13 @@ export function OfflineOrdersView() {
 function OrderRow({
   order,
   clientName,
+  pendingCount,
   detail,
 }: {
   order: OfflineOrder;
   clientName: string | undefined;
+  /** Capturas de esta orden que esperan señal. */
+  pendingCount: number;
   detail: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -112,6 +137,11 @@ function OrderRow({
             <span className={cn("rounded-[4px] px-1.5 text-xs", CUTTING_ORDER_STATUS_STYLES[order.status])}>
               {CUTTING_ORDER_STATUS_LABELS[order.status]}
             </span>
+            {pendingCount > 0 && (
+              <span className="tabular rounded-[4px] border border-border px-1.5 text-xs font-normal text-muted-foreground">
+                {pendingCount} por subir
+              </span>
+            )}
           </p>
           <p className="truncate text-sm">{order.description ?? "Sin descripción"}</p>
           <p className="truncate text-xs text-muted-foreground">{clientName ?? "Sin cliente"}</p>

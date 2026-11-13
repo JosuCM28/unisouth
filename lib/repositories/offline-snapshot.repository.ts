@@ -91,8 +91,18 @@ const ORDER_SELECT = {
       orderedQuantity: true,
       cutQuantity: true,
       position: true,
+      notes: true,
     },
     orderBy: { position: "asc" },
+  },
+  /* Lo ya mandado a taller, para que el envío sin señal diga "ya van 40" igual
+     que en línea. Los cancelados no cuentan: esas piezas nunca salieron. */
+  shipments: {
+    where: { status: { not: "CANCELLED" } },
+    select: {
+      stageId: true,
+      lines: { select: { sizeId: true, sentQuantity: true, bundles: true } },
+    },
   },
 } satisfies Prisma.CuttingOrderSelect;
 
@@ -152,6 +162,14 @@ export class OfflineSnapshotRepository extends BaseRepository<Lot, never, never>
       where: ACTIVE,
       select: { id: true, code: true, name: true },
       orderBy: { name: "asc" },
+    });
+  }
+
+  stages() {
+    return this.db.processStage.findMany({
+      where: ACTIVE,
+      select: { id: true, code: true, name: true, position: true },
+      orderBy: { position: "asc" },
     });
   }
 

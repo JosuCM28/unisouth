@@ -37,10 +37,22 @@ import { useIssueDraft } from "./use-issue-draft";
  * en el andén sin WiFi. Al guardar, si hay señal se aplica en el momento; si
  * no, se encola con folio TMP y se aplica sola al volver el internet.
  */
-export function OfflineIssueForm() {
+export function OfflineIssueForm({
+  order,
+  onClose,
+}: {
+  /**
+   * La orden de la que sale la tela, cuando se abre desde su ficha. Arranca
+   * con su cliente dueño y la salida queda ligada a la orden al subir, igual
+   * que una salida en línea capturada desde la orden.
+   */
+  order?: { id: string; clientId: string | null };
+  /** Desde la ficha, "Capturar otra" cierra el diálogo en vez de limpiar. */
+  onClose?: () => void;
+} = {}) {
   const catalog = useOfflineCatalog();
   const { items } = useOfflineQueue();
-  const draft = useIssueDraft();
+  const draft = useIssueDraft(order?.clientId ?? "");
   const lots = useOfflineLotsOf(draft.clientId);
   const pendingByLot = useMemo(() => pendingIssuedByLot(items), [items]);
   const [saving, setSaving] = useState(false);
@@ -54,7 +66,13 @@ export function OfflineIssueForm() {
   if (catalog.loaded && catalog.clients.length === 0) return <NoSnapshot />;
 
   if (result) {
-    return <OfflineIssueResult result={result} onNew={() => setResult(null)} />;
+    return (
+      <OfflineIssueResult
+        result={result}
+        onNew={onClose ?? (() => setResult(null))}
+        newLabel={onClose ? "Listo" : undefined}
+      />
+    );
   }
 
   async function handleSave() {
@@ -67,7 +85,12 @@ export function OfflineIssueForm() {
     setSaving(true);
     try {
       const captured = await captureOfflineIssue(
-        { clientId: draft.clientId, ...draft.details, lines: toPayloadLines(draft.lines) },
+        {
+          clientId: draft.clientId,
+          cuttingOrderId: order?.id,
+          ...draft.details,
+          lines: toPayloadLines(draft.lines),
+        },
         summarize(draft.lines, catalog.clients, draft.clientId),
       );
       const next = toResult(captured.outcome, captured.localCode);

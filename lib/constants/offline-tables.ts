@@ -14,6 +14,7 @@ export const OFFLINE_TABLES = [
   "sizes",
   "cutTags",
   "workshops",
+  "stages",
   "locations",
   "clients",
   "suppliers",
@@ -32,7 +33,7 @@ export type OfflineTable = (typeof OFFLINE_TABLES)[number];
  * enseña: es el mismo dato, sólo que guardado en el celular. Por eso cada
  * tabla pide la misma llave que su pantalla.
  *
- * Tallas, folios y talleres aceptan además `inventory:write`: son pantallas
+ * Tallas, folios, talleres y etapas aceptan además `inventory:write`: son pantallas
  * de producción, pero el auxiliar los ELIGE al capturar una salida a taller
  * y sin ellos el formulario offline quedaría con los selectores vacíos.
  */
@@ -41,6 +42,7 @@ export const OFFLINE_TABLE_PERMISSIONS: Record<OfflineTable, readonly Permission
   sizes: ["production:browse", "inventory:write"],
   cutTags: ["production:browse", "inventory:write"],
   workshops: ["production:browse", "inventory:write"],
+  stages: ["production:browse", "inventory:write"],
   locations: ["inventory:browse"],
   clients: ["inventory:browse"],
   suppliers: ["inventory:browse"],

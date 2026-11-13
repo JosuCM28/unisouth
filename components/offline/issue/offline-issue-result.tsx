@@ -16,9 +16,12 @@ export type IssueResult =
 export function OfflineIssueResult({
   result,
   onNew,
+  newLabel = "Capturar otra salida",
 }: {
   result: IssueResult;
   onNew: () => void;
+  /** Desde la ficha de la orden el botón cierra, y se dice así. */
+  newLabel?: string;
 }) {
   const queued = result.status === "queued";
   const Icon = queued ? CloudOff : CheckCircle2;
@@ -45,7 +48,7 @@ export function OfflineIssueResult({
       )}
 
       <Button type="button" className="touch-target" onClick={onNew}>
-        Capturar otra salida
+        {newLabel}
       </Button>
     </div>
   );

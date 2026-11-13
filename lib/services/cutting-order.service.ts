@@ -5,6 +5,7 @@ import type {
   CuttingOrderOrigin,
 } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { isUniqueViolation } from "@/lib/core/prisma-errors";
 import { sumBundlePieces, sumBundles } from "@/lib/bundles";
 import { assignCaptureDates, freshCaptureDate } from "@/lib/cutting/capture-dates";
 import { cutTotals } from "@/lib/utils";
@@ -619,9 +620,55 @@ export class CuttingOrderService extends BaseService {
    * mismo cálculo sobre los mismos renglones, y repetirlo por cada una sólo
    * gastaría viajes a la base.
    */
+  /**
+   * Sube un corte capturado SIN internet. Siempre estrena un corte nuevo.
+   *
+   * Nuevo y nunca "agregar a uno abierto": el celular no tiene los cortes de
+   * la orden, y meter bultos a ciegas en uno que otra persona pudo corregir
+   * mientras no había señal reemplazaría sus números por los de la mesa.
+   *
+   * IDEMPOTENTE por `offlineId`, como la salida sin conexión: si la señal se
+   * cayó después de guardar pero antes de la respuesta, el celular lo reenvía
+   * y sin esta revisión las piezas se sumarían dos veces a la orden.
+   */
+  async saveOfflineBatch(
+    input: BatchProgressInput,
+    offlineId: string,
+  ): Promise<{ code: string }> {
+    const existing = await this.findOfflineBatch(offlineId);
+    if (existing) return existing;
+
+    try {
+      const saved = await this.saveBatchProgress(
+        { ...input, batchId: undefined },
+        { offlineId },
+      );
+      return (await this.findOfflineBatch(offlineId)) ?? { code: saved.batchId };
+    } catch (error) {
+      // Dos reenvíos del mismo corte llegaron a la vez y el otro ganó: la
+      // llave única frenó el duplicado. Se devuelve el del otro.
+      const winner = isUniqueViolation(error)
+        ? await this.findOfflineBatch(offlineId)
+        : null;
+      if (winner) return winner;
+      throw error;
+    }
+  }
+
+  /** El corte que ya subió, nombrado como lo lee el piso: "PO-… · 2º corte". */
+  private async findOfflineBatch(offlineId: string): Promise<{ code: string } | null> {
+    const batch = await this.db.cuttingBatch.findUnique({
+      where: { offlineId },
+      select: { number: true, label: true, order: { select: { code: true } } },
+    });
+    if (!batch) return null;
+
+    return { code: `${batch.order.code} · ${cutBatchLabel(batch.number, batch.label)}` };
+  }
+
   async saveBatchProgress(
     input: BatchProgressInput,
-    options: { groupId?: string } = {},
+    options: { groupId?: string; offlineId?: string } = {},
   ) {
     return this.transaction(async (tx) => {
       const orderId = input.orderId;
@@ -671,6 +718,7 @@ export class CuttingOrderService extends BaseService {
             input.newBatchLabel,
             undefined,
             options.groupId,
+            options.offlineId,
           );
 
       /* Los renglones que el corte tenía ANTES. Se guardan porque hay que
@@ -863,6 +911,7 @@ export class CuttingOrderService extends BaseService {
     label?: string,
     notes?: string,
     groupId?: string,
+    offlineId?: string,
   ) {
     const last = await tx.cuttingBatch.findFirst({
       where: { orderId },
@@ -877,6 +926,7 @@ export class CuttingOrderService extends BaseService {
         label,
         notes,
         groupId,
+        offlineId,
         createdById: this.context.userId,
       },
     });

@@ -28,7 +28,9 @@ export type QueueKind =
   | "product.create"
   | "client.create"
   | "location.create"
-  | "issue.create";
+  | "issue.create"
+  | "cut.create"
+  | "shipment.create";
 
 export interface QueuedItem {
   /** Identificador local. NO es el folio: el folio lo asigna el servidor. */
@@ -59,6 +61,12 @@ export interface QueuedItem {
    * real; ése lo asigna el servidor al subirla y queda en la tabla `synced`.
    */
   localCode?: string;
+  /**
+   * La orden a la que pertenece la captura, si es de una. Es lo que deja a la
+   * ficha de la orden sin conexión enseñar sus cortes, envíos y salidas que
+   * todavía no suben, sin tener que abrir cada payload para adivinarlo.
+   */
+  orderId?: string;
 }
 
 /** ¿Se puede usar la cola aquí? Ver isOfflineDbAvailable. */

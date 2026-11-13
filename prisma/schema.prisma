@@ -1793,6 +1793,12 @@ model CuttingBatch {
   /// must touch exactly the batches that were captured as one.
   groupId String?
 
+  /// Lo genera el celular cuando el corte se capturó SIN internet. Único para
+  /// que reenviarlo —se cayó la señal antes de que llegara la respuesta—
+  /// devuelva el mismo corte en vez de sumar las piezas dos veces. Los cortes
+  /// capturados en línea lo dejan vacío.
+  offlineId String? @unique
+
   openedAt DateTime @default(now())
 
   createdById String?
@@ -2455,6 +2461,10 @@ model GarmentShipment {
   receivedBy   User?     @relation("GarmentShipmentReceivedBy", fields: [receivedById], references: [id])
   /// Lo que el taller anotó al recibir: "llegaron 2 bultos mojados".
   receivedNotes String?
+
+  /// Lo genera el celular cuando el envío se capturó SIN internet. Mismo
+  /// motivo que en el corte: reenviarlo no puede levantar un segundo vale.
+  offlineId String? @unique
 
   createdById String?
   createdBy   User?    @relation("GarmentShipmentCreatedBy", fields: [createdById], references: [id])

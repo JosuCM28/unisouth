@@ -587,6 +587,7 @@ export const OFFLINE_TABLE_LABELS: Record<OfflineTable, string> = {
   sizes: "Tallas",
   cutTags: "Folios",
   workshops: "Talleres",
+  stages: "Etapas",
   locations: "Ubicaciones",
   clients: "Clientes",
   suppliers: "Proveedores",
@@ -604,4 +605,6 @@ export const QUEUE_KIND_LABELS: Record<QueueKind, string> = {
   "client.create": "Cliente",
   "location.create": "Ubicación",
   "issue.create": "Salida",
+  "cut.create": "Corte",
+  "shipment.create": "Envío a taller",
 };

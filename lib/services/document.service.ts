@@ -1,5 +1,6 @@
-import { Prisma, type DocumentType, type InventoryDocument, type MovementType } from "@prisma/client";
+import { type DocumentType, type InventoryDocument, type MovementType } from "@prisma/client";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { isUniqueViolation } from "@/lib/core/prisma-errors";
 import type { DocumentInput } from "@/lib/validations/document.schema";
 import { BaseService } from "./base.service";
 import { InventoryService } from "./inventory.service";
@@ -535,9 +536,4 @@ function cutHeaderData(input: DocumentInput) {
     cutPattern: input.cutPattern,
     cutNotes: input.cutNotes ?? [],
   };
-}
-
-/** ¿Prisma rechazó la escritura por una llave única repetida? */
-function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

@@ -3,7 +3,11 @@
 import { executeAction } from "@/lib/core/action-handler";
 import { downloadOfflineTableSchema } from "@/lib/validations/offline.schema";
 import { offlineIssueSchema } from "@/lib/validations/offline-issue.schema";
+import { offlineCutSchema } from "@/lib/validations/offline-cut.schema";
+import { offlineShipmentSchema } from "@/lib/validations/offline-shipment.schema";
+import { CuttingOrderService } from "@/lib/services/cutting-order.service";
 import { DocumentService } from "@/lib/services/document.service";
+import { GarmentShipmentService } from "@/lib/services/garment-shipment.service";
 import { OfflineSnapshotService } from "@/lib/services/offline-snapshot.service";
 
 /**
@@ -39,6 +43,39 @@ export async function syncOfflineIssueAction(input: unknown) {
     handler: ({ input, auditContext }) =>
       new DocumentService(auditContext).createAndApplyOffline(
         input.document,
+        input.offlineId,
+      ),
+  });
+}
+
+/**
+ * Sube un corte capturado sin internet. Pide `cuts:write`, la misma llave
+ * que capturarlo en línea.
+ */
+export async function syncOfflineCutAction(input: unknown) {
+  return executeAction(input, {
+    schema: offlineCutSchema,
+    permission: "cuts:write",
+    revalidate: ["/orders", "/dashboard"],
+    successMessage: "Corte sin conexión guardado",
+    handler: ({ input, auditContext }) =>
+      new CuttingOrderService(auditContext).saveOfflineBatch(input.batch, input.offlineId),
+  });
+}
+
+/**
+ * Sube un envío a taller capturado sin internet. Misma llave que en línea
+ * (`inventory:write`) y mismas rutas: el envío levanta su vale en Salidas.
+ */
+export async function syncOfflineShipmentAction(input: unknown) {
+  return executeAction(input, {
+    schema: offlineShipmentSchema,
+    permission: "inventory:write",
+    revalidate: ["/orders", "/dashboard", "/issues"],
+    successMessage: "Envío sin conexión registrado",
+    handler: ({ input, auditContext }) =>
+      new GarmentShipmentService(auditContext).createOffline(
+        input.shipment,
         input.offlineId,
       ),
   });

@@ -57,6 +57,14 @@ export interface OfflineWorkshop {
   name: string;
 }
 
+/** Etapa del proceso (bordado, armado…): se elige al mandar a taller. */
+export interface OfflineStage {
+  id: string;
+  code: string;
+  name: string;
+  position: number;
+}
+
 export interface OfflineLocation {
   id: string;
   code: string;
@@ -129,6 +137,21 @@ export interface OfflineOrderLine {
   orderedQuantity: number;
   cutQuantity: number;
   position: number;
+  /** La anotación del renglón: distingue dos renglones de la misma talla. */
+  notes: string | null;
+}
+
+/**
+ * Piezas ya mandadas de una talla a UNA etapa, al descargar.
+ *
+ * Por etapa y no un total: lo que sale a bordar son paneles, y esas mismas
+ * prendas pueden ir después a armado. Es el mismo contador que enseña el
+ * envío en línea; informa, no bloquea.
+ */
+export interface OfflineSentCount {
+  sizeId: string;
+  stageId: string;
+  pieces: number;
 }
 
 export interface OfflineOrder {
@@ -146,6 +169,8 @@ export interface OfflineOrder {
   dueDate: string | null;
   /** Las tallas van dentro de la orden: nunca se leen sin ella. */
   lines: OfflineOrderLine[];
+  /** Lo ya enviado a taller, sin contar envíos cancelados. */
+  sent: OfflineSentCount[];
 }
 
 /** Qué registro guarda cada tabla. Une la llave con su forma. */
@@ -154,6 +179,7 @@ export interface OfflineRecordMap {
   sizes: OfflineSize;
   cutTags: OfflineCutTag;
   workshops: OfflineWorkshop;
+  stages: OfflineStage;
   locations: OfflineLocation;
   clients: OfflineClient;
   suppliers: OfflineSupplier;

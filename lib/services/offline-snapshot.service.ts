@@ -19,6 +19,7 @@ import type {
   OfflineMaterial,
   OfflineOrder,
   OfflineReceipt,
+  OfflineSentCount,
   OfflineRecord,
   OfflineTablePayload,
 } from "@/lib/offline/snapshot.types";
@@ -75,6 +76,7 @@ export class OfflineSnapshotService extends BaseService {
       sizes: () => repo.sizes(),
       cutTags: () => repo.cutTags(),
       workshops: () => repo.workshops(),
+      stages: () => repo.stages(),
       locations: () => repo.locations(),
       clients: () => repo.clients(),
       suppliers: () => repo.suppliers(),
@@ -129,10 +131,34 @@ function toIssue(row: SnapshotIssueRow): OfflineIssue {
   return { ...row, date: row.date.toISOString() };
 }
 
-function toOrder(row: SnapshotOrderRow): OfflineOrder {
+function toOrder({ shipments, ...row }: SnapshotOrderRow): OfflineOrder {
   return {
     ...row,
     orderedAt: row.orderedAt.toISOString(),
     dueDate: iso(row.dueDate),
+    sent: sentCounts(shipments),
   };
+}
+
+/**
+ * Los envíos aplanados a "talla + etapa → piezas". Piezas = cantidad por
+ * bulto × bultos, igual que lo cuenta el vale.
+ */
+function sentCounts(shipments: SnapshotOrderRow["shipments"]): OfflineSentCount[] {
+  const totals = new Map<string, OfflineSentCount>();
+
+  for (const shipment of shipments) {
+    for (const line of shipment.lines) {
+      const key = `${line.sizeId}:${shipment.stageId}`;
+      const current = totals.get(key) ?? {
+        sizeId: line.sizeId,
+        stageId: shipment.stageId,
+        pieces: 0,
+      };
+      current.pieces += line.sentQuantity * line.bundles;
+      totals.set(key, current);
+    }
+  }
+
+  return [...totals.values()];
 }

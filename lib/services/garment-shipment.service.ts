@@ -1,6 +1,7 @@
 import type { GarmentShipment } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, NotFoundError } from "@/lib/core/errors";
+import { isUniqueViolation } from "@/lib/core/prisma-errors";
 import { bundlePieces, sumBundlePieces } from "@/lib/bundles";
 import { isTrackedByWorkshop } from "@/lib/workshop-delivery";
 import type {
@@ -64,7 +65,39 @@ export class GarmentShipmentService extends BaseService {
    * veces el mismo renglón. No se aplica solo —eso es un acto deliberado del
    * auxiliar— y no descuenta tela, porque lo que sale son prendas cortadas.
    */
-  async create(input: GarmentShipmentInput): Promise<GarmentShipment> {
+  /**
+   * Sube un envío capturado SIN internet. Es un `create` normal que llegó
+   * tarde: el folio ENV y el de su vale salen aquí, los que siguen en la serie.
+   *
+   * IDEMPOTENTE por `offlineId`: reenviarlo porque la respuesta no llegó no
+   * puede levantar un segundo vale para el mismo camión.
+   */
+  async createOffline(
+    input: GarmentShipmentInput,
+    offlineId: string,
+  ): Promise<GarmentShipment> {
+    const existing = await this.findOffline(offlineId);
+    if (existing) return existing;
+
+    try {
+      return await this.create(input, { offlineId });
+    } catch (error) {
+      // Dos reenvíos a la vez: el otro ganó la carrera y la llave única
+      // frenó el duplicado. Se devuelve el suyo.
+      const winner = isUniqueViolation(error) ? await this.findOffline(offlineId) : null;
+      if (winner) return winner;
+      throw error;
+    }
+  }
+
+  private findOffline(offlineId: string): Promise<GarmentShipment | null> {
+    return this.db.garmentShipment.findUnique({ where: { offlineId } });
+  }
+
+  async create(
+    input: GarmentShipmentInput,
+    options: { offlineId?: string } = {},
+  ): Promise<GarmentShipment> {
     return this.transaction(async (tx) => {
       const order = await tx.cuttingOrder.findUnique({
         where: { id: input.orderId },
@@ -129,6 +162,7 @@ export class GarmentShipmentService extends BaseService {
           parts: input.parts,
           reference: input.reference,
           notes: input.notes,
+          offlineId: options.offlineId,
           createdById: this.context.userId,
           lines: {
             create: input.lines.map((line, index) => ({

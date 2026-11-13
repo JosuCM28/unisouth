@@ -30,6 +30,7 @@ const SNAPSHOT_INDEXES: Record<OfflineTable, string> = {
   sizes: "id, code, order",
   cutTags: "id, code, order",
   workshops: "id, name",
+  stages: "id, position",
   locations: "id, code",
   clients: "id, name",
   suppliers: "id, name",
@@ -81,6 +82,10 @@ export class OfflineDatabase extends Dexie {
 
     // Fase 2: el puente entre el folio TMP del celular y el real.
     this.version(3).stores({ synced: "id, syncedAt" });
+
+    /* Las etapas, para mandar a taller sin señal. Sólo la tabla nueva: Dexie
+       conserva las demás tal cual, con la copia y la cola que ya traían. */
+    this.version(4).stores({ stages: SNAPSHOT_INDEXES.stages });
   }
 
   /** Una tabla de la copia por su llave, con su tipo correcto. */

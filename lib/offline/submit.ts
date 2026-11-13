@@ -54,7 +54,7 @@ export async function submitOrQueue<T>(
   kind: QueueKind,
   payload: unknown,
   summary: string,
-  localCode?: string,
+  extra: Pick<QueuedItem, "localCode" | "orderId"> = {},
 ): Promise<SubmitOutcome<T>> {
   try {
     const result = (await QUEUE_KINDS[kind].send(payload)) as ActionResult<T>;
@@ -83,7 +83,7 @@ export async function submitOrQueue<T>(
       };
     }
 
-    const item = await enqueue({ kind, payload, summary, localCode });
+    const item = await enqueue({ kind, payload, summary, ...extra });
     return { status: "queued", item };
   }
 }

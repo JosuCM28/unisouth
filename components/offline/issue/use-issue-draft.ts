@@ -13,8 +13,8 @@ import { EMPTY_DETAILS, type IssueDetails } from "./offline-issue-details";
  * dueño, y dejar los del cliente anterior en una salida del nuevo sería
  * justo surtir tela de uno a la producción de otro.
  */
-export function useIssueDraft() {
-  const [clientId, setClientIdState] = useState("");
+export function useIssueDraft(initialClientId = "") {
+  const [clientId, setClientIdState] = useState(initialClientId);
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [details, setDetails] = useState<IssueDetails>(EMPTY_DETAILS);
 
