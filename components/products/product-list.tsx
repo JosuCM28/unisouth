@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
+import type { GarmentCategoryOption } from "@/lib/repositories/garment-category.repository";
 import type { ProductListItem } from "@/lib/repositories/product.repository";
 import { Button } from "@/components/ui/button";
 import { ProductActions } from "./product-actions";
@@ -7,10 +8,11 @@ import { ProductActions } from "./product-actions";
 interface Props {
   products: ProductListItem[];
   clients: { id: string; name: string }[];
+  categories: GarmentCategoryOption[];
 }
 
 /** Server Component: sólo el menú de cada fila necesita ser cliente. */
-export function ProductList({ products, clients }: Props) {
+export function ProductList({ products, clients, categories }: Props) {
   return (
     <ul className="flex flex-col gap-2">
       {products.map((product) => (
@@ -19,7 +21,7 @@ export function ProductList({ products, clients }: Props) {
             <p className="tabular text-sm font-medium">{product.code}</p>
             <p className="truncate text-sm">{product.name}</p>
             <p className="text-xs text-muted-foreground">
-              {product.clientName ?? "Sin cliente"} · {bomLabel(product.bomVersion)}
+              {[product.categoryName ?? "Sin tipo", product.clientName ?? "Sin cliente", bomLabel(product.bomVersion)].join(" · ")}
             </p>
           </div>
 
@@ -30,7 +32,7 @@ export function ProductList({ products, clients }: Props) {
                 Ficha
               </Link>
             </Button>
-            <ProductActions product={product} clients={clients} />
+            <ProductActions product={product} clients={clients} categories={categories} />
           </div>
         </li>
       ))}

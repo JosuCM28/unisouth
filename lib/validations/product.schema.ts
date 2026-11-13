@@ -9,7 +9,8 @@ export const productSchema = z.object({
   ),
   name: requiredText("El nombre", 160),
   clientId: optionalCuid,
-  category: optionalText,
+  /** Tipo de prenda del catálogo. Sustituye al texto libre de antes. */
+  categoryId: optionalCuid,
   unit: z.nativeEnum(Unit).default(Unit.PIECE),
   description: optionalText,
   active: z.boolean().default(true),
@@ -21,7 +22,7 @@ export const productFormSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio").max(40),
   name: z.string().trim().min(1, "El nombre es obligatorio").max(160),
   clientId: z.string().optional(),
-  category: z.string().optional(),
+  categoryId: z.string().optional(),
   unit: z.nativeEnum(Unit),
   description: z.string().optional(),
   active: z.boolean(),

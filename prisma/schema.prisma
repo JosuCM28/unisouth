@@ -1232,7 +1232,16 @@ model FinishedProduct {
   description String?
   clientId    String?
   client      Client?   @relation(fields: [clientId], references: [id])
+  /// OBSOLETO: el texto libre de antes. Se migró a `categoryId` y ya nadie lo
+  /// escribe. Sigue en la tabla sólo para que la versión desplegada —que lo
+  /// lee— no truene mientras se aplica la migración; se borra en una
+  /// migración posterior, cuando ya no quede código que lo pida.
   category    String?
+  /// Qué tipo de prenda es: lo que filtra el inventario de Embarques y lo que
+  /// se imprime en el packing list. Opcional: la mayoría de los productos de
+  /// ficha técnica nacieron antes del catálogo.
+  categoryId  String?
+  garmentCategory GarmentCategory? @relation(fields: [categoryId], references: [id])
   unit        Unit      @default(PIECE)
   imageUrl    String?
   active      Boolean   @default(true)
@@ -1247,7 +1256,32 @@ model FinishedProduct {
   productionOrderLines ProductionOrderLine[]
 
   @@index([active, category])
+  @@index([categoryId])
   @@map("finished_products")
+}
+
+/// El tipo de prenda: Camisa, Pantalón, Chamarra, Overol.
+///
+/// Catálogo y no enum por lo mismo que ProcessStage: el día que entre
+/// "Chaleco" no puede hacer falta un deploy. Y tabla y no el texto libre que
+/// había: con texto, "Camisa", "CAMISA" y "camisas" eran tres filtros
+/// distintos en el inventario y tres renglones en el packing list.
+model GarmentCategory {
+  id   String @id @default(cuid())
+  name String @unique
+
+  /// Orden de lectura en filtros y en el packing list.
+  position Int @default(0)
+
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products FinishedProduct[]
+
+  @@index([deletedAt, position])
+  @@map("garment_categories")
 }
 
 /// Size catalog with its consumption multiplier: an XL eats more fabric than

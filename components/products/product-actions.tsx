@@ -3,6 +3,7 @@
 import { Pencil } from "lucide-react";
 import type { FinishedProduct } from "@prisma/client";
 import { removeProductAction } from "@/app/actions/product.actions";
+import type { GarmentCategoryOption } from "@/lib/repositories/garment-category.repository";
 import { RowActions } from "@/components/shared/row-actions";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ProductFormDialog } from "./product-form-dialog";
@@ -10,9 +11,10 @@ import { ProductFormDialog } from "./product-form-dialog";
 interface Props {
   product: FinishedProduct;
   clients: { id: string; name: string }[];
+  categories: GarmentCategoryOption[];
 }
 
-export function ProductActions({ product, clients }: Props) {
+export function ProductActions({ product, clients, categories }: Props) {
   return (
     <RowActions
       label={product.name}
@@ -20,6 +22,7 @@ export function ProductActions({ product, clients }: Props) {
         <ProductFormDialog
           product={product}
           clients={clients}
+          categories={categories}
           trigger={
             <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
               <Pencil className="size-4" aria-hidden />

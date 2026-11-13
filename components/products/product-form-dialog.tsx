@@ -12,6 +12,7 @@ import { runAction } from "@/lib/offline/run-action";
 import { notifyQueueChanged } from "@/hooks/use-offline-queue";
 import { UNIT_LABELS, toSelectOptions } from "@/lib/constants/labels";
 import { productFormSchema, type ProductFormValues } from "@/lib/validations/product.schema";
+import type { GarmentCategoryOption } from "@/lib/repositories/garment-category.repository";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
 import { FormSection } from "@/components/shared/form-section";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
@@ -26,10 +27,11 @@ const FIELDS = Object.keys(productFormSchema.shape) as (keyof ProductFormValues)
 interface Props {
   product?: FinishedProduct;
   clients: { id: string; name: string }[];
+  categories: GarmentCategoryOption[];
   trigger: ReactNode;
 }
 
-export function ProductFormDialog({ product, clients, trigger }: Props) {
+export function ProductFormDialog({ product, clients, categories, trigger }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const isEditing = Boolean(product);
@@ -51,7 +53,7 @@ export function ProductFormDialog({ product, clients, trigger }: Props) {
     const payload = {
       ...values,
       clientId: values.clientId || undefined,
-      category: values.category || undefined,
+      categoryId: values.categoryId || undefined,
       description: values.description || undefined,
     };
 
@@ -126,7 +128,18 @@ export function ProductFormDialog({ product, clients, trigger }: Props) {
             </Select>
           </FormSelectField>
 
-          <FormField id="category" label="Categoría" placeholder="Uniformes" {...register("category")} />
+          <FormSelectField id="categoryId" label="Tipo de prenda">
+            <Select value={watch("categoryId") || "none"}
+              onValueChange={(v) => setValue("categoryId", v === "none" ? "" : v)}>
+              <SelectTrigger id="categoryId" className="touch-target w-full">
+                <SelectValue placeholder="Sin tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin tipo</SelectItem>
+                {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </FormSelectField>
 
           <FormSelectField id="unit" label="Unidad">
             <Select value={watch("unit")} onValueChange={(v) => setValue("unit", v as Unit)}>
@@ -155,7 +168,7 @@ export function ProductFormDialog({ product, clients, trigger }: Props) {
 function toDefaults(product?: FinishedProduct): ProductFormValues {
   return {
     code: product?.code ?? "", name: product?.name ?? "",
-    clientId: product?.clientId ?? "", category: product?.category ?? "",
+    clientId: product?.clientId ?? "", categoryId: product?.categoryId ?? "",
     unit: product?.unit ?? "PIECE", description: product?.description ?? "",
     active: product?.active ?? true,
   };

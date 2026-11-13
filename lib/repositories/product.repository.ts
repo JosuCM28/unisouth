@@ -35,6 +35,7 @@ export interface ProductOption {
 
 export interface ProductListItem extends FinishedProduct {
   clientName: string | null;
+  categoryName: string | null;
   /** Versión de la ficha vigente, o null si aún no tiene. */
   bomVersion: number | null;
 }
@@ -43,6 +44,8 @@ export interface ProductListInput {
   page: number;
   pageSize: number;
   accumulate: boolean;
+  /** Sólo los de este tipo de prenda. */
+  categoryId?: string;
 }
 
 export class ProductRepository extends BaseRepository<
@@ -86,7 +89,10 @@ export class ProductRepository extends BaseRepository<
     const take = input.accumulate
       ? Math.min(input.page * input.pageSize, 300)
       : input.pageSize;
-    const where = this.notDeleted;
+    const where = {
+      ...this.notDeleted,
+      ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+    };
 
     const [total, products] = await Promise.all([
       this.db.finishedProduct.count({ where }),
@@ -99,15 +105,17 @@ export class ProductRepository extends BaseRepository<
         take,
         include: {
           client: { select: { name: true } },
+          garmentCategory: { select: { name: true } },
           billsOfMaterials: { ...CURRENT_BOM_SELECTION, select: { version: true } },
         },
       }),
     ]);
 
     return {
-      items: products.map(({ client, billsOfMaterials, ...product }) => ({
+      items: products.map(({ client, garmentCategory, billsOfMaterials, ...product }) => ({
         ...product,
         clientName: client?.name ?? null,
+        categoryName: garmentCategory?.name ?? null,
         bomVersion: billsOfMaterials[0]?.version ?? null,
       })),
       total,
