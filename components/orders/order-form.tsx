@@ -323,7 +323,9 @@ export function OrderForm({
         id: line.id,
         sizeId: line.sizeId,
         orderedQuantity: splitsTotal(line.splits),
-        tagId: line.tagId || undefined,
+        /* Sólo al corregir: al crear el campo no se pinta, y al duplicar
+           llegaría el folio de la orden original sin que nadie lo vea. */
+        tagId: isEditing ? line.tagId || undefined : undefined,
         // Las partes en blanco (sin PO ni piezas) no son nada: se descartan.
         poSplits: line.splits
           .filter((split) => Number(split.quantity) > 0)
@@ -476,20 +478,31 @@ export function OrderForm({
 
         <ul className="flex flex-col gap-3">
           {lines.map((line) => (
-            <li key={line.key} className="flat-surface flex flex-col gap-2 p-3">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
+            <li key={line.key} className="flat-surface flex flex-col gap-3 p-3">
+              {/* Talla y piezas en una sola fila: es lo único obligatorio del
+                  renglón y lo que se teclea en cada talla. */}
+              <div className="flex items-end gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Talla</span>
                   <SearchSelect
                     options={sizeOptions}
                     value={line.sizeId}
                     onChange={(value) => updateLine(line.key, { sizeId: value })}
-                    placeholder="Talla"
+                    placeholder="Elegir talla"
                     searchPlaceholder="Buscar talla…"
                     // Cambiar la talla de un renglón con avance movería su
                     // historial a otra talla: se bloquea.
                     disabled={line.locked}
                   />
                 </div>
+
+                <label className="flex w-24 shrink-0 flex-col gap-1 sm:w-32">
+                  <span className="text-xs text-muted-foreground">Piezas</span>
+                  <LineQuantityInput
+                    splits={line.splits}
+                    onChange={(splits) => updateLine(line.key, { splits })}
+                  />
+                </label>
 
                 <Button
                   type="button"
@@ -503,64 +516,39 @@ export function OrderForm({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* El folio (color de la etiqueta) se asigna DESPUÉS, cuando la
+                  orden ya se está trabajando: al dar de alta nunca se conoce,
+                  y un campo que siempre se deja vacío sólo estorba. */}
+              {isEditing && (
+                <LineFolioField
+                  tags={tags}
+                  value={line.tagId}
+                  onChange={(tagId) => updateLine(line.key, { tagId })}
+                />
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2 md:items-start">
+                {/* También en modo planta: el packing list se arma por PO sin
+                    importar en qué planta nació la orden. */}
+                <LinePoSplits
+                  splits={line.splits}
+                  onChange={(splits) => updateLine(line.key, { splits })}
+                />
+
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">
-                    Cantidad pedida
+                    Anotaciones
                   </span>
-                  <LineQuantityInput
-                    splits={line.splits}
-                    onChange={(splits) => updateLine(line.key, { splits })}
+                  <Input
+                    value={line.notes}
+                    onChange={(event) =>
+                      updateLine(line.key, { notes: event.target.value })
+                    }
+                    placeholder="Opcional"
+                    className="touch-target"
                   />
                 </label>
-
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Folio</span>
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                      <SearchSelect
-                        options={tags.map((tag) => ({
-                          value: tag.id,
-                          label: tag.name,
-                        }))}
-                        value={line.tagId}
-                        onChange={(value) =>
-                          updateLine(line.key, { tagId: value })
-                        }
-                        placeholder="Sin folio"
-                        searchPlaceholder="Buscar color…"
-                        clearLabel="Sin folio"
-                      />
-                    </div>
-                    {line.tagId && (
-                      <span
-                        className="size-6 shrink-0 border border-border"
-                        style={{
-                          backgroundColor: tags.find((t) => t.id === line.tagId)
-                            ?.color,
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                  </div>
-                </div>
               </div>
-
-              {/* También en modo planta: el packing list se arma por PO sin
-                  importar en qué planta nació la orden. */}
-              <LinePoSplits
-                splits={line.splits}
-                onChange={(splits) => updateLine(line.key, { splits })}
-              />
-
-              <Input
-                value={line.notes}
-                onChange={(event) =>
-                  updateLine(line.key, { notes: event.target.value })
-                }
-                placeholder="Anotaciones"
-                className="touch-target"
-              />
             </li>
           ))}
         </ul>
@@ -722,6 +710,44 @@ function submit({
 
   if (isPlant) return createPlantOrderAction(payload);
   return createCuttingOrderAction(payload);
+}
+
+/** El folio de la talla: el color de la etiqueta que lleva el bulto. */
+function LineFolioField({
+  tags,
+  value,
+  onChange,
+}: {
+  tags: TagOption[];
+  value: string;
+  onChange: (tagId: string) => void;
+}) {
+  const color = tags.find((tag) => tag.id === value)?.color;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">Folio</span>
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <SearchSelect
+            options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            value={value}
+            onChange={onChange}
+            placeholder="Sin folio"
+            searchPlaceholder="Buscar color…"
+            clearLabel="Sin folio"
+          />
+        </div>
+        {value && (
+          <span
+            className="size-6 shrink-0 border border-border"
+            style={{ backgroundColor: color }}
+            aria-hidden
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Una parte con PO escrito pero sin piezas: no se puede guardar. */
