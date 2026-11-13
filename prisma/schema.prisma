@@ -56,41 +56,43 @@ model User {
   accounts Account[]
 
   // ── Traceability: who did what ──
-  auditLogs                 AuditLog[]
-  movements                 Movement[]            @relation("MovementUser")
-  lotsCreated               Lot[]                 @relation("LotCreatedBy")
-  receiptsRecorded          Receipt[]             @relation("ReceiptRecordedBy")
-  documentsCreated          InventoryDocument[]   @relation("DocumentCreatedBy")
-  documentsWorkshopReceived InventoryDocument[]   @relation("DocumentWorkshopReceivedBy")
-  documentsApplied          InventoryDocument[]   @relation("DocumentAppliedBy")
-  documentsCancelled        InventoryDocument[]   @relation("DocumentCancelledBy")
-  reservationsCreated       Reservation[]         @relation("ReservationCreatedBy")
-  countsResponsible         Count[]               @relation("CountResponsible")
-  countLinesCounted         CountLine[]           @relation("CountLineCountedBy")
-  billsOfMaterialsCreated   BillOfMaterials[]     @relation("BomCreatedBy")
-  billsOfMaterialsApproved  BillOfMaterials[]     @relation("BomApprovedBy")
-  calculationsCreated       Calculation[]         @relation("CalculationCreatedBy")
-  productionOrdersCreated   ProductionOrder[]     @relation("ProductionOrderCreatedBy")
-  purchaseRequestsRequested PurchaseRequest[]     @relation("PurchaseRequestRequestedBy")
-  purchaseRequestsApproved  PurchaseRequest[]     @relation("PurchaseRequestApprovedBy")
-  cuttingOrders             CuttingOrder[]        @relation("CuttingOrderCreatedBy")
+  auditLogs                  AuditLog[]
+  movements                  Movement[]            @relation("MovementUser")
+  lotsCreated                Lot[]                 @relation("LotCreatedBy")
+  receiptsRecorded           Receipt[]             @relation("ReceiptRecordedBy")
+  documentsCreated           InventoryDocument[]   @relation("DocumentCreatedBy")
+  documentsWorkshopReceived  InventoryDocument[]   @relation("DocumentWorkshopReceivedBy")
+  documentsApplied           InventoryDocument[]   @relation("DocumentAppliedBy")
+  documentsCancelled         InventoryDocument[]   @relation("DocumentCancelledBy")
+  reservationsCreated        Reservation[]         @relation("ReservationCreatedBy")
+  countsResponsible          Count[]               @relation("CountResponsible")
+  countLinesCounted          CountLine[]           @relation("CountLineCountedBy")
+  billsOfMaterialsCreated    BillOfMaterials[]     @relation("BomCreatedBy")
+  billsOfMaterialsApproved   BillOfMaterials[]     @relation("BomApprovedBy")
+  calculationsCreated        Calculation[]         @relation("CalculationCreatedBy")
+  productionOrdersCreated    ProductionOrder[]     @relation("ProductionOrderCreatedBy")
+  purchaseRequestsRequested  PurchaseRequest[]     @relation("PurchaseRequestRequestedBy")
+  purchaseRequestsApproved   PurchaseRequest[]     @relation("PurchaseRequestApprovedBy")
+  cuttingOrders              CuttingOrder[]        @relation("CuttingOrderCreatedBy")
   /// Las órdenes de la otra planta que este usuario jaló al concentrado.
-  plantOrdersAdded          CuttingOrder[]        @relation("CuttingOrderAddedBy")
-  cuttingProgress           CuttingProgress[]     @relation("CuttingProgressBy")
-  cuttingBatches            CuttingBatch[]        @relation("CuttingBatchOpenedBy")
-  orderComments             CuttingOrderComment[] @relation("CuttingOrderCommentBy")
-  garmentReturns            GarmentReturn[]       @relation("GarmentReturnBy")
-  garmentShipments          GarmentShipment[]     @relation("GarmentShipmentCreatedBy")
-  garmentShipmentsReceived  GarmentShipment[]     @relation("GarmentShipmentReceivedBy")
-  garmentShipmentsDispatched GarmentShipment[]    @relation("GarmentShipmentDispatchedBy")
-  documentsDispatched       InventoryDocument[]   @relation("DocumentDispatchedBy")
-  garmentFolders            GarmentFolder[]       @relation("GarmentFolderCreatedBy")
-  garmentsCreated           Garment[]             @relation("GarmentCreatedBy")
-  garmentPhotos             GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
-  attachments               Attachment[]          @relation("AttachmentUploadedBy")
-  orderFolders              OrderFolder[]         @relation("OrderFolderCreatedBy")
-  cutEditRequests           CutEditRequest[]      @relation("CutEditRequestBy")
-  cutEditReviews            CutEditRequest[]      @relation("CutEditReviewedBy")
+  plantOrdersAdded           CuttingOrder[]        @relation("CuttingOrderAddedBy")
+  cuttingProgress            CuttingProgress[]     @relation("CuttingProgressBy")
+  cuttingBatches             CuttingBatch[]        @relation("CuttingBatchOpenedBy")
+  orderComments              CuttingOrderComment[] @relation("CuttingOrderCommentBy")
+  garmentReturns             GarmentReturn[]       @relation("GarmentReturnBy")
+  garmentShipments           GarmentShipment[]     @relation("GarmentShipmentCreatedBy")
+  garmentShipmentsReceived   GarmentShipment[]     @relation("GarmentShipmentReceivedBy")
+  workshopOutputsCreated     WorkshopOutput[]      @relation("WorkshopOutputCreatedBy")
+  workshopOutputsCancelled   WorkshopOutput[]      @relation("WorkshopOutputCancelledBy")
+  garmentShipmentsDispatched GarmentShipment[]     @relation("GarmentShipmentDispatchedBy")
+  documentsDispatched        InventoryDocument[]   @relation("DocumentDispatchedBy")
+  garmentFolders             GarmentFolder[]       @relation("GarmentFolderCreatedBy")
+  garmentsCreated            Garment[]             @relation("GarmentCreatedBy")
+  garmentPhotos              GarmentPhoto[]        @relation("GarmentPhotoCreatedBy")
+  attachments                Attachment[]          @relation("AttachmentUploadedBy")
+  orderFolders               OrderFolder[]         @relation("OrderFolderCreatedBy")
+  cutEditRequests            CutEditRequest[]      @relation("CutEditRequestBy")
+  cutEditReviews             CutEditRequest[]      @relation("CutEditReviewedBy")
 
   @@index([active, role])
   @@map("user")
@@ -802,9 +804,9 @@ model InventoryDocument {
 
   /// Cuándo confirmó el taller que le llegó, y quién. Con prefijo porque
   /// `receivedBy` ya es el nombre que se firma en el papel.
-  workshopReceivedAt   DateTime?
-  workshopReceivedById String?
-  workshopReceivedBy   User?     @relation("DocumentWorkshopReceivedBy", fields: [workshopReceivedById], references: [id])
+  workshopReceivedAt    DateTime?
+  workshopReceivedById  String?
+  workshopReceivedBy    User?     @relation("DocumentWorkshopReceivedBy", fields: [workshopReceivedById], references: [id])
   /// Lo que el taller anotó al recibir.
   workshopReceivedNotes String?
 
@@ -1226,29 +1228,29 @@ enum CountLineResult {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model FinishedProduct {
-  id          String    @id @default(cuid())
-  code        String    @unique
-  name        String
-  description String?
-  clientId    String?
-  client      Client?   @relation(fields: [clientId], references: [id])
+  id              String           @id @default(cuid())
+  code            String           @unique
+  name            String
+  description     String?
+  clientId        String?
+  client          Client?          @relation(fields: [clientId], references: [id])
   /// OBSOLETO: el texto libre de antes. Se migró a `categoryId` y ya nadie lo
   /// escribe. Sigue en la tabla sólo para que la versión desplegada —que lo
   /// lee— no truene mientras se aplica la migración; se borra en una
   /// migración posterior, cuando ya no quede código que lo pida.
-  category    String?
+  category        String?
   /// Qué tipo de prenda es: lo que filtra el inventario de Embarques y lo que
   /// se imprime en el packing list. Opcional: la mayoría de los productos de
   /// ficha técnica nacieron antes del catálogo.
-  categoryId  String?
+  categoryId      String?
   garmentCategory GarmentCategory? @relation(fields: [categoryId], references: [id])
-  unit        Unit      @default(PIECE)
-  imageUrl    String?
-  active      Boolean   @default(true)
-  extras      Json?
-  deletedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  unit            Unit             @default(PIECE)
+  imageUrl        String?
+  active          Boolean          @default(true)
+  extras          Json?
+  deletedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   variants             Variant[]
   billsOfMaterials     BillOfMaterials[]
@@ -1302,6 +1304,7 @@ model Size {
   documentCutLines     DocumentCutLine[]
   cuttingOrderLines    CuttingOrderLine[]
   shipmentLines        GarmentShipmentLine[]
+  workshopOutputLines  WorkshopOutputLine[]
 
   @@index([group, order])
   @@map("sizes")
@@ -1653,9 +1656,9 @@ model OrderFolder {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orders CuttingOrder[]
+  orders     CuttingOrder[]
   /// The folder-wide issue vouchers born from it.
-  issues InventoryDocument[] @relation("DocumentOrderFolder")
+  issues     InventoryDocument[] @relation("DocumentOrderFolder")
   /// Los bultos REALES de cada corte global, tal como salieron de la mesa.
   cutBundles GlobalCutBundle[]
 
@@ -1696,9 +1699,9 @@ model CuttingOrder {
 
   /// Free text ("Blusa manga larga"): the catalogue of finished products is
   /// not always filled in, and the order must not wait for it.
-  description String?
+  description   String?
   /// The client's own order number, written on the paper.
-  reference   String?
+  reference     String?
   /// Where the finished garments go ("Planta Ternium Pesquería, almacén 3").
   /// Free text and not a catalogue: it changes order by order and the client
   /// dictates it on the phone. Printed on the order sheet next to the due date.
@@ -1774,17 +1777,19 @@ model CuttingOrder {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  lines       CuttingOrderLine[]
-  batches     CuttingBatch[]
-  shipments   GarmentShipment[]
-  comments    CuttingOrderComment[]
+  lines           CuttingOrderLine[]
+  batches         CuttingBatch[]
+  shipments       GarmentShipment[]
+  /// Lo que los talleres sacaron de esta orden.
+  workshopOutputs WorkshopOutput[]
+  comments        CuttingOrderComment[]
   /// Permisos pedidos para corregir los cortes de la orden ya terminada.
-  editRequests CutEditRequest[]
+  editRequests    CutEditRequest[]
   /// Photos of the paper the client handed over. The order's backup.
-  attachments Attachment[]
+  attachments     Attachment[]
   /// The issue vouchers born from this order. Read to show whether it already
   /// left and whether that delivery is still standing.
-  issues      InventoryDocument[]   @relation("DocumentCuttingOrder")
+  issues          InventoryDocument[]   @relation("DocumentCuttingOrder")
 
   @@index([status, orderedAt])
   @@index([clientId])
@@ -2378,7 +2383,12 @@ model Workshop {
   /// Unique porque un rol que apuntara a dos talleres dejaría ver a cada uno
   /// las entregas del otro. Es String por la misma razón que `User.role`: la
   /// lista válida vive en `lib/constants/roles.ts`.
-  accessRole  String?   @unique
+  accessRole String? @unique
+
+  /// Qué hace: borda/serigrafía (PROCESS) o confecciona (ASSEMBLY). Decide
+  /// qué salida captura desde su tablero. Campo y no deducido del nombre: el
+  /// día que entre otro taller sólo se elige aquí.
+  kind        WorkshopKind @default(PROCESS)
   /// Desde cuándo tiene cuenta. Sólo se le enseña lo enviado de ahí en
   /// adelante: si no, todo su historial le aparecería "por recibir".
   accessSince DateTime?
@@ -2388,10 +2398,103 @@ model Workshop {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  shipments GarmentShipment[]
-  documents InventoryDocument[]
+  shipments       GarmentShipment[]
+  documents       InventoryDocument[]
+  /// Lo que este taller sacó de su saldo.
+  outputs         WorkshopOutput[]    @relation("WorkshopOutputFrom")
+  /// Lo que otros talleres dicen haberle mandado. Sólo informa: nadie lo
+  /// recibe ni lo confirma.
+  incomingOutputs WorkshopOutput[]    @relation("WorkshopOutputTo")
 
   @@map("workshops")
+}
+
+enum WorkshopKind {
+  /// Borda o serigrafía piezas sueltas y las manda a quien confecciona.
+  PROCESS
+  /// Confecciona la prenda completa y la manda a Embarques.
+  ASSEMBLY
+}
+
+enum WorkshopOutputType {
+  /// Piezas procesadas (bordadas, serigrafiadas) que salen hacia otro taller
+  /// o de regreso a la planta.
+  PROCESSED
+  /// Prenda terminada que sale a Embarques. Llega en la Fase 4.
+  FINISHED
+}
+
+/// Lo que un taller SACA de lo que recibió: la otra mitad de su saldo.
+///
+/// Nadie la recibe ni la confirma, y es a propósito: si el destino tuviera
+/// que confirmar cada salida, quien confecciona viviría dándole "recibir" a
+/// tres frentes bordados por orden. Queda como rastro: el destino es
+/// informativo, y cuando falten piezas se sabe adónde dijo el taller que las
+/// mandó.
+///
+/// Se cancela con motivo, nunca se edita ni se borra: lo que el taller dijo
+/// que sacó es un hecho, igual que un movimiento del kárdex.
+model WorkshopOutput {
+  id   String             @id @default(cuid())
+  code String             @unique
+  type WorkshopOutputType @default(PROCESSED)
+
+  workshopId String
+  workshop   Workshop @relation("WorkshopOutputFrom", fields: [workshopId], references: [id])
+
+  /// La orden de donde nacieron las piezas. El saldo se lleva por orden y
+  /// talla, así que una salida nunca mezcla dos órdenes.
+  orderId String
+  order   CuttingOrder @relation(fields: [orderId], references: [id])
+
+  /// A qué taller van. Vacío = regresan a la planta.
+  destinationWorkshopId String?
+  destinationWorkshop   Workshop? @relation("WorkshopOutputTo", fields: [destinationWorkshopId], references: [id])
+
+  date  DateTime @default(now())
+  /// Qué partes van: "frente izquierdo bordado".
+  parts String?
+  notes String?
+
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancelledBy        User?     @relation("WorkshopOutputCancelledBy", fields: [cancelledById], references: [id])
+  cancellationReason String?
+
+  createdById String?
+  createdBy   User?    @relation("WorkshopOutputCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  lines WorkshopOutputLine[]
+
+  @@index([workshopId, cancelledAt])
+  @@index([orderId])
+  @@index([destinationWorkshopId])
+  @@map("workshop_outputs")
+}
+
+model WorkshopOutputLine {
+  id       String         @id @default(cuid())
+  outputId String
+  output   WorkshopOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  sizeId String
+  size   Size   @relation(fields: [sizeId], references: [id])
+
+  /// Piezas buenas que salen.
+  quantity      Int
+  /// Piezas que el taller echó a perder. Salen del saldo igual que las
+  /// buenas —ya no están en su mesa— pero no viajan a ningún lado.
+  scrapQuantity Int     @default(0)
+  /// Obligatorio cuando hay merma: sin él nadie sabe si fue la máquina, la
+  /// tela o el bordado.
+  scrapReason   String?
+
+  position Int @default(0)
+
+  @@index([outputId])
+  @@index([sizeId])
+  @@map("workshop_output_lines")
 }
 
 /// A step garments go through after the cut: embroidery, assembly, washing.
@@ -2490,9 +2593,9 @@ model GarmentShipment {
   /// Fecha y no booleano, y aparte de `status`: el estado habla de retornos,
   /// que son la excepción; esto responde "¿ya está allá?", que es lo que se
   /// pregunta de cada envío.
-  receivedAt   DateTime?
-  receivedById String?
-  receivedBy   User?     @relation("GarmentShipmentReceivedBy", fields: [receivedById], references: [id])
+  receivedAt    DateTime?
+  receivedById  String?
+  receivedBy    User?     @relation("GarmentShipmentReceivedBy", fields: [receivedById], references: [id])
   /// Lo que el taller anotó al recibir: "llegaron 2 bultos mojados".
   receivedNotes String?
 

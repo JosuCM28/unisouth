@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WorkshopKind } from "@prisma/client";
 import { WORKSHOP_ROLES } from "@/lib/constants/workshop-access";
 import {
   cuidSchema,
@@ -109,6 +110,8 @@ export const workshopSchema = z.object({
   notes: optionalText,
   /* La cuenta con la que entra el taller. `null` = no tiene cuenta. */
   accessRole: z.enum(WORKSHOP_ROLES).nullable().default(null),
+  /* Proceso o confección: decide qué salida captura desde su tablero. */
+  kind: z.nativeEnum(WorkshopKind).default(WorkshopKind.PROCESS),
 });
 
 export type WorkshopInput = z.infer<typeof workshopSchema>;

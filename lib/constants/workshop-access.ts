@@ -14,13 +14,15 @@ export type WorkshopRole = (typeof WORKSHOP_ROLES)[number];
 export type WorkshopDeliveryState = "PENDING" | "RECEIVED" | "CANCELLED";
 
 /** Las pestañas del tablero de un taller. */
-export type WorkshopBoardTab = "pending" | "received";
+export type WorkshopBoardTab = "pending" | "received" | "outputs";
 
 /** Viene de la URL: lo que no se reconozca abre lo que falta por recibir. */
 export function parseWorkshopBoardTab(
   value: string | undefined,
 ): WorkshopBoardTab {
-  return value === "recibidas" ? "received" : "pending";
+  if (value === "recibidas") return "received";
+  if (value === "salidas") return "outputs";
+  return "pending";
 }
 
 /** Los cuatro tableros, como van en la URL. */

@@ -19,6 +19,7 @@ import {
 } from "@/lib/repositories/workshop-delivery.repository";
 import type { WorkshopInput } from "@/lib/validations/garment-shipment.schema";
 import { deliveryState, voucherDeliveryState } from "@/lib/workshop-delivery";
+import { WorkshopOutputRepository } from "@/lib/repositories/workshop-output.repository";
 import { BaseService } from "./base.service";
 
 export interface WorkshopDeliveryRow {
@@ -100,6 +101,19 @@ export interface ActiveWorkshopDelivery {
   cuts: DeliveryCut[];
   /** Un vale capturado sin orden de origen no tiene cortes que enseñar. */
   showCuts: boolean;
+  /**
+   * Lo que otros talleres dicen haberle mandado de esta misma orden ("De
+   * Sitex: 300 frentes bordados"). Sólo informa: no se recibe ni se confirma.
+   */
+  incoming: IncomingOutput[];
+}
+
+export interface IncomingOutput {
+  code: string;
+  fromWorkshop: string;
+  date: Date;
+  parts: string | null;
+  pieces: number;
 }
 
 export type WorkshopDeliveryDetail =
@@ -185,10 +199,25 @@ export class WorkshopDeliveryService extends BaseService {
     if (!workshop) return null;
 
     const shipment = await this.repository.findDetail(workshop, id);
-    if (shipment) return toDetail(shipment);
+    const voucher = shipment
+      ? null
+      : await this.repository.findVoucherDetail(workshop, id);
 
-    const voucher = await this.repository.findVoucherDetail(workshop, id);
-    return voucher ? toVoucherDetail(voucher) : null;
+    const detail = shipment ? toDetail(shipment) : voucher && toVoucherDetail(voucher);
+    if (!detail || detail.state === "CANCELLED" || !detail.orderId) return detail;
+
+    return { ...detail, incoming: await this.incomingFor(workshop.id, detail.orderId) };
+  }
+
+  private async incomingFor(workshopId: string, orderId: string): Promise<IncomingOutput[]> {
+    const outputs = await new WorkshopOutputRepository().findIncoming(workshopId, orderId);
+    return outputs.map((output) => ({
+      code: output.code,
+      fromWorkshop: output.workshop.name,
+      date: output.date,
+      parts: output.parts,
+      pieces: output.lines.reduce((sum, line) => sum + line.quantity, 0),
+    }));
   }
 
   /**
@@ -618,6 +647,7 @@ function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail 
     },
     cuts: row.cuttingOrder ? toCuts(row.cuttingOrder, row.cuttingBatchId) : [],
     showCuts: row.cuttingOrder !== null,
+    incoming: [],
   };
 }
 
@@ -653,6 +683,7 @@ function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
     order: toOrderView(row.order),
     cuts: toCuts(row.order, null),
     showCuts: true,
+    incoming: [],
   };
 }
 

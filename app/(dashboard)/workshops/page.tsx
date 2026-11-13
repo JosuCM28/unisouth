@@ -3,6 +3,7 @@ import { Factory, Layers, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/core/session";
 import { ROLE_LABELS, toRole } from "@/lib/constants/roles";
+import { WORKSHOP_KIND_LABELS } from "@/lib/constants/labels";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { WorkshopFormDialog } from "@/components/workshops/workshop-form-dialog";
@@ -79,6 +80,8 @@ export default async function WorkshopsPage() {
                     {workshop.name}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
+                    {WORKSHOP_KIND_LABELS[workshop.kind]}
+                    {" · "}
                     {[workshop.contact, workshop.phone]
                       .filter(Boolean)
                       .join(" · ") || "Sin contacto"}

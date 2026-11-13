@@ -18,6 +18,7 @@ import type {
   StandingRuleTopic,
   TaskStatus,
   Unit,
+  WorkshopKind,
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
@@ -44,6 +45,13 @@ export const ORDER_VIEW_LABELS: Record<OrderView, string> = {
 export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {
   pending: "Por recibir",
   received: "Recibidas",
+  outputs: "Salidas",
+};
+
+/** Qué hace un taller: decide qué salida captura en su tablero. */
+export const WORKSHOP_KIND_LABELS: Record<WorkshopKind, string> = {
+  PROCESS: "Proceso (bordado, serigrafía)",
+  ASSEMBLY: "Confección",
 };
 
 /** De dónde vino una entrega del taller, en el reporte del tablero. */

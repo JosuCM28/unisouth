@@ -13,6 +13,8 @@ import {
 } from "@/lib/services/workshop-delivery.service";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { WorkshopOutputService } from "@/lib/services/workshop-output.service";
+import type { OutputsBoardData } from "@/components/workshop-outputs/outputs-panel";
 import { DeliveryBoardBody } from "./delivery-board-body";
 
 export interface DeliveryBoardProps {
@@ -26,8 +28,29 @@ export interface DeliveryBoardProps {
 }
 
 export async function DeliveryBoard(props: DeliveryBoardProps) {
-  const list = await new WorkshopDeliveryService().listForRole(props.boardRole);
-  return <DeliveryBoardView {...props} list={list} />;
+  const [list, outputs] = await Promise.all([
+    new WorkshopDeliveryService().listForRole(props.boardRole),
+    loadOutputs(props.boardRole, props.viewerRole === props.boardRole),
+  ]);
+  return <DeliveryBoardView {...props} list={list} outputs={outputs} />;
+}
+
+/**
+ * La pestaña Salidas sólo existe para un taller de PROCESO: el de confección
+ * saca prenda terminada a Embarques, que es otra salida. El saldo sólo se
+ * calcula para el dueño, que es el único que captura.
+ */
+async function loadOutputs(boardRole: WorkshopRole, isOwner: boolean): Promise<OutputsBoardData | null> {
+  const service = new WorkshopOutputService();
+  const workshop = await service.findWorkshopByRole(boardRole);
+  if (!workshop || workshop.kind !== "PROCESS") return null;
+
+  const [rows, balance, destinations] = await Promise.all([
+    service.listFor(workshop.id),
+    isOwner ? service.balanceFor(workshop.id) : Promise.resolve([]),
+    isOwner ? service.destinationsFor(workshop.id) : Promise.resolve([]),
+  ]);
+  return { rows, balance, destinations };
 }
 
 /** Sin consultas: recibe las entregas ya leídas. */
@@ -38,7 +61,11 @@ export function DeliveryBoardView({
   tab,
   basePath,
   list,
-}: DeliveryBoardProps & { list: WorkshopDeliveryList | null }) {
+  outputs = null,
+}: DeliveryBoardProps & {
+  list: WorkshopDeliveryList | null;
+  outputs?: OutputsBoardData | null;
+}) {
   if (!list) {
     return (
       <div className="flex flex-col gap-4">
@@ -59,6 +86,7 @@ export function DeliveryBoardView({
       <PageHeader title={title} description={list.workshopName} />
       <DeliveryBoardBody
         rows={list.rows}
+        outputs={outputs}
         tab={tab}
         basePath={basePath}
         // El detalle pide la llave del taller: a ADMIN lo mandaría a un error.

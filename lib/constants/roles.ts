@@ -137,6 +137,14 @@ export const PERMISSIONS = [
      confirmar que llegaron. Qué taller es lo decide el rol de quien entra, y
      el filtro por taller se aplica en el servidor en cada lectura. */
   "workshop-orders:access",
+  /* Capturar la SALIDA de un taller: lo que saca de su saldo —piezas
+     bordadas hacia otro taller, o de regreso a planta— y cancelarla con
+     motivo. Aparte de `workshop-orders:access` porque ver y confirmar lo que
+     llega no es lo mismo que declarar lo que sale; un taller de sólo
+     consulta mañana no tendría por qué poder sacar piezas. Igual que
+     aquélla, ADMIN no la lleva: la salida se le carga al taller del rol que
+     entra, y ADMIN no es un taller. */
+  "workshop-output:write",
   /* Un tablero por taller, con llave propia cada uno: son pantallas distintas
      y uno no tiene por qué ver el del otro. */
   "workshop-board:acatlan",
@@ -157,7 +165,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
      entregas se arma con el taller del rol que entra y ADMIN no tiene uno. Lo
      que confirman los talleres lo ve en la ficha de cada orden. */
   ADMIN: PERMISSIONS.filter(
-    (permission) => permission !== "workshop-orders:access",
+    (permission) =>
+      permission !== "workshop-orders:access" &&
+      permission !== "workshop-output:write",
   ),
 
   /* Es quien MUEVE EL MATERIAL, y nada más: recibe, acomoda, surte y
@@ -277,10 +287,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   /* Un taller externo: sus entregas y su tablero, nada más. Sin
      `orders:browse` a propósito: esa llave abre TODAS las órdenes de la casa,
      de todos los clientes, y aquí sólo debe verse lo que le mandaron a él. */
-  WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-board:acatlan"],
-  WORKSHOP_SITEX: ["workshop-orders:access", "workshop-board:sitex"],
-  WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-board:broderie"],
-  WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-board:allende"],
+  WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-output:write", "workshop-board:acatlan"],
+  WORKSHOP_SITEX: ["workshop-orders:access", "workshop-output:write", "workshop-board:sitex"],
+  WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-output:write", "workshop-board:broderie"],
+  WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-output:write", "workshop-board:allende"],
 };
 
 /** Convierte el String de la base a un Role válido. */

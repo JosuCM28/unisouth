@@ -44,6 +44,7 @@ export function DeliveryDetail({
         onReceived={onReceived}
       />
       <DeliveryLines delivery={delivery} />
+      <IncomingOutputs delivery={delivery} />
       <OrderData delivery={delivery} />
       <Notes delivery={delivery} />
 
@@ -249,6 +250,29 @@ function Row({
         {value}
       </dd>
     </div>
+  );
+}
+
+/**
+ * Lo que otros talleres mandaron de esta orden. Sólo se lee: nadie tiene que
+ * recibirlo, y por eso no lleva botón.
+ */
+function IncomingOutputs({ delivery }: { delivery: ActiveWorkshopDelivery }) {
+  if (delivery.incoming.length === 0) return null;
+
+  return (
+    <section className="flat-surface flex flex-col gap-2 p-4">
+      <h2 className="text-sm font-semibold">De otros talleres</h2>
+      <ul className="flex flex-col gap-1 text-sm">
+        {delivery.incoming.map((output) => (
+          <li key={output.code} className="tabular">
+            De {output.fromWorkshop}: {formatQuantity(output.pieces)} pzas
+            {output.parts && ` · ${output.parts}`} · {formatDate(output.date)}
+            <span className="ml-2 text-xs text-muted-foreground">{output.code}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

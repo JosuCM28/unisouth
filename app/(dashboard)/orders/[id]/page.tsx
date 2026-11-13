@@ -75,6 +75,7 @@ import { Button } from "@/components/ui/button";
 import type { ReturnableRoll } from "@/components/orders/order-fabric-return-dialog";
 import { OrderFabricPanel } from "@/components/orders/order-fabric-panel";
 import { OrderDetailTabs } from "@/components/orders/order-detail-tabs";
+import { OrderWorkshopOutputs } from "@/components/orders/order-workshop-outputs";
 import { OrderFabricRepository } from "@/lib/repositories/order-fabric.repository";
 import { summarizeFabric } from "@/lib/order-fabric";
 
@@ -852,6 +853,11 @@ export default async function OrderDetailPage({
           />
         </section>
       )}
+
+      <OrderWorkshopOutputs
+        orderId={order.id}
+        canCancel={!!user && roleHasPermission(user.role, "cuts:unlock")}
+      />
 
       <section className="flat-surface p-4">
         <h2 className="mb-3 text-sm font-semibold">Tallas</h2>

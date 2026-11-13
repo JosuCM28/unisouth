@@ -17,9 +17,16 @@ import {
   useBoardDelivery,
 } from "./board-delivery-dialog";
 import { BoardReportDialog } from "./board-report-dialog";
+import {
+  activeOutputCount,
+  OutputsPanel,
+  type OutputsBoardData,
+} from "@/components/workshop-outputs/outputs-panel";
 
 interface Props {
   rows: WorkshopDeliveryRow[];
+  /** `null` = este taller no lleva pestaña Salidas (confección, o sin cuenta). */
+  outputs: OutputsBoardData | null;
   tab: WorkshopBoardTab;
   basePath: string;
   /** Sólo el dueño abre el detalle y confirma; ADMIN nada más mira. */
@@ -31,11 +38,12 @@ interface Props {
 const TAB_PARAMS: Record<WorkshopBoardTab, string> = {
   pending: "por-recibir",
   received: "recibidas",
+  outputs: "salidas",
 };
 
-const TABS: WorkshopBoardTab[] = ["pending", "received"];
+type DeliveryTab = Exclude<WorkshopBoardTab, "outputs">;
 
-const EMPTY_MESSAGES: Record<WorkshopBoardTab, string> = {
+const EMPTY_MESSAGES: Record<DeliveryTab, string> = {
   pending: "No tienes entregas por recibir.",
   received: "Todavía no has marcado ninguna entrega como recibida.",
 };
@@ -49,7 +57,8 @@ const EMPTY_MESSAGES: Record<WorkshopBoardTab, string> = {
  */
 export function DeliveryBoardBody({
   rows,
-  tab,
+  outputs,
+  tab: requestedTab,
   basePath,
   isOwner,
   report,
@@ -60,6 +69,14 @@ export function DeliveryBoardBody({
     () => groupRows(filterDeliveries(rows, query)),
     [rows, query],
   );
+  /* Un taller sin Salidas que llegue con ?pestana=salidas cae en Por recibir. */
+  const tab = requestedTab === "outputs" && !outputs ? "pending" : requestedTab;
+  const tabs: WorkshopBoardTab[] = outputs ? ["pending", "received", "outputs"] : ["pending", "received"];
+  const counts: Record<WorkshopBoardTab, number> = {
+    pending: groups.pending.length,
+    received: groups.received.length,
+    outputs: outputs ? activeOutputCount(outputs) : 0,
+  };
 
   return (
     <>
@@ -69,7 +86,7 @@ export function DeliveryBoardBody({
       </div>
 
       <nav className="flex border-b border-border" aria-label="Entregas">
-        {TABS.map((item) => (
+        {tabs.map((item) => (
           <Link
             key={item}
             href={`${basePath}?pestana=${TAB_PARAMS[item]}`}
@@ -83,18 +100,22 @@ export function DeliveryBoardBody({
             )}
           >
             {WORKSHOP_BOARD_TAB_LABELS[item]}
-            <span className="tabular text-xs">{groups[item].length}</span>
+            <span className="tabular text-xs">{counts[item]}</span>
           </Link>
         ))}
       </nav>
 
-      <BoardList
-        rows={groups[tab]}
-        tab={tab}
-        query={query}
-        isOwner={isOwner}
-        onOpen={(row) => delivery.open({ id: row.id, code: row.code })}
-      />
+      {tab === "outputs" && outputs ? (
+        <OutputsPanel data={outputs} isOwner={isOwner} query={query} />
+      ) : (
+        <BoardList
+          rows={groups[tab === "outputs" ? "pending" : tab]}
+          tab={tab === "outputs" ? "pending" : tab}
+          query={query}
+          isOwner={isOwner}
+          onOpen={(row) => delivery.open({ id: row.id, code: row.code })}
+        />
+      )}
 
       {/* Una sola ventana para todo el tablero: cambia de entrega, no se
           monta una por tarjeta. */}
@@ -111,7 +132,7 @@ function BoardList({
   onOpen,
 }: {
   rows: WorkshopDeliveryRow[];
-  tab: WorkshopBoardTab;
+  tab: DeliveryTab;
   query: string;
   isOwner: boolean;
   onOpen: (row: WorkshopDeliveryRow) => void;
@@ -150,7 +171,7 @@ function BoardList({
  */
 function groupRows(
   rows: WorkshopDeliveryRow[],
-): Record<WorkshopBoardTab, WorkshopDeliveryRow[]> {
+): Record<DeliveryTab, WorkshopDeliveryRow[]> {
   return {
     // La que más lleva esperando va primero: es la que urge revisar.
     pending: rows

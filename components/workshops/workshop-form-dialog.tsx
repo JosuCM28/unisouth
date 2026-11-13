@@ -11,6 +11,7 @@ import {
   updateWorkshopAction,
 } from "@/app/actions/garment-shipment.actions";
 import { ROLE_LABELS } from "@/lib/constants/roles";
+import { toSelectOptions, WORKSHOP_KIND_LABELS } from "@/lib/constants/labels";
 import { WORKSHOP_ROLES } from "@/lib/constants/workshop-access";
 import { runAction } from "@/lib/offline/run-action";
 import { FormField, FormSelectField } from "@/components/shared/form-field";
@@ -34,7 +35,10 @@ const formSchema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   accessRole: z.string(),
+  kind: z.enum(["PROCESS", "ASSEMBLY"]),
 });
+
+const KIND_OPTIONS = toSelectOptions(WORKSHOP_KIND_LABELS);
 
 /* Radix no admite un valor vacío en sus opciones, así que "sin cuenta" necesita
    un valor propio que se traduce a `null` al guardar. */
@@ -51,6 +55,7 @@ export interface EditableWorkshop {
   address: string | null;
   notes: string | null;
   accessRole: string | null;
+  kind: "PROCESS" | "ASSEMBLY";
 }
 
 export function WorkshopFormDialog({
@@ -145,6 +150,31 @@ export function WorkshopFormDialog({
           />
         </FormSelectField>
 
+        <FormSelectField
+          id="kind"
+          label="Qué hace"
+          hint="Proceso saca piezas a otro taller; confección saca prenda terminada a Embarques."
+        >
+          <Controller
+            control={form.control}
+            name="kind"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="kind" className="touch-target w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {KIND_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </FormSelectField>
+
         {/* Lo demás plegado: se llena cuando hace falta, no al dar de alta. */}
         <FormSection title="Contacto">
           <div className="flex flex-col gap-4">
@@ -194,5 +224,6 @@ function toFormValues(workshop?: EditableWorkshop): FormValues {
     address: workshop?.address ?? "",
     notes: workshop?.notes ?? "",
     accessRole: workshop?.accessRole ?? NO_ACCESS,
+    kind: workshop?.kind ?? "PROCESS",
   };
 }
