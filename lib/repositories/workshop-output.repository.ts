@@ -23,6 +23,8 @@ const OUTPUT_SELECT = {
   createdAt: true,
   workshop: { select: { id: true, name: true } },
   destinationWorkshop: { select: { name: true } },
+  product: { select: { id: true, name: true } },
+  client: { select: { id: true, name: true } },
   createdBy: { select: { name: true } },
   order: {
     select: {
@@ -40,6 +42,7 @@ const OUTPUT_SELECT = {
       quantity: true,
       scrapQuantity: true,
       scrapReason: true,
+      clientPo: true,
       size: { select: { id: true, code: true } },
     },
   },
@@ -53,7 +56,16 @@ const ORDER_INFO_SELECT = {
   code: true,
   reference: true,
   description: true,
+  clientId: true,
   client: { select: { name: true } },
+  /* El reparto por PO de cada talla, para prellenar la salida a Embarques. */
+  lines: {
+    orderBy: { position: "asc" },
+    select: {
+      sizeId: true,
+      poSplits: { orderBy: { position: "asc" }, select: { clientPo: true, quantity: true } },
+    },
+  },
 } satisfies Prisma.CuttingOrderSelect;
 
 export type BalanceOrderInfo = Prisma.CuttingOrderGetPayload<{ select: typeof ORDER_INFO_SELECT }>;

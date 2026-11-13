@@ -14,7 +14,12 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { WorkshopOutputService } from "@/lib/services/workshop-output.service";
+import { roleHasPermission } from "@/lib/constants/roles";
+import { ClientRepository } from "@/lib/repositories/client.repository";
+import { FinishedGoodsRepository } from "@/lib/repositories/finished-goods.repository";
+import { GarmentCategoryRepository } from "@/lib/repositories/garment-category.repository";
 import type { OutputsBoardData } from "@/components/workshop-outputs/outputs-panel";
+import type { FinishedOutputOptions } from "@/components/workshop-outputs/finished-output-dialog";
 import { DeliveryBoardBody } from "./delivery-board-body";
 
 export interface DeliveryBoardProps {
@@ -36,21 +41,39 @@ export async function DeliveryBoard(props: DeliveryBoardProps) {
 }
 
 /**
- * La pestaña Salidas sólo existe para un taller de PROCESO: el de confección
- * saca prenda terminada a Embarques, que es otra salida. El saldo sólo se
- * calcula para el dueño, que es el único que captura.
+ * La pestaña Salidas: piezas a otro taller si es de PROCESO, prenda
+ * terminada a Embarques si es de CONFECCIÓN. El saldo y los catálogos sólo
+ * se leen para el dueño, que es el único que captura.
  */
 async function loadOutputs(boardRole: WorkshopRole, isOwner: boolean): Promise<OutputsBoardData | null> {
   const service = new WorkshopOutputService();
   const workshop = await service.findWorkshopByRole(boardRole);
-  if (!workshop || workshop.kind !== "PROCESS") return null;
+  if (!workshop) return null;
 
-  const [rows, balance, destinations] = await Promise.all([
+  const isAssembly = workshop.kind === "ASSEMBLY";
+  const [rows, balance, destinations, finishedOptions] = await Promise.all([
     service.listFor(workshop.id),
     isOwner ? service.balanceFor(workshop.id) : Promise.resolve([]),
-    isOwner ? service.destinationsFor(workshop.id) : Promise.resolve([]),
+    isOwner && !isAssembly ? service.destinationsFor(workshop.id) : Promise.resolve([]),
+    isOwner && isAssembly ? loadFinishedOptions(boardRole) : Promise.resolve(null),
   ]);
-  return { rows, balance, destinations };
+  return { kind: workshop.kind, rows, balance, destinations, finishedOptions };
+}
+
+async function loadFinishedOptions(role: WorkshopRole): Promise<FinishedOutputOptions> {
+  const [products, categories, clients] = await Promise.all([
+    new FinishedGoodsRepository().findProductOptions(),
+    new GarmentCategoryRepository().findOptions(),
+    new ClientRepository().findOptions(),
+  ]);
+  return {
+    products: products.map(({ garmentCategory, ...product }) => ({
+      ...product, category: garmentCategory?.name ?? null,
+    })),
+    categories,
+    clients,
+    canCreateProduct: roleHasPermission(role, "products:create"),
+  };
 }
 
 /** Sin consultas: recibe las entregas ya leídas. */

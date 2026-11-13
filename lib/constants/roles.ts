@@ -156,6 +156,11 @@ export const PERMISSIONS = [
      carga inicial de lo que ya estaba en la bodega y los reconteos. Aparte de
      ver porque mover un saldo sin papel detrás es lo que se vigila. */
   "finished-goods:adjust",
+  /* Dar de alta un producto terminado RÁPIDO —nombre, tipo y cliente— desde
+     donde hace falta: la salida a Embarques del taller que confecciona, o la
+     entrada manual de Embarques. Aparte de `bom:write` porque eso abre la
+     ficha técnica y el catálogo completo; esto sólo agrega un nombre. */
+  "products:create",
   /* Un tablero por taller, con llave propia cada uno: son pantallas distintas
      y uno no tiene por qué ver el del otro. */
   "workshop-board:acatlan",
@@ -298,15 +303,17 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   /* Un taller externo: sus entregas y su tablero, nada más. Sin
      `orders:browse` a propósito: esa llave abre TODAS las órdenes de la casa,
      de todos los clientes, y aquí sólo debe verse lo que le mandaron a él. */
-  WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-output:write", "workshop-board:acatlan"],
+  /* Acatlán y Allende confeccionan: su salida a Embarques lleva producto, y
+     si no existe lo dan de alta ahí mismo (`products:create`). */
+  WORKSHOP_ACATLAN: ["workshop-orders:access", "workshop-output:write", "products:create", "workshop-board:acatlan"],
   WORKSHOP_SITEX: ["workshop-orders:access", "workshop-output:write", "workshop-board:sitex"],
   WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-output:write", "workshop-board:broderie"],
-  WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-output:write", "workshop-board:allende"],
+  WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-output:write", "products:create", "workshop-board:allende"],
 
   /* EMBARQUES: la prenda terminada que mandan los talleres de confección,
      las cajas y el packing list. Nada del almacén de tela, ni órdenes, ni
      tableros de taller: su trabajo empieza cuando la prenda ya está hecha. */
-  SHIPPING: ["finished-goods:browse", "finished-goods:adjust"],
+  SHIPPING: ["finished-goods:browse", "finished-goods:adjust", "products:create"],
 };
 
 /** Convierte el String de la base a un Role válido. */

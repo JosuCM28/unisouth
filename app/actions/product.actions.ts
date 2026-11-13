@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { executeAction } from "@/lib/core/action-handler";
 import { cuidSchema, removeSchema } from "@/lib/validations/common";
-import { productSchema, sizeSchema } from "@/lib/validations/product.schema";
+import { productSchema, quickProductSchema, sizeSchema } from "@/lib/validations/product.schema";
 import { ProductService, SizeService } from "@/lib/services/product.service";
 
 const REVALIDATE = ["/products", "/calculations"];
@@ -16,6 +16,16 @@ export async function createProductAction(input: unknown) {
     schema: productSchema, permission: "bom:write", revalidate: REVALIDATE,
     successMessage: "Producto creado",
     handler: ({ input, auditContext }) => new ProductService(auditContext).create(input),
+  });
+}
+
+/* Alta rápida desde la salida a Embarques o la entrada manual. Llave propia:
+   quien la usa no tiene por qué abrir fichas técnicas (`bom:write`). */
+export async function quickCreateProductAction(input: unknown) {
+  return executeAction(input, {
+    schema: quickProductSchema, permission: "products:create", revalidate: ["/products"],
+    successMessage: "Producto listo",
+    handler: ({ input, auditContext }) => new ProductService(auditContext).quickCreate(input),
   });
 }
 

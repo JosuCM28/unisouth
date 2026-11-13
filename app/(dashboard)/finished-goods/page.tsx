@@ -36,7 +36,7 @@ export default async function FinishedGoodsPage({ searchParams }: PageProps) {
     repo.findStock(filters),
     repo.findFilterOptions(),
     new GarmentCategoryRepository().findOptions(),
-    canAdjust ? loadAdjustOptions(repo) : Promise.resolve(null),
+    canAdjust ? loadAdjustOptions(repo, roleHasPermission(user.role, "products:create")) : Promise.resolve(null),
   ]);
 
   return (
@@ -60,11 +60,12 @@ export default async function FinishedGoodsPage({ searchParams }: PageProps) {
   );
 }
 
-async function loadAdjustOptions(repo: FinishedGoodsRepository): Promise<AdjustOptions> {
-  const [products, sizes, clients] = await Promise.all([
+async function loadAdjustOptions(repo: FinishedGoodsRepository, canCreateProduct: boolean): Promise<AdjustOptions> {
+  const [products, sizes, clients, categories] = await Promise.all([
     repo.findProductOptions(),
     new SizeRepository().findOptions(),
     new ClientRepository().findOptions(),
+    new GarmentCategoryRepository().findOptions(),
   ]);
   return {
     products: products.map(({ garmentCategory, ...product }) => ({
@@ -72,5 +73,7 @@ async function loadAdjustOptions(repo: FinishedGoodsRepository): Promise<AdjustO
     })),
     sizes,
     clients,
+    categories,
+    canCreateProduct,
   };
 }

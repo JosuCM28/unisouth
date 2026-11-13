@@ -12,6 +12,8 @@ export interface FinishedMoveInput extends FinishedStockKeyInput {
   /** Con signo: positivo entra, negativo sale. */
   quantity: number;
   reason?: string;
+  /** La salida de taller que lo origina, para el kárdex. */
+  workshopOutputId?: string;
 }
 
 /** La llave del renglón. "-" donde falta, para que dos vacíos sí choquen. */
@@ -82,6 +84,7 @@ export class FinishedGoodsService extends BaseService {
         type: input.type,
         quantity: input.quantity,
         reason: input.reason,
+        workshopOutputId: input.workshopOutputId ?? null,
         userId: this.context.userId ?? null,
       },
     });

@@ -18,6 +18,20 @@ export const productSchema = z.object({
 
 export type ProductInput = z.infer<typeof productSchema>;
 
+/**
+ * Alta RÁPIDA desde donde hace falta (la salida a Embarques, la entrada
+ * manual): sólo nombre, tipo y cliente. El código lo arma el servicio con el
+ * nombre. El tipo es obligatorio aquí porque sin él la prenda no aparece al
+ * filtrar el inventario de Embarques.
+ */
+export const quickProductSchema = z.object({
+  name: requiredText("El nombre", 160),
+  categoryId: z.string({ message: "Elige el tipo de prenda" }).min(1, "Elige el tipo de prenda"),
+  clientId: optionalCuid,
+});
+
+export type QuickProductInput = z.infer<typeof quickProductSchema>;
+
 export const productFormSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio").max(40),
   name: z.string().trim().min(1, "El nombre es obligatorio").max(160),

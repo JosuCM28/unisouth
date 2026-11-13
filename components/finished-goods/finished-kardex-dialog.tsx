@@ -60,6 +60,12 @@ export function FinishedKardexDialog({ stockId, title }: { stockId: string; titl
                 {formatDateTime(movement.createdAt)}
                 {movement.user && ` · ${movement.user.name}`}
               </span>
+              {movement.workshopOutput && (
+                <span className="tabular text-xs">
+                  {movement.workshopOutput.code} · {movement.workshopOutput.workshop.name} · orden{" "}
+                  {movement.workshopOutput.order.reference ?? movement.workshopOutput.order.code}
+                </span>
+              )}
               {movement.reason && <span className="text-xs">{movement.reason}</span>}
             </li>
           ))}

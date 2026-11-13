@@ -1,5 +1,6 @@
 "use client";
 
+import type { WorkshopKind } from "@prisma/client";
 import { PackageOpen, SearchX } from "lucide-react";
 import type { WorkshopOutputRow } from "@/lib/repositories/workshop-output.repository";
 import type { WorkshopBalanceOrder } from "@/lib/services/workshop-output.service";
@@ -7,13 +8,18 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { OutputCancelButton } from "./output-cancel-button";
 import { OutputCard } from "./output-card";
 import { OutputFormDialog } from "./output-form-dialog";
+import { FinishedOutputDialog, type FinishedOutputOptions } from "./finished-output-dialog";
 
 /** Lo que el tablero de un taller de proceso trae para su pestaña Salidas. */
 export interface OutputsBoardData {
+  /** Proceso saca piezas a otro taller; confección, prenda a Embarques. */
+  kind: WorkshopKind;
   rows: WorkshopOutputRow[];
   /** Vacío para quien sólo mira: ADMIN no captura salidas. */
   balance: WorkshopBalanceOrder[];
   destinations: { id: string; name: string }[];
+  /** Sólo para el dueño de un taller de confección. */
+  finishedOptions: FinishedOutputOptions | null;
 }
 
 /**
@@ -40,7 +46,7 @@ export function OutputsPanel({
               ? "No tienes piezas recibidas pendientes de salir."
               : `Tienes piezas de ${data.balance.length} ${data.balance.length === 1 ? "orden" : "órdenes"}.`}
           </p>
-          <OutputFormDialog balance={data.balance} destinations={data.destinations} />
+          <NewOutputButton data={data} />
         </div>
       )}
 
@@ -67,6 +73,14 @@ export function OutputsPanel({
   );
 }
 
+/** El botón que toca según lo que hace el taller. */
+function NewOutputButton({ data }: { data: OutputsBoardData }) {
+  if (data.kind === "ASSEMBLY" && data.finishedOptions) {
+    return <FinishedOutputDialog balance={data.balance} options={data.finishedOptions} />;
+  }
+  return <OutputFormDialog balance={data.balance} destinations={data.destinations} />;
+}
+
 /** Mismo criterio que el buscador de entregas: folio, orden, cliente, prenda. */
 function filterOutputs(rows: WorkshopOutputRow[], query: string): WorkshopOutputRow[] {
   const term = query.trim().toLowerCase();
@@ -74,7 +88,7 @@ function filterOutputs(rows: WorkshopOutputRow[], query: string): WorkshopOutput
 
   return rows.filter((row) =>
     [row.code, row.order.code, row.order.reference, row.order.client?.name, row.order.description,
-      row.destinationWorkshop?.name, row.parts]
+      row.destinationWorkshop?.name, row.parts, row.product?.name]
       .some((value) => value?.toLowerCase().includes(term)),
   );
 }

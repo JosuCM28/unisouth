@@ -1,7 +1,20 @@
 import type { FinishedProduct, Size } from "@prisma/client";
 import type { PrismaExecutor } from "@/lib/prisma";
 import { BusinessRuleError, DuplicateError } from "@/lib/core/errors";
-import type { ProductInput, SizeInput } from "@/lib/validations/product.schema";
+import type {
+  ProductInput,
+  QuickProductInput,
+  SizeInput,
+} from "@/lib/validations/product.schema";
+
+/** Lo que el selector necesita del producto recién dado de alta. */
+export interface QuickProduct {
+  id: string;
+  code: string;
+  name: string;
+  clientId: string | null;
+  category: string | null;
+}
 import { BaseService } from "./base.service";
 
 export class ProductService extends BaseService {
@@ -17,6 +30,44 @@ export class ProductService extends BaseService {
       });
 
       return product;
+    });
+  }
+
+  /**
+   * Alta rápida: nombre, tipo y cliente, desde la salida a Embarques o la
+   * entrada manual. Si ya existe uno con ese nombre y cliente se devuelve ése
+   * en vez de crear otro: en el piso el mismo producto se teclearía dos veces
+   * y el inventario quedaría partido entre dos fichas iguales.
+   */
+  async quickCreate(input: QuickProductInput): Promise<QuickProduct> {
+    return this.transaction(async (tx) => {
+      const category = await tx.garmentCategory.findFirst({
+        where: { id: input.categoryId, deletedAt: null },
+        select: { name: true },
+      });
+      if (!category) throw new BusinessRuleError("Elige un tipo de prenda del catálogo.", "categoryId");
+
+      const existing = await tx.finishedProduct.findFirst({
+        where: { name: input.name, clientId: input.clientId ?? null, deletedAt: null },
+        include: { garmentCategory: { select: { name: true } } },
+      });
+      if (existing) return toQuickProduct(existing, existing.garmentCategory?.name ?? null);
+
+      const product = await tx.finishedProduct.create({
+        data: {
+          code: await freeCode(tx, input.name),
+          name: input.name,
+          categoryId: input.categoryId,
+          clientId: input.clientId ?? null,
+        },
+      });
+
+      await this.auditWith(tx).record({
+        entity: "FinishedProduct", entityId: product.id, action: "CREATE",
+        reference: product.code, newValue: product, sensitivity: "LOW",
+      });
+
+      return toQuickProduct(product, category.name);
     });
   }
 
@@ -82,6 +133,35 @@ export class ProductService extends BaseService {
     }
     throw new DuplicateError("el producto", "código", code, "code");
   }
+}
+
+function toQuickProduct(product: FinishedProduct, category: string | null): QuickProduct {
+  return {
+    id: product.id, code: product.code, name: product.name, clientId: product.clientId, category,
+  };
+}
+
+/**
+ * Código a partir del nombre: "Camisa manga larga" → CAMISA-MANGA-LARGA. Sin
+ * acentos ni símbolos para que se pueda teclear y buscar. Si ya existe
+ * (aunque esté dado de baja: el código es único en la tabla) se le agrega -2,
+ * -3…
+ */
+async function freeCode(tx: PrismaExecutor, name: string): Promise<string> {
+  const base = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 34) || "PRODUCTO";
+
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const code = suffix === 1 ? base : `${base}-${suffix}`;
+    const taken = await tx.finishedProduct.findUnique({ where: { code }, select: { id: true } });
+    if (!taken) return code;
+  }
+  throw new BusinessRuleError("No se pudo armar un código para ese nombre. Dalo de alta en Productos.");
 }
 
 /**

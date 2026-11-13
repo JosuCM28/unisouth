@@ -328,6 +328,7 @@ model Client {
   garmentFolders   GarmentFolder[]
   standingRules    StandingRule[]
   finishedStocks   FinishedStock[]
+  workshopOutputs  WorkshopOutput[]
 
   @@index([active])
   @@map("clients")
@@ -1257,6 +1258,7 @@ model FinishedProduct {
   variants             Variant[]
   billsOfMaterials     BillOfMaterials[]
   finishedStock        FinishedStock[]
+  workshopOutputs      WorkshopOutput[]
   calculationLines     CalculationLine[]
   productionOrderLines ProductionOrderLine[]
 
@@ -2455,6 +2457,15 @@ model WorkshopOutput {
   destinationWorkshopId String?
   destinationWorkshop   Workshop? @relation("WorkshopOutputTo", fields: [destinationWorkshopId], references: [id])
 
+  /// Qué prenda terminada sale. Sólo en la salida a Embarques (FINISHED):
+  /// la de proceso saca piezas sueltas, no un producto.
+  productId String?
+  product   FinishedProduct? @relation(fields: [productId], references: [id])
+  /// El dueño de esa prenda en el inventario de Embarques. Sale de la orden
+  /// y el taller lo puede cambiar.
+  clientId  String?
+  client    Client?          @relation(fields: [clientId], references: [id])
+
   date  DateTime @default(now())
   /// Qué partes van: "frente izquierdo bordado".
   parts String?
@@ -2469,7 +2480,9 @@ model WorkshopOutput {
   createdBy   User?    @relation("WorkshopOutputCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
-  lines WorkshopOutputLine[]
+  lines             WorkshopOutputLine[]
+  /// Lo que esta salida movió en el inventario de Embarques.
+  finishedMovements FinishedMovement[]
 
   @@index([workshopId, cancelledAt])
   @@index([orderId])
@@ -2493,6 +2506,9 @@ model WorkshopOutputLine {
   /// Obligatorio cuando hay merma: sin él nadie sabe si fue la máquina, la
   /// tela o el bordado.
   scrapReason   String?
+  /// La PO del cliente a la que se cargan las piezas en Embarques. Sólo en la
+  /// salida a Embarques; vacío = "Sin PO".
+  clientPo      String?
 
   position Int @default(0)
 
@@ -2965,6 +2981,8 @@ enum FinishedMovementType {
   PACKED
   /// Se sacó de una caja y regresó al inventario.
   UNPACKED
+  /// Se canceló la salida del taller que la había metido: sale lo que entró.
+  WORKSHOP_IN_REVERSAL
 }
 
 /// El saldo de prenda terminada de UN producto, talla, cliente y PO.
@@ -3021,11 +3039,17 @@ model FinishedMovement {
   /// Obligatorio en los ajustes: sin él un faltante no se puede revisar.
   reason   String?
 
+  /// La salida de taller que lo originó (entrada o su reverso). Es lo que
+  /// deja leer en el kárdex de qué taller y de qué orden vino cada pieza.
+  workshopOutputId String?
+  workshopOutput   WorkshopOutput? @relation(fields: [workshopOutputId], references: [id])
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 
   @@index([stockId, createdAt])
+  @@index([workshopOutputId])
   @@map("finished_movements")
 }

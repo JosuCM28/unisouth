@@ -4,6 +4,7 @@ import { executeAction } from "@/lib/core/action-handler";
 import { WorkshopOutputService } from "@/lib/services/workshop-output.service";
 import {
   cancelWorkshopOutputSchema,
+  finishedOutputSchema,
   workshopOutputSchema,
 } from "@/lib/validations/workshop-output.schema";
 
@@ -21,12 +22,24 @@ export async function createWorkshopOutputAction(input: unknown) {
   });
 }
 
+/* Embarques entra en las rutas: lo que sale de aquí aparece en su inventario. */
+export async function createFinishedOutputAction(input: unknown) {
+  return executeAction(input, {
+    schema: finishedOutputSchema,
+    permission: "workshop-output:write",
+    revalidate: [...REVALIDATE, "/finished-goods"],
+    successMessage: "Salida enviada a Embarques",
+    handler: ({ input, user, auditContext }) =>
+      new WorkshopOutputService(auditContext).createFinished(user.role, input),
+  });
+}
+
 /** El taller cancela la suya; el rol decide de quién es. */
 export async function cancelWorkshopOutputAction(input: unknown) {
   return executeAction(input, {
     schema: cancelWorkshopOutputSchema,
     permission: "workshop-output:write",
-    revalidate: REVALIDATE,
+    revalidate: [...REVALIDATE, "/finished-goods"],
     successMessage: "Salida cancelada",
     handler: ({ input, user, auditContext }) =>
       new WorkshopOutputService(auditContext).cancel(input.id, input.reason, user.role),
@@ -44,7 +57,7 @@ export async function cancelWorkshopOutputAsAdminAction(input: unknown) {
   return executeAction(input, {
     schema: cancelWorkshopOutputSchema,
     permission: "cuts:unlock",
-    revalidate: REVALIDATE,
+    revalidate: [...REVALIDATE, "/finished-goods"],
     successMessage: "Salida cancelada",
     handler: ({ input, auditContext }) =>
       new WorkshopOutputService(auditContext).cancel(input.id, input.reason, null),

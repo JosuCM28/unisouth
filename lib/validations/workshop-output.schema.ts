@@ -56,6 +56,48 @@ export const workshopOutputSchema = z.object({
 
 export type WorkshopOutputInput = z.infer<typeof workshopOutputSchema>;
 
+/**
+ * Un renglón de la salida a Embarques: talla + PO. La misma talla SÍ puede
+ * repetirse si va a dos PO distintas (60 de la M a la 4565 y 40 a la 4570),
+ * porque en Embarques son dos renglones del inventario.
+ */
+const finishedOutputLineSchema = z
+  .object({
+    sizeId: cuidSchema,
+    clientPo: optionalText,
+    quantity: pieces("cuántas salen"),
+    scrapQuantity: pieces("la merma").default(0),
+    scrapReason: optionalText,
+  })
+  .refine((line) => line.quantity + line.scrapQuantity > 0, {
+    message: "Un renglón sin piezas no se captura",
+    path: ["quantity"],
+  })
+  .refine((line) => line.scrapQuantity === 0 || Boolean(line.scrapReason), {
+    message: "Escribe por qué se perdieron",
+    path: ["scrapReason"],
+  });
+
+/** La salida de un taller de CONFECCIÓN: prenda terminada hacia Embarques. */
+export const finishedOutputSchema = z.object({
+  orderId: cuidSchema,
+  productId: cuidSchema,
+  /* El dueño en Embarques. Sale de la orden; vacío = sin cliente. */
+  clientId: optionalCuid,
+  date: localDate.optional(),
+  notes: optionalText,
+  lines: z
+    .array(finishedOutputLineSchema)
+    .min(1, "Agrega al menos una talla")
+    .refine(
+      (lines) =>
+        new Set(lines.map((line) => `${line.sizeId}|${line.clientPo ?? ""}`)).size === lines.length,
+      "La misma talla con la misma PO va una sola vez",
+    ),
+});
+
+export type FinishedOutputInput = z.infer<typeof finishedOutputSchema>;
+
 export const cancelWorkshopOutputSchema = z.object({
   id: cuidSchema,
   reason: requiredText("El motivo", 500),

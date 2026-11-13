@@ -3,6 +3,7 @@ import type { WorkshopOutputRow } from "@/lib/repositories/workshop-output.repos
 import { cn, formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
 
 export const PLANT_DESTINATION_LABEL = "Regresa a planta";
+export const SHIPPING_DESTINATION_LABEL = "Embarques";
 
 /** Totales de una salida: buenas y merma, ya sumadas. */
 export function outputTotals(output: WorkshopOutputRow) {
@@ -10,6 +11,12 @@ export function outputTotals(output: WorkshopOutputRow) {
     (sum, line) => ({ good: sum.good + line.quantity, scrap: sum.scrap + line.scrapQuantity }),
     { good: 0, scrap: 0 },
   );
+}
+
+/** A dónde fue: a Embarques, a otro taller o de regreso a planta. */
+function destinationLabel(output: WorkshopOutputRow): string {
+  if (output.type === "FINISHED") return SHIPPING_DESTINATION_LABEL;
+  return output.destinationWorkshop?.name ?? PLANT_DESTINATION_LABEL;
 }
 
 /**
@@ -49,8 +56,14 @@ export function OutputCard({
           )}
           <p className="text-sm">
             {showWorkshop && `${output.workshop.name} → `}
-            {output.destinationWorkshop?.name ?? PLANT_DESTINATION_LABEL}
+            {destinationLabel(output)}
           </p>
+          {output.product && (
+            <p className="text-sm">
+              {output.product.name}
+              {output.client && <span className="text-muted-foreground"> · {output.client.name}</span>}
+            </p>
+          )}
           {output.parts && <p className="break-words text-sm">{output.parts}</p>}
           <p className="tabular text-xs text-muted-foreground">
             {formatDate(output.date)} · {formatQuantity(totals.good)} pzas
@@ -63,7 +76,8 @@ export function OutputCard({
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         {output.lines.map((line) => (
           <li key={line.id} className="tabular">
-            <span className="font-medium">{line.size.code}</span> {line.quantity}
+            <span className="font-medium">{line.size.code}</span>
+            {line.clientPo && <span className="text-muted-foreground"> {line.clientPo}</span>} {line.quantity}
             {line.scrapQuantity > 0 && (
               <span className="text-muted-foreground"> (−{line.scrapQuantity}: {line.scrapReason})</span>
             )}

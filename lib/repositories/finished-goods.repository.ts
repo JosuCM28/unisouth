@@ -34,6 +34,14 @@ const MOVEMENT_SELECT = {
   reason: true,
   createdAt: true,
   user: { select: { name: true } },
+  /* De qué salida, taller y orden vino: la trazabilidad hasta el corte. */
+  workshopOutput: {
+    select: {
+      code: true,
+      workshop: { select: { name: true } },
+      order: { select: { code: true, reference: true } },
+    },
+  },
 } satisfies Prisma.FinishedMovementSelect;
 
 export type FinishedMovementRow = Prisma.FinishedMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;

@@ -255,7 +255,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `MANAGEMENT` | **La OTRA PLANTA. Seis pantallas: Órdenes · Órdenes de planta · los cuatro tableros de taller.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. Los tableros de taller los ve en sólo lectura, como ADMIN: no confirma entregas porque eso le toca al taller. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
 | `SHIPPING` | **Embarques. La prenda ya confeccionada.** Ve el Inventario terminado por producto, talla, cliente y PO, su kárdex, y carga o descuenta a mano con motivo. Más adelante arma cajas y el packing list. No ve tela, órdenes ni tableros de taller |
-| `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` · `WORKSHOP_ALLENDE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. Un taller de proceso además da **Salida** de lo que procesó desde su tablero. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
+| `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` · `WORKSHOP_ALLENDE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. Desde la pestaña **Salidas** de su tablero, el de proceso saca piezas procesadas a otro taller y el de confección manda prenda terminada a Embarques. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, folios,
 talleres, corridas, reglas y bodegas son del lado de producción: el auxiliar
@@ -323,6 +323,7 @@ Estas capacidades separan lo anterior:
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
 | `offline:manage` | La **copia de la base en el navegador** para trabajar sin internet: bajarla, ver lo pendiente de subir y borrarla. ADMIN y WAREHOUSE. Sólo dice "puede usar la copia": cada tabla se sigue cobrando con la llave de su pantalla (`OFFLINE_TABLE_PERMISSIONS`), así que nunca enseña más de lo que el rol ya ve en línea. Subir una salida offline pide `inventory:write`, igual que en línea |
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
+| `products:create` | **Alta rápida de producto** —nombre, tipo y cliente— desde la salida a Embarques o la entrada manual. ADMIN, Embarques, Acatlán y Allende. Aparte de `bom:write`, que abre fichas técnicas |
 | `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, y entradas y salidas manuales con motivo. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
 | `workshop-output:write` | La **salida** de UN taller: lo que saca de su saldo y cancelarla con motivo. Los cuatro talleres; ADMIN no, por la misma razón. ADMIN corrige desde la ficha de la orden con `cuts:unlock` |
 | `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN y la otra planta (`MANAGEMENT`) llevan las cuatro en sólo lectura: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access` |
@@ -353,6 +354,15 @@ folio `ST-`). Nadie la recibe ni la confirma —si quien confecciona tuviera
 que darle "recibir" a cada frente bordado se ahogaría—: el destino queda de
 registro, se ve en la ficha de la orden y, como dato, en la entrega del taller
 destino.
+
+El de **confección** (Acatlán, Allende) da **Salida a Embarques**: elige la
+orden y el producto (o lo da de alta ahí, con su tipo), el cliente sale de
+la orden, y las tallas llegan repartidas por PO como se capturaron en la
+orden; lo que sobra va "Sin PO". Descontar del taller y sumar al
+inventario de Embarques van en la MISMA transacción, y cada movimiento
+guarda su `workshopOutputId`: el kárdex de Embarques dice de qué taller y
+de qué orden vino cada pieza. Cancelarla saca del inventario lo que había
+entrado; si Embarques ya lo empacó, no se deja.
 
 El **saldo** del taller por orden y talla no se guarda, se calcula: lo que
 CONFIRMÓ que recibió (envío o vale ligado a una orden) menos lo que la casa

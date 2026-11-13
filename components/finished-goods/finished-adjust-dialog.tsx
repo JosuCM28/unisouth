@@ -14,11 +14,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ProductPicker, type ProductOption } from "@/components/products/product-picker";
 
 export interface AdjustOptions {
-  products: { id: string; code: string; name: string; clientId: string | null; category: string | null }[];
+  products: ProductOption[];
+  categories: { id: string; name: string }[];
   sizes: { id: string; code: string }[];
   clients: { id: string; name: string }[];
+  /** `products:create`: dar de alta el producto ahí mismo. */
+  canCreateProduct: boolean;
 }
 
 /** El renglón ya elegido cuando se ajusta desde la lista. */
@@ -58,11 +62,12 @@ export function FinishedAdjustDialog({
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [products, setProducts] = useState(options.products);
 
   function chooseProduct(id: string) {
     setProductId(id);
     // El cliente del producto es el punto de partida; se puede cambiar.
-    const product = options.products.find((entry) => entry.id === id);
+    const product = products.find((entry) => entry.id === id);
     if (product?.clientId && !clientId) setClientId(product.clientId);
   }
 
@@ -99,7 +104,8 @@ export function FinishedAdjustDialog({
     >
       <div className="flex flex-col gap-4">
         {!preset && (
-          <KeyFields options={options} productId={productId} sizeId={sizeId} clientId={clientId}
+          <KeyFields options={{ ...options, products }} productId={productId}
+            onProductCreated={(product) => setProducts((list) => [...list.filter((p) => p.id !== product.id), product])} sizeId={sizeId} clientId={clientId}
             clientPo={clientPo} onProduct={chooseProduct} onSize={setSizeId} onClient={setClientId}
             onPo={setClientPo} />
         )}
@@ -145,17 +151,14 @@ function KeyFields(props: {
   onSize: (id: string) => void;
   onClient: (id: string) => void;
   onPo: (po: string) => void;
+  onProductCreated: (product: ProductOption) => void;
 }) {
   const { options } = props;
   return (
     <>
-      <FormSelectField id="adjust-product" label="Producto" hint="Si no está, ADMIN lo da de alta en Productos.">
-        <SearchSelect id="adjust-product" value={props.productId} onChange={props.onProduct}
-          options={options.products.map((p) => ({
-            value: p.id, label: p.name, hint: [p.category, p.code].filter(Boolean).join(" · "), keywords: p.code,
-          }))}
-          placeholder="Elige el producto" searchPlaceholder="Buscar producto…" />
-      </FormSelectField>
+      <ProductPicker products={options.products} categories={options.categories} clientId={props.clientId}
+        value={props.productId} onChange={props.onProduct} onCreated={props.onProductCreated}
+        canCreate={options.canCreateProduct} />
       <div className="grid grid-cols-2 gap-3">
         <FormSelectField id="adjust-size" label="Talla">
           <SearchSelect id="adjust-size" value={props.sizeId} onChange={props.onSize}
