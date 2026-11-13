@@ -19,6 +19,7 @@ import type {
   TaskStatus,
   Unit,
   WorkshopKind,
+  FinishedMovementType,
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
@@ -46,6 +47,15 @@ export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {
   pending: "Por recibir",
   received: "Recibidas",
   outputs: "Salidas",
+};
+
+/** El kárdex de prenda terminada. */
+export const FINISHED_MOVEMENT_TYPE_LABELS: Record<FinishedMovementType, string> = {
+  WORKSHOP_IN: "Entrada de taller",
+  ADJUSTMENT_IN: "Ajuste de entrada",
+  ADJUSTMENT_OUT: "Ajuste de salida",
+  PACKED: "A caja",
+  UNPACKED: "De caja",
 };
 
 /** Qué hace un taller: decide qué salida captura en su tablero. */

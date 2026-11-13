@@ -9,6 +9,10 @@ import { round4 } from "@/lib/services/inventory.service";
  * Si un lote no cuadra, alguien escribió `currentQuantity` fuera de
  * InventoryService, o borró un movimiento que debía ser append-only.
  *
+ * Y la misma regla para la prenda terminada de Embarques:
+ *
+ *   FinishedStock.quantity === Σ(FinishedMovement.quantity WHERE stockId)
+ *
  * Correr con: npm run verify:integrity
  */
 
@@ -21,6 +25,38 @@ interface Mismatch {
 }
 
 async function main() {
+  await checkLots();
+  await checkFinishedStock();
+}
+
+/**
+ * Prenda terminada. Enteros, sin redondeo: son piezas. Un renglón no
+ * cuadra si alguien escribió `quantity` fuera de FinishedGoodsService.
+ */
+async function checkFinishedStock() {
+  console.log("\nVerificando inventario terminado…\n");
+
+  const [stock, sums] = await Promise.all([
+    prisma.finishedStock.findMany({ select: { id: true, key: true, quantity: true } }),
+    prisma.finishedMovement.groupBy({ by: ["stockId"], _sum: { quantity: true } }),
+  ]);
+  const byStock = new Map(sums.map((row) => [row.stockId, row._sum.quantity ?? 0]));
+  const wrong = stock.filter((row) => row.quantity !== (byStock.get(row.id) ?? 0));
+
+  console.log(`Renglones revisados:  ${stock.length}`);
+  if (wrong.length === 0) {
+    console.log("✓ Todo cuadra en Embarques.");
+    return;
+  }
+
+  console.log(`\n✗ ${wrong.length} renglón(es) NO cuadran:`);
+  for (const row of wrong) {
+    console.log(`   ${row.key}  guardado ${row.quantity}  kárdex ${byStock.get(row.id) ?? 0}`);
+  }
+  hasProblems = true;
+}
+
+async function checkLots() {
   console.log("Verificando integridad del inventario…\n");
 
   const [lots, sums] = await Promise.all([

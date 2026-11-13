@@ -17,6 +17,7 @@ export const ROLES = [
   "WORKSHOP_SITEX",
   "WORKSHOP_BRODERIE",
   "WORKSHOP_ALLENDE",
+  "SHIPPING",
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -35,6 +36,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   WORKSHOP_SITEX: "Taller Sitex",
   WORKSHOP_BRODERIE: "Taller Broderie",
   WORKSHOP_ALLENDE: "Taller Allende",
+  SHIPPING: "Embarques",
 };
 
 /**
@@ -145,6 +147,15 @@ export const PERMISSIONS = [
      aquélla, ADMIN no la lleva: la salida se le carga al taller del rol que
      entra, y ADMIN no es un taller. */
   "workshop-output:write",
+  /* El inventario de PRENDA TERMINADA de Embarques: verlo y leer su kárdex.
+     Aparte de `inventory:browse` porque son dos bodegas distintas —tela del
+     cliente contra prenda lista para empacar— y quien empaca no tiene nada
+     que hacer entre los rollos, ni el auxiliar entre las cajas. */
+  "finished-goods:browse",
+  /* Entradas y salidas MANUALES de prenda terminada, siempre con motivo: la
+     carga inicial de lo que ya estaba en la bodega y los reconteos. Aparte de
+     ver porque mover un saldo sin papel detrás es lo que se vigila. */
+  "finished-goods:adjust",
   /* Un tablero por taller, con llave propia cada uno: son pantallas distintas
      y uno no tiene por qué ver el del otro. */
   "workshop-board:acatlan",
@@ -291,6 +302,11 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   WORKSHOP_SITEX: ["workshop-orders:access", "workshop-output:write", "workshop-board:sitex"],
   WORKSHOP_BRODERIE: ["workshop-orders:access", "workshop-output:write", "workshop-board:broderie"],
   WORKSHOP_ALLENDE: ["workshop-orders:access", "workshop-output:write", "workshop-board:allende"],
+
+  /* EMBARQUES: la prenda terminada que mandan los talleres de confección,
+     las cajas y el packing list. Nada del almacén de tela, ni órdenes, ni
+     tableros de taller: su trabajo empieza cuando la prenda ya está hecha. */
+  SHIPPING: ["finished-goods:browse", "finished-goods:adjust"],
 };
 
 /** Convierte el String de la base a un Role válido. */

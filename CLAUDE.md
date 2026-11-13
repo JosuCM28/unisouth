@@ -209,6 +209,14 @@ Además:
 - Al bajar de `Material.remnantThreshold`, el lote pasa a `REMNANT`
   automáticamente. Los retazos se ofrecen PRIMERO al surtir.
 
+La **prenda terminada** de Embarques sigue las mismas tres reglas:
+`FinishedStock.quantity` (un saldo por producto + talla + cliente + PO) se
+escribe ÚNICAMENTE en `FinishedGoodsService`, en la misma transacción que su
+`FinishedMovement` —append-only— y con la fila bloqueada `FOR UPDATE`. Un
+renglón nace en cero y lo llena su primer movimiento. Los ajustes manuales
+llevan motivo y salen en la auditoría como `HIGH`. `verify-integrity.ts`
+revisa los dos inventarios.
+
 ---
 
 ## 7. Auditoría — "quién metió mano"
@@ -246,6 +254,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | **La OTRA PLANTA. Seis pantallas: Órdenes · Órdenes de planta · los cuatro tableros de taller.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. Los tableros de taller los ve en sólo lectura, como ADMIN: no confirma entregas porque eso le toca al taller. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
+| `SHIPPING` | **Embarques. La prenda ya confeccionada.** Ve el Inventario terminado por producto, talla, cliente y PO, su kárdex, y carga o descuenta a mano con motivo. Más adelante arma cajas y el packing list. No ve tela, órdenes ni tableros de taller |
 | `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` · `WORKSHOP_ALLENDE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. Un taller de proceso además da **Salida** de lo que procesó desde su tablero. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, folios,
@@ -300,7 +309,7 @@ que se miden cuando se levanta la mesa, y la mesa está aquí. Tampoco captura
 cortes, envíos a taller ni salidas: todo eso se hace desde Órdenes contra la
 misma orden, así que el avance nunca queda partido en dos lugares.
 
-Nueve capacidades separan lo anterior:
+Estas capacidades separan lo anterior:
 
 | Capacidad | Qué gobierna |
 |---|---|
@@ -314,6 +323,7 @@ Nueve capacidades separan lo anterior:
 | `staff:browse` / `staff:write` | El padrón de ayudantes de descarga |
 | `offline:manage` | La **copia de la base en el navegador** para trabajar sin internet: bajarla, ver lo pendiente de subir y borrarla. ADMIN y WAREHOUSE. Sólo dice "puede usar la copia": cada tabla se sigue cobrando con la llave de su pantalla (`OFFLINE_TABLE_PERMISSIONS`), así que nunca enseña más de lo que el rol ya ve en línea. Subir una salida offline pide `inventory:write`, igual que en línea |
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
+| `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, y entradas y salidas manuales con motivo. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
 | `workshop-output:write` | La **salida** de UN taller: lo que saca de su saldo y cancelarla con motivo. Los cuatro talleres; ADMIN no, por la misma razón. ADMIN corrige desde la ficha de la orden con `cuts:unlock` |
 | `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN y la otra planta (`MANAGEMENT`) llevan las cuatro en sólo lectura: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access` |
 

@@ -264,6 +264,20 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
+    /* La prenda ya confeccionada, lista para empacar. Sección propia porque es
+       otra bodega: lo que aquí se cuenta son camisas por talla y PO, no
+       rollos de tela. */
+    label: "Embarques",
+    items: [
+      {
+        href: "/finished-goods",
+        label: "Inventario terminado",
+        icon: "finishedGoods",
+        permission: "finished-goods:browse",
+      },
+    ],
+  },
+  {
     /* Hasta abajo y en su propia sección: no es parte de la operación del
        almacén, y casi todo cuelga de llaves que sólo trae ADMIN, así que para
        los demás roles la sección entera desaparece. La excepción es Almacén,

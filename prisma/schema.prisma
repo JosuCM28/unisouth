@@ -84,6 +84,7 @@ model User {
   garmentShipmentsReceived   GarmentShipment[]     @relation("GarmentShipmentReceivedBy")
   workshopOutputsCreated     WorkshopOutput[]      @relation("WorkshopOutputCreatedBy")
   workshopOutputsCancelled   WorkshopOutput[]      @relation("WorkshopOutputCancelledBy")
+  finishedMovements          FinishedMovement[]
   garmentShipmentsDispatched GarmentShipment[]     @relation("GarmentShipmentDispatchedBy")
   documentsDispatched        InventoryDocument[]   @relation("DocumentDispatchedBy")
   garmentFolders             GarmentFolder[]       @relation("GarmentFolderCreatedBy")
@@ -326,6 +327,7 @@ model Client {
   orderFolders     OrderFolder[]
   garmentFolders   GarmentFolder[]
   standingRules    StandingRule[]
+  finishedStocks   FinishedStock[]
 
   @@index([active])
   @@map("clients")
@@ -1254,6 +1256,7 @@ model FinishedProduct {
 
   variants             Variant[]
   billsOfMaterials     BillOfMaterials[]
+  finishedStock        FinishedStock[]
   calculationLines     CalculationLine[]
   productionOrderLines ProductionOrderLine[]
 
@@ -1305,6 +1308,7 @@ model Size {
   cuttingOrderLines    CuttingOrderLine[]
   shipmentLines        GarmentShipmentLine[]
   workshopOutputLines  WorkshopOutputLine[]
+  finishedStock        FinishedStock[]
 
   @@index([group, order])
   @@map("sizes")
@@ -2944,4 +2948,84 @@ model EmailContact {
 
   @@index([active, name])
   @@map("email_contacts")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EMBARQUES — prenda terminada lista para empacar
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum FinishedMovementType {
+  /// Llegó de un taller de confección (su salida a Embarques).
+  WORKSHOP_IN
+  /// Entrada manual: prenda que ya estaba en la bodega o un reconteo a favor.
+  ADJUSTMENT_IN
+  /// Salida manual: faltante en un reconteo, prenda dañada.
+  ADJUSTMENT_OUT
+  /// Se metió a una caja de un pedido.
+  PACKED
+  /// Se sacó de una caja y regresó al inventario.
+  UNPACKED
+}
+
+/// El saldo de prenda terminada de UN producto, talla, cliente y PO.
+///
+/// La orden de corte de donde salió NO separa el saldo: la misma camisa M con
+/// PO 4565 de dos órdenes es lo mismo para quien empaca, y partirla en dos
+/// renglones sólo estorbaría al llenar la caja. De qué orden vino cada pieza
+/// lo cuenta el kárdex.
+///
+/// `quantity` lo escribe ÚNICAMENTE FinishedGoodsService, en la misma
+/// transacción que el FinishedMovement que lo justifica y con la fila
+/// bloqueada. Es la misma regla sagrada que Lot.currentQuantity.
+model FinishedStock {
+  id String @id @default(cuid())
+
+  /// "producto|talla|cliente|PO", con "-" donde falta. Único y no un
+  /// @@unique de las cuatro columnas porque en Postgres dos NULL nunca son
+  /// iguales: con el cliente o la PO vacíos, el índice dejaría pasar el mismo
+  /// renglón dos veces.
+  key String @unique
+
+  productId String
+  product   FinishedProduct @relation(fields: [productId], references: [id])
+  sizeId    String
+  size      Size            @relation(fields: [sizeId], references: [id])
+  /// El dueño. Vacío = sin cliente asignado.
+  clientId  String?
+  client    Client?         @relation(fields: [clientId], references: [id])
+  /// La PO del cliente. Vacío = "Sin PO" en el inventario y el packing list.
+  clientPo  String?
+
+  quantity Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements FinishedMovement[]
+
+  @@index([productId])
+  @@index([clientId, clientPo])
+  @@map("finished_stock")
+}
+
+/// El kárdex de la prenda terminada. Append-only, igual que Movement: una
+/// corrección es OTRO movimiento con su motivo, nunca un UPDATE.
+model FinishedMovement {
+  id      String        @id @default(cuid())
+  stockId String
+  stock   FinishedStock @relation(fields: [stockId], references: [id])
+
+  type     FinishedMovementType
+  /// Con signo: positivo entra, negativo sale. El saldo es la suma.
+  quantity Int
+  /// Obligatorio en los ajustes: sin él un faltante no se puede revisar.
+  reason   String?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([stockId, createdAt])
+  @@map("finished_movements")
 }
