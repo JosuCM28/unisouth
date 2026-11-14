@@ -20,6 +20,7 @@ import type {
   Unit,
   WorkshopKind,
   FinishedMovementType,
+  PackingOrderStatus,
 } from "@prisma/client";
 import type { RemnantLevel } from "@/lib/export/cut-report";
 import type { CutDetailGroup } from "@/lib/report-period";
@@ -47,6 +48,17 @@ export const WORKSHOP_BOARD_TAB_LABELS: Record<WorkshopBoardTab, string> = {
   pending: "Por recibir",
   received: "Recibidas",
   outputs: "Salidas",
+};
+
+/** Un pedido de empaque se llena y se cierra al embarcarse. */
+export const PACKING_ORDER_STATUS_LABELS: Record<PackingOrderStatus, string> = {
+  OPEN: "Abierto",
+  CLOSED: "Cerrado",
+};
+
+export const PACKING_ORDER_STATUS_STYLES: Record<PackingOrderStatus, string> = {
+  OPEN: "bg-state-reserved text-state-reserved-foreground",
+  CLOSED: "bg-state-available text-state-available-foreground",
 };
 
 /** El kárdex de prenda terminada. */

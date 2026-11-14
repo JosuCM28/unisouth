@@ -34,7 +34,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Recepciones", "Salidas", "Órdenes", "Órdenes de planta", "Movimientos",
     "Requisiciones", "Reportes", "Auditoría",
     "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
-    "Inventario terminado",
+    "Inventario terminado", "Pedidos",
     "Usuarios", "Notificaciones", "Datos sin conexión", "Solicitudes de edición",
   ],
 
@@ -85,7 +85,7 @@ const ESPERADO: Record<Role, string[]> = {
   WORKSHOP_ALLENDE: ["Órdenes", "Tablero Allende"],
 
   /* La prenda terminada y nada más: ni tela, ni órdenes, ni talleres. */
-  SHIPPING: ["Inventario terminado"],
+  SHIPPING: ["Inventario terminado", "Pedidos"],
 };
 
 let fallos = 0;

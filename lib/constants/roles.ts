@@ -161,6 +161,11 @@ export const PERMISSIONS = [
      entrada manual de Embarques. Aparte de `bom:write` porque eso abre la
      ficha técnica y el catálogo completo; esto sólo agrega un nombre. */
   "products:create",
+  /* Armar PEDIDOS DE EMPAQUE: crearlos, abrir cajas, meter y sacar prenda,
+     cerrarlos y reabrirlos con motivo. Mirarlos basta con
+     `finished-goods:browse`; ésta es la que mueve el inventario de Embarques
+     hacia las cajas. */
+  "packing:write",
   /* Un tablero por taller, con llave propia cada uno: son pantallas distintas
      y uno no tiene por qué ver el del otro. */
   "workshop-board:acatlan",
@@ -313,7 +318,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   /* EMBARQUES: la prenda terminada que mandan los talleres de confección,
      las cajas y el packing list. Nada del almacén de tela, ni órdenes, ni
      tableros de taller: su trabajo empieza cuando la prenda ya está hecha. */
-  SHIPPING: ["finished-goods:browse", "finished-goods:adjust", "products:create"],
+  SHIPPING: ["finished-goods:browse", "finished-goods:adjust", "products:create", "packing:write"],
 };
 
 /** Convierte el String de la base a un Role válido. */

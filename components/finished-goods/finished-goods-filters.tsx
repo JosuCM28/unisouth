@@ -39,13 +39,16 @@ export function FinishedGoodsFilters({ options }: { options: FinishedFilterOptio
           clearLabel="Todos los tipos"
           placeholder="Tipo de prenda"
         />
-        <SearchSelect
-          options={options.clients.map((c) => ({ value: c.id, label: c.name }))}
-          value={searchParams.get("cliente") ?? ""}
-          onChange={(value) => setParam("cliente", value)}
-          clearLabel="Todos los clientes"
-          placeholder="Cliente"
-        />
+        {/* Dentro de la caja de un pedido el dueño ya está fijo y no se ofrece. */}
+        {options.clients.length > 0 && (
+          <SearchSelect
+            options={options.clients.map((c) => ({ value: c.id, label: c.name }))}
+            value={searchParams.get("cliente") ?? ""}
+            onChange={(value) => setParam("cliente", value)}
+            clearLabel="Todos los clientes"
+            placeholder="Cliente"
+          />
+        )}
         <SearchSelect
           options={options.pos.map((po) => ({ value: po, label: po }))}
           value={searchParams.get("po") ?? ""}

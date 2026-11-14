@@ -85,6 +85,8 @@ model User {
   workshopOutputsCreated     WorkshopOutput[]      @relation("WorkshopOutputCreatedBy")
   workshopOutputsCancelled   WorkshopOutput[]      @relation("WorkshopOutputCancelledBy")
   finishedMovements          FinishedMovement[]
+  packingOrdersCreated       PackingOrder[]        @relation("PackingOrderCreatedBy")
+  packingOrdersClosed        PackingOrder[]        @relation("PackingOrderClosedBy")
   garmentShipmentsDispatched GarmentShipment[]     @relation("GarmentShipmentDispatchedBy")
   documentsDispatched        InventoryDocument[]   @relation("DocumentDispatchedBy")
   garmentFolders             GarmentFolder[]       @relation("GarmentFolderCreatedBy")
@@ -328,6 +330,7 @@ model Client {
   garmentFolders   GarmentFolder[]
   standingRules    StandingRule[]
   finishedStocks   FinishedStock[]
+  packingOrders    PackingOrder[]
   workshopOutputs  WorkshopOutput[]
 
   @@index([active])
@@ -3020,6 +3023,8 @@ model FinishedStock {
   updatedAt DateTime @updatedAt
 
   movements FinishedMovement[]
+  /// Lo que de este renglón está metido en cajas.
+  boxLines  PackingBoxLine[]
 
   @@index([productId])
   @@index([clientId, clientPo])
@@ -3044,6 +3049,10 @@ model FinishedMovement {
   workshopOutputId String?
   workshopOutput   WorkshopOutput? @relation(fields: [workshopOutputId], references: [id])
 
+  /// La caja a la que entró o de la que salió (A caja / De caja).
+  packingBoxId String?
+  packingBox   PackingBox? @relation(fields: [packingBoxId], references: [id], onDelete: SetNull)
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
@@ -3051,5 +3060,82 @@ model FinishedMovement {
 
   @@index([stockId, createdAt])
   @@index([workshopOutputId])
+  @@index([packingBoxId])
   @@map("finished_movements")
+}
+
+enum PackingOrderStatus {
+  /// Se están llenando sus cajas.
+  OPEN
+  /// Ya se embarcó: sus cajas no se mueven y su packing list es el definitivo.
+  CLOSED
+}
+
+/// Un pedido de empaque: "TAMSA 13/11/2026" con sus cajas.
+///
+/// De UN cliente: sus cajas sólo aceptan prenda de ese dueño (o sin dueño),
+/// por la misma regla de la casa con la tela —nunca se le surte a un cliente
+/// lo que es de otro—. Sin cliente, acepta cualquiera.
+model PackingOrder {
+  id     String             @id @default(cuid())
+  code   String             @unique
+  /// Como lo llama quien empaca: "TAMSA 13/11/2026".
+  name   String
+  status PackingOrderStatus @default(OPEN)
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  date  DateTime @default(now())
+  notes String?
+
+  closedAt   DateTime?
+  closedById String?
+  closedBy   User?     @relation("PackingOrderClosedBy", fields: [closedById], references: [id])
+
+  createdById String?
+  createdBy   User?    @relation("PackingOrderCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  boxes PackingBox[]
+
+  @@index([status, date])
+  @@map("packing_orders")
+}
+
+/// Una caja del pedido. El número lo pone el sistema al crearla (1, 2, 3…)
+/// para que el packing list nunca salga con dos "Caja 3" ni se brinque la 4;
+/// si se quita una vacía, las de atrás se recorren.
+model PackingBox {
+  id      String       @id @default(cuid())
+  orderId String
+  order   PackingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number  Int
+
+  createdAt DateTime @default(now())
+
+  lines     PackingBoxLine[]
+  movements FinishedMovement[]
+
+  @@unique([orderId, number])
+  @@map("packing_boxes")
+}
+
+/// Cuántas piezas de un renglón del inventario van en una caja.
+///
+/// `quantity` sólo lo escribe PackingService, en la misma transacción que el
+/// movimiento A caja / De caja que lo justifica: la caja y el kárdex nunca
+/// pueden contar cosas distintas.
+model PackingBoxLine {
+  id       String        @id @default(cuid())
+  boxId    String
+  box      PackingBox    @relation(fields: [boxId], references: [id], onDelete: Cascade)
+  stockId  String
+  stock    FinishedStock @relation(fields: [stockId], references: [id])
+  quantity Int
+
+  @@unique([boxId, stockId])
+  @@index([stockId])
+  @@map("packing_box_lines")
 }

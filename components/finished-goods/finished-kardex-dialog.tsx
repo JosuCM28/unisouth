@@ -66,6 +66,11 @@ export function FinishedKardexDialog({ stockId, title }: { stockId: string; titl
                   {movement.workshopOutput.order.reference ?? movement.workshopOutput.order.code}
                 </span>
               )}
+              {movement.packingBox && (
+                <span className="tabular text-xs">
+                  Caja {movement.packingBox.number} · {movement.packingBox.order.name} · {movement.packingBox.order.code}
+                </span>
+              )}
               {movement.reason && <span className="text-xs">{movement.reason}</span>}
             </li>
           ))}

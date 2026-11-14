@@ -42,6 +42,8 @@ const MOVEMENT_SELECT = {
       order: { select: { code: true, reference: true } },
     },
   },
+  /* A qué pedido y caja fue (o de cuál regresó). */
+  packingBox: { select: { number: true, order: { select: { code: true, name: true } } } },
 } satisfies Prisma.FinishedMovementSelect;
 
 export type FinishedMovementRow = Prisma.FinishedMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;
@@ -122,6 +124,9 @@ function toWhere(filters: FinishedGoodsFilters): Prisma.FinishedStockWhereInput 
   const search = filters.search?.trim();
   return {
     quantity: { not: 0 },
+    ...(filters.forClientId
+      ? { AND: [{ OR: [{ clientId: filters.forClientId }, { clientId: null }] }] }
+      : {}),
     ...(filters.clientId ? { clientId: filters.clientId } : {}),
     ...(filters.clientPo ? { clientPo: filters.clientPo } : {}),
     ...(filters.sizeId ? { sizeId: filters.sizeId } : {}),

@@ -27,6 +27,41 @@ interface Mismatch {
 async function main() {
   await checkLots();
   await checkFinishedStock();
+  await checkPackedBoxes();
+}
+
+/**
+ * Lo que hay en cajas de cada renglón debe ser exactamente lo que el kárdex
+ * dice que entró a caja menos lo que regresó: A caja (negativo) y De caja
+ * (positivo) suman, con el signo al revés, lo empacado.
+ */
+async function checkPackedBoxes() {
+  console.log("\nVerificando cajas…\n");
+
+  const [boxed, moved] = await Promise.all([
+    prisma.packingBoxLine.groupBy({ by: ["stockId"], _sum: { quantity: true } }),
+    prisma.finishedMovement.groupBy({
+      by: ["stockId"],
+      where: { type: { in: ["PACKED", "UNPACKED"] } },
+      _sum: { quantity: true },
+    }),
+  ]);
+  const inBoxes = new Map(boxed.map((row) => [row.stockId, row._sum.quantity ?? 0]));
+  const fromKardex = new Map(moved.map((row) => [row.stockId, -(row._sum.quantity ?? 0)]));
+  const ids = new Set([...inBoxes.keys(), ...fromKardex.keys()]);
+  const wrong = [...ids].filter((id) => (inBoxes.get(id) ?? 0) !== (fromKardex.get(id) ?? 0));
+
+  console.log(`Renglones en cajas:   ${ids.size}`);
+  if (wrong.length === 0) {
+    console.log("✓ Las cajas cuadran con el kárdex.");
+    return;
+  }
+
+  console.log(`\n✗ ${wrong.length} renglón(es) con cajas que NO cuadran:`);
+  for (const id of wrong) {
+    console.log(`   ${id}  en cajas ${inBoxes.get(id) ?? 0}  kárdex ${fromKardex.get(id) ?? 0}`);
+  }
+  hasProblems = true;
 }
 
 /**

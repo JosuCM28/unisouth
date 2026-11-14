@@ -14,6 +14,8 @@ export interface FinishedMoveInput extends FinishedStockKeyInput {
   reason?: string;
   /** La salida de taller que lo origina, para el kárdex. */
   workshopOutputId?: string;
+  /** La caja a la que entra o de la que sale. */
+  packingBoxId?: string;
 }
 
 /** La llave del renglón. "-" donde falta, para que dos vacíos sí choquen. */
@@ -66,7 +68,18 @@ export class FinishedGoodsService extends BaseService {
     input: FinishedMoveInput,
   ): Promise<{ stockId: string; quantity: number }> {
     const stockId = await this.ensureStock(tx, input);
+    return this.applyToStockWith(tx, stockId, input);
+  }
 
+  /**
+   * Lo mismo sobre un renglón que ya existe y se conoce por su id: meter o
+   * sacar de una caja, donde se eligió el renglón del inventario.
+   */
+  async applyToStockWith(
+    tx: PrismaExecutor,
+    stockId: string,
+    input: Omit<FinishedMoveInput, keyof FinishedStockKeyInput>,
+  ): Promise<{ stockId: string; quantity: number }> {
     // Sin el candado, dos cajas llenándose a la vez leerían el mismo saldo y
     // entre las dos sacarían de más.
     await tx.$queryRaw`SELECT id FROM finished_stock WHERE id = ${stockId} FOR UPDATE`;
@@ -85,6 +98,7 @@ export class FinishedGoodsService extends BaseService {
         quantity: input.quantity,
         reason: input.reason,
         workshopOutputId: input.workshopOutputId ?? null,
+        packingBoxId: input.packingBoxId ?? null,
         userId: this.context.userId ?? null,
       },
     });

@@ -217,6 +217,15 @@ renglón nace en cero y lo llena su primer movimiento. Los ajustes manuales
 llevan motivo y salen en la auditoría como `HIGH`. `verify-integrity.ts`
 revisa los dos inventarios.
 
+Las **cajas** de un pedido de empaque (`PackingBoxLine.quantity`) sólo las
+escribe `PackingService`, en la misma transacción que el movimiento *A caja*
+o *De caja* que mueve el inventario: lo empacado de cada renglón es siempre
+lo que el kárdex dice, y `verify-integrity.ts` también lo revisa. Un pedido
+de un cliente sólo acepta prenda de ese dueño o sin dueño. La caja la crea
+quien empaca con **Nueva caja** y el número lo pone el sistema; quitar una
+vacía recorre las de atrás. Cerrado, el pedido ya no se mueve; reabrirlo
+pide motivo (`HIGH`).
+
 ---
 
 ## 7. Auditoría — "quién metió mano"
@@ -254,7 +263,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | **La OTRA PLANTA. Seis pantallas: Órdenes · Órdenes de planta · los cuatro tableros de taller.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. Los tableros de taller los ve en sólo lectura, como ADMIN: no confirma entregas porque eso le toca al taller. No recorre el almacén, no corre cálculos y no ve auditoría |
 | `READ_ONLY` | **Una sola pantalla: Órdenes.** Ve el pedido completo —tallas, cortes, envíos a taller, salidas y comentarios— y cómo va la operación de cada orden, sin un solo botón de captura. No recorre el almacén |
-| `SHIPPING` | **Embarques. La prenda ya confeccionada.** Ve el Inventario terminado por producto, talla, cliente y PO, su kárdex, y carga o descuenta a mano con motivo. Más adelante arma cajas y el packing list. No ve tela, órdenes ni tableros de taller |
+| `SHIPPING` | **Embarques. La prenda ya confeccionada.** Ve el Inventario terminado por producto, talla, cliente y PO, su kárdex, y carga o descuenta a mano con motivo. Arma **Pedidos** de empaque caja por caja. Más adelante, el packing list. No ve tela, órdenes ni tableros de taller |
 | `WORKSHOP_ACATLAN` · `WORKSHOP_SITEX` · `WORKSHOP_BRODERIE` · `WORKSHOP_ALLENDE` | **Un taller externo. Dos pantallas: Órdenes (sus entregas) · su Tablero.** Ve sólo lo que se le mandó, reimprime su vale vigente y confirma que le llegó. Desde la pestaña **Salidas** de su tablero, el de proceso saca piezas procesadas a otro taller y el de confección manda prenda terminada a Embarques. No lleva `orders:browse`: esa llave abre todas las órdenes de la casa |
 
 **Lo que WAREHOUSE NO tiene, y por qué.** Fichas técnicas, tallas, folios,
@@ -325,6 +334,7 @@ Estas capacidades separan lo anterior:
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
 | `products:create` | **Alta rápida de producto** —nombre, tipo y cliente— desde la salida a Embarques o la entrada manual. ADMIN, Embarques, Acatlán y Allende. Aparte de `bom:write`, que abre fichas técnicas |
 | `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, y entradas y salidas manuales con motivo. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
+| `packing:write` | **Pedidos de empaque**: crearlos, abrir cajas, meter y sacar prenda, cerrarlos y reabrirlos con motivo. Embarques y ADMIN. Verlos basta con `finished-goods:browse` |
 | `workshop-output:write` | La **salida** de UN taller: lo que saca de su saldo y cancelarla con motivo. Los cuatro talleres; ADMIN no, por la misma razón. ADMIN corrige desde la ficha de la orden con `cuts:unlock` |
 | `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN y la otra planta (`MANAGEMENT`) llevan las cuatro en sólo lectura: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access` |
 
@@ -495,6 +505,7 @@ con incremento atómico dentro de la transacción.
 | Orden de otra planta | `OP-2026-0007` |
 | Requisición | `PR-2026-0074` |
 | Salida de taller | `ST-2026-0001` |
+| Pedido de empaque | `EMB-2026-0001` |
 
 El folio del lote es el contenido del QR: `https://{APP_URL}/r/{code}`.
 

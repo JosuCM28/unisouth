@@ -37,4 +37,6 @@ export interface FinishedGoodsFilters {
   clientPo?: string;
   sizeId?: string;
   search?: string;
+  /** Para llenar la caja de un pedido: sólo prenda de este dueño o sin dueño. */
+  forClientId?: string;
 }

@@ -275,6 +275,13 @@ export const NAVIGATION: NavSection[] = [
         icon: "finishedGoods",
         permission: "finished-goods:browse",
       },
+      {
+        // Los pedidos de empaque, con sus cajas y su packing list.
+        href: "/packing",
+        label: "Pedidos",
+        icon: "packing",
+        permission: "finished-goods:browse",
+      },
     ],
   },
   {
