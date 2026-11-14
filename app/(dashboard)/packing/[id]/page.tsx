@@ -8,6 +8,7 @@ import { formatDate, formatQuantity } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { NewBoxButton } from "@/components/packing/packing-box-buttons";
 import { PackingBoxGrid } from "@/components/packing/packing-box-grid";
+import { PackingListButtons } from "@/components/packing/packing-list-buttons";
 import { PackingOrderActions } from "@/components/packing/packing-order-actions";
 import { PackingStatusBadge, sumPieces } from "@/components/packing/packing-status-badge";
 
@@ -45,6 +46,7 @@ export default async function PackingOrderPage({ params }: PageProps) {
         {canWrite && <PackingOrderActions order={order} status={order.status} clients={clients} />}
       </div>
       {order.notes && <p className="whitespace-pre-wrap text-sm">{order.notes}</p>}
+      <PackingListButtons orderId={order.id} hasPieces={pieces > 0} />
 
       <PackingBoxGrid orderId={order.id} boxes={order.boxes} canEdit={canWrite && isOpen} />
     </div>
