@@ -87,6 +87,7 @@ model User {
   finishedMovements          FinishedMovement[]
   packingOrdersCreated       PackingOrder[]        @relation("PackingOrderCreatedBy")
   packingOrdersClosed        PackingOrder[]        @relation("PackingOrderClosedBy")
+  packingListSheetsUpdated   PackingListSheet[]    @relation("PackingListSheetUpdatedBy")
   garmentShipmentsDispatched GarmentShipment[]     @relation("GarmentShipmentDispatchedBy")
   documentsDispatched        InventoryDocument[]   @relation("DocumentDispatchedBy")
   garmentFolders             GarmentFolder[]       @relation("GarmentFolderCreatedBy")
@@ -3099,6 +3100,8 @@ model PackingOrder {
   updatedAt   DateTime @updatedAt
 
   boxes PackingBox[]
+  /// La versión editada de su packing list, si alguien la guardó.
+  sheet PackingListSheet?
 
   @@index([status, date])
   @@map("packing_orders")
@@ -3138,4 +3141,76 @@ model PackingBoxLine {
   @@unique([boxId, stockId])
   @@index([stockId])
   @@map("packing_box_lines")
+}
+
+/// El packing list EDITADO de un pedido: lo que sale en el papel.
+///
+/// Es papelería, no inventario: aquí se escribe color, destino o una
+/// descripción distinta a la del catálogo, y nada de eso mueve existencias.
+/// Por eso se guarda aparte de las cajas y nunca las toca. Si las cajas
+/// cambian después, la pantalla avisa que ya no cuadra y ofrece volver a
+/// llenarlo; no se corrige solo, porque lo escrito a mano es de quien lo
+/// escribió.
+model PackingListSheet {
+  id      String       @id @default(cuid())
+  orderId String       @unique
+  order   PackingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Código y revisión del formato de calidad: "F12-POP01", "REV:2 20 MAY13".
+  formatCode String
+  revision   String
+  client     String
+  date       DateTime
+  preparedBy String?
+  reviewedBy String?
+  /// Quien recibe: el transportista que firma.
+  receivedBy String?
+  notes      String?
+
+  updatedById String?
+  updatedBy   User?    @relation("PackingListSheetUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines PackingListSheetLine[]
+  boxes PackingListSheetBox[]
+
+  @@map("packing_list_sheets")
+}
+
+/// Un renglón del packing list, tal como se imprime. Todo es texto libre
+/// salvo la cantidad: el papel manda.
+model PackingListSheetLine {
+  id       String           @id @default(cuid())
+  sheetId  String
+  sheet    PackingListSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  position Int
+
+  /// De qué renglón del inventario salió al llenarse. Sin relación a
+  /// propósito: sólo sirve para conservar lo escrito al volver a llenar, y un
+  /// renglón agregado a mano no viene de ninguno.
+  stockId     String?
+  orderRef    String?
+  destination String?
+  description String
+  color       String?
+  boxNumber   Int?
+  size        String?
+  quantity    Int
+
+  @@index([sheetId, position])
+  @@map("packing_list_sheet_lines")
+}
+
+/// Peso y medidas de una caja, para la paquetería.
+model PackingListSheetBox {
+  id         String           @id @default(cuid())
+  sheetId    String
+  sheet      PackingListSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  boxNumber  Int
+  weightKg   Decimal?         @db.Decimal(8, 2)
+  dimensions String?
+
+  @@unique([sheetId, boxNumber])
+  @@map("packing_list_sheet_boxes")
 }

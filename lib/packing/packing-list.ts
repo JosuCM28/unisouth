@@ -1,152 +1,153 @@
 import type { PackingOrderStatus } from "@prisma/client";
-import type {
-  PackingBoxLineRow,
-  PackingOrderDetail,
-} from "@/lib/repositories/packing.repository";
+import type { PackingListData } from "./packing-list-data";
 
-export const NO_PO_LABEL = "SIN PO";
-export const NO_CATEGORY_LABEL = "SIN TIPO";
-export const NO_CLIENT_LABEL = "SIN CLIENTE";
-
-export interface PackingListLine {
-  category: string;
-  product: string;
+/** Un renglón tal como se imprime: lo que falta va vacío, no "—". */
+export interface PackingListRow {
+  orderRef: string;
+  destination: string;
+  description: string;
+  color: string;
   size: string;
-  po: string;
-  /** El dueño de esa prenda: en un pedido sin cliente puede variar por renglón. */
-  client: string;
-  pieces: number;
+  quantity: number;
 }
 
-export interface PackingListBox {
-  number: number;
-  lines: PackingListLine[];
+/** Los renglones seguidos de una misma caja, con su subtotal. */
+export interface PackingListBoxGroup {
+  /** `null` = renglones capturados sin caja antes de la primera. */
+  boxNumber: number | null;
+  rows: PackingListRow[];
+  pieces: number;
+  weightKg: number | null;
+  dimensions: string | null;
+}
+
+export interface PackingListSummaryLine {
+  description: string;
+  color: string;
+  size: string;
   pieces: number;
 }
 
 /**
- * Lo que dice el packing list, ya resuelto: el PDF y el Excel lo DIBUJAN,
- * pero qué renglones lleva, en qué orden y cuánto suman se decide aquí una
- * sola vez. Si cada uno lo armara por su lado, tarde o temprano el Excel y
- * el papel dirían cosas distintas del mismo pedido.
+ * El packing list ya resuelto. El PDF y el Excel lo DIBUJAN, pero qué
+ * renglones lleva, cómo se agrupan y cuánto suman se decide aquí una sola
+ * vez: si cada uno lo armara por su lado, tarde o temprano el Excel y el
+ * papel dirían cosas distintas del mismo pedido.
  */
 export interface PackingList {
   code: string;
   name: string;
-  client: string;
-  /**
-   * Más de un dueño en el pedido (Tenaris y Tenaris Shawcor en el mismo
-   * embarque): entonces la hoja lleva la columna Cliente. Con uno solo
-   * sobra, ya lo dice el encabezado.
-   */
-  showClient: boolean;
-  date: Date;
   status: PackingOrderStatus;
   /** Abierto: todavía se mueve, y la hoja lo advierte. */
   preliminary: boolean;
-  boxes: PackingListBox[];
-  /** El total por tipo, producto, talla y PO de todo el pedido. */
-  summary: PackingListLine[];
+  formatCode: string;
+  revision: string;
+  client: string;
+  date: Date;
+  preparedBy: string;
+  reviewedBy: string;
+  receivedBy: string;
+  notes: string;
+  groups: PackingListBoxGroup[];
+  /** Total por descripción, color y talla de todo el pedido. */
+  summary: PackingListSummaryLine[];
   totalBoxes: number;
   totalPieces: number;
+  /** `null` si ninguna caja trae peso: un "0 kg" afirmaría algo falso. */
+  totalWeightKg: number | null;
 }
 
-/** Orden del tipo de prenda (posición del catálogo) y de la talla. */
-interface SortKeys {
-  categoryPosition: number;
-  sizeOrder: number;
-}
-
-type KeyedLine = PackingListLine & SortKeys;
-
-export function toPackingList(order: PackingOrderDetail): PackingList {
-  const boxes = order.boxes
-    .filter((box) => box.lines.length > 0)
-    .map((box) => {
-      const lines = sortLines(box.lines.map(toLine));
-      return { number: box.number, lines: lines.map(stripKeys), pieces: sum(lines) };
-    });
-
-  const summary = sortLines(mergeLines(order.boxes.flatMap((box) => box.lines.map(toLine))));
-  const owners = [...new Set(summary.map((line) => line.client))];
+export function toPackingList(
+  order: { code: string; name: string; status: PackingOrderStatus },
+  data: PackingListData,
+): PackingList {
+  const groups = groupByBox(data);
+  const weights = groups.flatMap((group) => (group.weightKg === null ? [] : [group.weightKg]));
 
   return {
     code: order.code,
     name: order.name,
-    client: headerClient(order.client?.name ?? null, owners),
-    showClient: owners.length > 1,
-    date: order.date,
     status: order.status,
     preliminary: order.status === "OPEN",
-    boxes,
-    summary: summary.map(stripKeys),
-    totalBoxes: boxes.length,
-    totalPieces: sum(summary),
+    formatCode: data.formatCode,
+    revision: data.revision,
+    client: data.client,
+    date: data.date,
+    preparedBy: data.preparedBy ?? "",
+    reviewedBy: data.reviewedBy ?? "",
+    receivedBy: data.receivedBy ?? "",
+    notes: data.notes ?? "",
+    groups,
+    summary: summarize(data),
+    totalBoxes: new Set(groups.flatMap((group) => (group.boxNumber === null ? [] : [group.boxNumber]))).size,
+    totalPieces: data.lines.reduce((sum, line) => sum + line.quantity, 0),
+    totalWeightKg: weights.length > 0 ? weights.reduce((sum, value) => sum + value, 0) : null,
   };
 }
 
 /**
- * El cliente del encabezado: el del pedido; si no tiene, el único dueño de
- * lo empacado, o todos los que lleva para que nadie lea "SIN CLIENTE" en un
- * embarque que sí tiene dueños.
+ * Agrupa en el orden de la hoja, no ordenando: el papel manda. Un renglón
+ * sin caja sigue en la caja de arriba, que es como se lee en la hoja de
+ * papel —el número sólo se escribe en el primer renglón de cada caja—.
  */
-function headerClient(orderClient: string | null, owners: string[]): string {
-  if (orderClient) return orderClient;
-  if (owners.length === 0) return NO_CLIENT_LABEL;
-  return owners.sort((a, b) => a.localeCompare(b)).join(" / ");
+function groupByBox(data: PackingListData): PackingListBoxGroup[] {
+  const extras = new Map(data.boxes.map((box) => [box.boxNumber, box]));
+  const groups: PackingListBoxGroup[] = [];
+
+  for (const line of data.lines) {
+    const current = groups.at(-1);
+    const startsNew = !current || (line.boxNumber !== undefined && line.boxNumber !== current.boxNumber);
+    const group = startsNew ? newGroup(line.boxNumber ?? null, extras) : current;
+    if (startsNew) groups.push(group);
+    // Una caja puede volver a aparecer más abajo (la caja 1 de camisas y la
+    // caja 1 de pantalones en la hoja de papel): su peso se dice UNA vez,
+    // en su primer bloque, o el total lo sumaría dos veces.
+    if (startsNew && group.boxNumber !== null) extras.delete(group.boxNumber);
+    group.rows.push(toRow(line));
+    group.pieces += line.quantity;
+  }
+  return groups;
+}
+
+function newGroup(
+  boxNumber: number | null,
+  extras: Map<number, PackingListData["boxes"][number]>,
+): PackingListBoxGroup {
+  const extra = boxNumber === null ? undefined : extras.get(boxNumber);
+  return {
+    boxNumber,
+    rows: [],
+    pieces: 0,
+    weightKg: extra?.weightKg ?? null,
+    dimensions: extra?.dimensions ?? null,
+  };
+}
+
+function toRow(line: PackingListData["lines"][number]): PackingListRow {
+  return {
+    orderRef: line.orderRef ?? "",
+    destination: line.destination ?? "",
+    description: line.description,
+    color: line.color ?? "",
+    size: line.size ?? "",
+    quantity: line.quantity,
+  };
+}
+
+/** Suma por descripción + color + talla, en el orden en que aparecen. */
+function summarize(data: PackingListData): PackingListSummaryLine[] {
+  const merged = new Map<string, PackingListSummaryLine>();
+  for (const line of data.lines) {
+    const entry = { description: line.description, color: line.color ?? "", size: line.size ?? "" };
+    const key = [entry.description, entry.color, entry.size].join("|");
+    const known = merged.get(key);
+    if (known) known.pieces += line.quantity;
+    else merged.set(key, { ...entry, pieces: line.quantity });
+  }
+  return [...merged.values()];
 }
 
 /** "packing-EMB-2026-0001-TAMSA-13-11-2026" sin nada que un sistema de archivos rechace. */
 export function packingListFileName(list: PackingList): string {
   return `packing-${list.code}-${list.name}`.replace(/[^A-Za-z0-9-]+/g, "-").replace(/-+/g, "-");
-}
-
-function toLine(line: PackingBoxLineRow): KeyedLine {
-  const category = line.stock.product.garmentCategory;
-  return {
-    category: category?.name ?? NO_CATEGORY_LABEL,
-    product: line.stock.product.name,
-    size: line.stock.size.code,
-    po: line.stock.clientPo ?? NO_PO_LABEL,
-    client: line.stock.client?.name ?? NO_CLIENT_LABEL,
-    pieces: line.quantity,
-    categoryPosition: category?.position ?? Number.MAX_SAFE_INTEGER,
-    sizeOrder: line.stock.size.order,
-  };
-}
-
-/** Junta los renglones iguales de todas las cajas para el resumen. */
-function mergeLines(lines: KeyedLine[]): KeyedLine[] {
-  const merged = new Map<string, KeyedLine>();
-  for (const line of lines) {
-    const key = [line.category, line.product, line.size, line.po, line.client].join("|");
-    const known = merged.get(key);
-    if (known) known.pieces += line.pieces;
-    else merged.set(key, { ...line });
-  }
-  return [...merged.values()];
-}
-
-/** Tipo (como en el catálogo), producto, talla (CH antes que XG), PO y dueño. */
-function sortLines(lines: KeyedLine[]): KeyedLine[] {
-  return [...lines].sort(
-    (a, b) =>
-      a.categoryPosition - b.categoryPosition ||
-      a.product.localeCompare(b.product) ||
-      a.sizeOrder - b.sizeOrder ||
-      a.po.localeCompare(b.po) ||
-      a.client.localeCompare(b.client),
-  );
-}
-
-/** Las llaves de orden no viajan al papel. */
-function stripKeys(line: KeyedLine): PackingListLine {
-  return {
-    category: line.category, product: line.product, size: line.size, po: line.po,
-    client: line.client, pieces: line.pieces,
-  };
-}
-
-function sum(lines: { pieces: number }[]): number {
-  return lines.reduce((total, line) => total + line.pieces, 0);
 }

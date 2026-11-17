@@ -226,6 +226,13 @@ quien empaca con **Nueva caja** y el número lo pone el sistema; quitar una
 vacía recorre las de atrás. Cerrado, el pedido ya no se mueve; reabrirlo
 pide motivo (`HIGH`).
 
+Un pedido **sin cliente** acepta prenda de cualquier empresa (Tenaris y Tenaris
+Shawcor en el mismo embarque). Su **packing list** se puede editar y guardar
+(`PackingListSheet`): color, destino, descripción, firmas, peso y medidas. Es
+papelería —no toca cajas, inventario ni kárdex—, así que se corrige aun con el
+pedido cerrado; el PDF y el Excel salen de lo guardado o, si nadie lo editó, de
+las cajas.
+
 ---
 
 ## 7. Auditoría — "quién metió mano"
