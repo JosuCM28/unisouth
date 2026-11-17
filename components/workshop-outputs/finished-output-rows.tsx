@@ -14,6 +14,9 @@ export interface FinishedDraftRow {
   scrapReason: string;
 }
 
+/** Mismas columnas para el encabezado y los inputs, para que queden alineados. */
+const ROW_GRID = "grid grid-cols-[1fr_4.5rem_4.5rem_2.75rem] gap-2";
+
 let nextKey = 0;
 const newKey = () => `row-${(nextKey += 1)}`;
 
@@ -76,13 +79,22 @@ export function FinishedOutputRows({
                 {used} de {size.available}{over && " · te pasas"}
               </span>
             </div>
+            {/* Encabezado por talla y no uno solo arriba de todo: con varias
+                tallas el de hasta arriba queda fuera de pantalla en el celular. */}
+            {sizeRows.length > 0 && (
+              <div className={`${ROW_GRID} text-xs font-medium text-muted-foreground`} aria-hidden>
+                <span>PO</span>
+                <span>Cantidad</span>
+                <span>Merma</span>
+              </div>
+            )}
             {sizeRows.map((entry) => (
               <div key={entry.key} className="flex flex-col gap-1">
-                <div className="grid grid-cols-[1fr_4.5rem_4.5rem_2.75rem] items-center gap-2">
+                <div className={`${ROW_GRID} items-center`}>
                   <Input aria-label={`PO de ${size.sizeCode}`} placeholder="Sin PO" value={entry.clientPo}
                     onChange={(event) => update(entry.key, { clientPo: event.target.value })}
                     className="tabular touch-target uppercase" />
-                  <Input inputMode="numeric" aria-label={`Salen de ${size.sizeCode}`} value={entry.quantity}
+                  <Input inputMode="numeric" aria-label={`Cantidad de ${size.sizeCode}`} value={entry.quantity}
                     onChange={(event) => update(entry.key, { quantity: event.target.value })}
                     className="tabular touch-target" />
                   <Input inputMode="numeric" aria-label={`Merma de ${size.sizeCode}`} placeholder="0" value={entry.scrap}

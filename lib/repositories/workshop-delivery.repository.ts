@@ -13,6 +13,7 @@ export const WORKSHOP_DELIVERY_LIMIT = 300;
 const LIST_SELECT = {
   id: true,
   code: true,
+  orderId: true,
   status: true,
   sentAt: true,
   parts: true,
@@ -41,6 +42,7 @@ export type WorkshopDeliveryListRow = Prisma.GarmentShipmentGetPayload<{
 const VOUCHER_LIST_SELECT = {
   id: true,
   code: true,
+  cuttingOrderId: true,
   status: true,
   date: true,
   concept: true,

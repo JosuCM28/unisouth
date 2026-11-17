@@ -26,6 +26,8 @@ export interface WorkshopDeliveryRow {
   id: string;
   code: string;
   state: WorkshopDeliveryState;
+  /** Con ella la tarjeta precarga la salida a Embarques de esa orden. */
+  orderId: string | null;
   orderReference: string;
   /** La PO del cliente, para que el taller busque con el papel en la mano. */
   clientPo: string | null;
@@ -541,6 +543,7 @@ function toListRow(row: WorkshopDeliveryListRow): WorkshopDeliveryRow {
     id: row.id,
     code: row.code,
     state: stateOf(row),
+    orderId: row.orderId,
     // El número que el taller conoce: el del papel, no el folio interno.
     orderReference: row.order.reference ?? row.order.code,
     clientPo: row.order.clientPo,
@@ -587,6 +590,7 @@ function toVoucherListRow(row: WorkshopVoucherListRow): WorkshopDeliveryRow {
     id: row.id,
     code: row.code,
     state: voucherStateOf(row),
+    orderId: row.cuttingOrderId,
     orderReference: voucherReference(row),
     // Un vale no lleva PO propia: la hereda de la orden de la que salió.
     clientPo: row.cuttingOrder?.clientPo ?? null,

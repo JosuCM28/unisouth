@@ -2,13 +2,15 @@
 
 import { useMemo, useState, type ComponentProps } from "react";
 import Link from "next/link";
-import { Inbox, SearchX } from "lucide-react";
+import { Inbox, PackageCheck, SearchX } from "lucide-react";
 import { WORKSHOP_BOARD_TAB_LABELS } from "@/lib/constants/labels";
 import type { WorkshopBoardTab } from "@/lib/constants/workshop-access";
 import type { WorkshopDeliveryRow } from "@/lib/services/workshop-delivery.service";
 import { cn, formatDate, formatDateTime, formatQuantity } from "@/lib/utils";
 import { filterDeliveries } from "@/lib/workshop-delivery-search";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
+import { FinishedOutputDialog } from "@/components/workshop-outputs/finished-output-dialog";
 import { DeliveryFilter } from "@/components/workshop-orders/delivery-filter";
 import { DispatchNote } from "@/components/workshop-orders/dispatch-status";
 import { ReceiveButton } from "@/components/workshop-orders/receive-button";
@@ -64,7 +66,9 @@ export function DeliveryBoardBody({
   report,
 }: Props) {
   const [query, setQuery] = useState("");
+  const [shipOrderId, setShipOrderId] = useState<string | null>(null);
   const delivery = useBoardDelivery(report.boardKey);
+  const shippable = useMemo(() => shippableOrders(outputs, isOwner), [outputs, isOwner]);
   const groups = useMemo(
     () => groupRows(filterDeliveries(rows, query)),
     [rows, query],
@@ -114,6 +118,20 @@ export function DeliveryBoardBody({
           query={query}
           isOwner={isOwner}
           onOpen={(row) => delivery.open({ id: row.id, code: row.code })}
+          canShip={(row) => row.state === "RECEIVED" && !!row.orderId && shippable.has(row.orderId)}
+          onShip={(row) => setShipOrderId(row.orderId)}
+        />
+      )}
+
+      {/* Montada sólo mientras se usa, con la orden de la tarjeta: la `key`
+          la vuelve a armar limpia si se elige otra. */}
+      {shipOrderId && outputs?.finishedOptions && (
+        <FinishedOutputDialog
+          key={shipOrderId}
+          balance={outputs.balance}
+          options={outputs.finishedOptions}
+          initialOrderId={shipOrderId}
+          onClose={() => setShipOrderId(null)}
         />
       )}
 
@@ -124,24 +142,44 @@ export function DeliveryBoardBody({
   );
 }
 
+/**
+ * Las órdenes a las que se les puede dar salida a Embarques desde Recibidas:
+ * sólo el dueño de un taller de confección, y sólo si a la orden le quedan
+ * piezas. Sin saldo el botón sobra: el servidor la rechazaría igual.
+ */
+function shippableOrders(outputs: OutputsBoardData | null, isOwner: boolean): Set<string> {
+  if (!isOwner || outputs?.kind !== "ASSEMBLY" || !outputs.finishedOptions) return new Set();
+  return new Set(outputs.balance.map((order) => order.orderId));
+}
+
 function BoardList({
   rows,
   tab,
   query,
   isOwner,
   onOpen,
+  canShip,
+  onShip,
 }: {
   rows: WorkshopDeliveryRow[];
   tab: DeliveryTab;
   query: string;
   isOwner: boolean;
   onOpen: (row: WorkshopDeliveryRow) => void;
+  canShip: (row: WorkshopDeliveryRow) => boolean;
+  onShip: (row: WorkshopDeliveryRow) => void;
 }) {
   if (rows.length > 0) {
     return (
       <ul className="flex flex-col gap-2">
         {rows.map((row) => (
-          <BoardRow key={row.id} row={row} isOwner={isOwner} onOpen={onOpen} />
+          <BoardRow
+            key={row.id}
+            row={row}
+            isOwner={isOwner}
+            onOpen={onOpen}
+            onShip={canShip(row) ? () => onShip(row) : undefined}
+          />
         ))}
       </ul>
     );
@@ -190,10 +228,13 @@ function BoardRow({
   row,
   isOwner,
   onOpen,
+  onShip,
 }: {
   row: WorkshopDeliveryRow;
   isOwner: boolean;
   onOpen: (row: WorkshopDeliveryRow) => void;
+  /** Sólo llega cuando a esta orden se le puede dar salida a Embarques. */
+  onShip?: () => void;
 }) {
   return (
     <li className="flat-surface relative flex flex-col gap-2 p-3 transition-colors active:bg-accent">
@@ -234,6 +275,16 @@ function BoardRow({
               pieces={row.pieces}
               bundles={row.bundles}
             />
+          </div>
+        )}
+
+        {/* Igual que Recibir: por encima de la capa, para no abrir la ficha. */}
+        {onShip && (
+          <div className="relative z-20">
+            <Button className="touch-target w-full sm:w-auto" onClick={onShip}>
+              <PackageCheck className="size-4" aria-hidden />
+              Enviar
+            </Button>
           </div>
         )}
       </div>

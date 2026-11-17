@@ -36,19 +36,28 @@ export interface FinishedOutputOptions {
 export function FinishedOutputDialog({
   balance,
   options,
+  initialOrderId,
+  onClose,
 }: {
   balance: WorkshopBalanceOrder[];
   options: FinishedOutputOptions;
+  /**
+   * Abierta desde una tarjeta de Recibidas: nace abierta, con esa orden ya
+   * cargada y sin botón propio. Quien la monta la quita en `onClose`.
+   */
+  initialOrderId?: string;
+  onClose?: () => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const initial = balance.find((entry) => entry.orderId === initialOrderId);
+  const [open, setOpen] = useState(Boolean(initial));
   const [products, setProducts] = useState(options.products);
-  const [orderId, setOrderId] = useState("");
+  const [orderId, setOrderId] = useState(initial?.orderId ?? "");
   const [productId, setProductId] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(initial?.clientId ?? "");
   const [date, setDate] = useState(todayInputValue());
   const [notes, setNotes] = useState("");
-  const [rows, setRows] = useState<FinishedDraftRow[]>([]);
+  const [rows, setRows] = useState<FinishedDraftRow[]>(() => toFinishedRows(initial));
   const [saving, setSaving] = useState(false);
 
   const order = balance.find((entry) => entry.orderId === orderId);
@@ -95,25 +104,29 @@ export function FinishedOutputDialog({
       return;
     }
     toast.success(`Salida ${result.data.code} enviada a Embarques`);
+    close();
+    router.refresh();
+  }
+
+  function close() {
     setOpen(false);
     reset();
-    router.refresh();
+    onClose?.();
   }
 
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
+      onOpenChange={(next) => (next ? setOpen(true) : close())}
       title="Salida a Embarques"
       description="Prenda terminada. Entra al inventario de Embarques al guardar."
       trigger={
-        <Button className="touch-target" disabled={balance.length === 0}>
-          <PackageCheck className="size-4" aria-hidden />
-          Salida a Embarques
-        </Button>
+        initialOrderId ? undefined : (
+          <Button className="touch-target" disabled={balance.length === 0}>
+            <PackageCheck className="size-4" aria-hidden />
+            Salida a Embarques
+          </Button>
+        )
       }
     >
       <div className="flex flex-col gap-4">
@@ -157,10 +170,7 @@ export function FinishedOutputDialog({
         </div>
 
         {order && (
-          <>
-            <p className="text-xs text-muted-foreground">PO · salen · merma</p>
-            <FinishedOutputRows sizes={order.sizes} rows={rows} onChange={setRows} />
-          </>
+          <FinishedOutputRows sizes={order.sizes} rows={rows} onChange={setRows} />
         )}
 
         <div className="flex flex-col gap-2">
