@@ -20,6 +20,12 @@ import {
 import type { WorkshopInput } from "@/lib/validations/garment-shipment.schema";
 import { deliveryState, voucherDeliveryState } from "@/lib/workshop-delivery";
 import { WorkshopOutputRepository } from "@/lib/repositories/workshop-output.repository";
+import {
+  toProcessOutput,
+  toProcessSent,
+  type ProcessSent,
+  type ProcessTrail,
+} from "./workshop-process-trail";
 import { BaseService } from "./base.service";
 
 export interface WorkshopDeliveryRow {
@@ -108,6 +114,12 @@ export interface ActiveWorkshopDelivery {
    * Sitex: 300 frentes bordados"). Sólo informa: no se recibe ni se confirma.
    */
   incoming: IncomingOutput[];
+  /**
+   * Sólo para un taller de CONFECCIÓN: qué se mandó de esta orden a bordado o
+   * serigrafía y a dónde lo sacaron. Reemplaza a `incoming`, que es un
+   * subconjunto. `null` en un taller de proceso.
+   */
+  processTrail: ProcessTrail | null;
 }
 
 export interface IncomingOutput {
@@ -208,7 +220,24 @@ export class WorkshopDeliveryService extends BaseService {
     const detail = shipment ? toDetail(shipment) : voucher && toVoucherDetail(voucher);
     if (!detail || detail.state === "CANCELLED" || !detail.orderId) return detail;
 
+    if (workshop.kind === "ASSEMBLY") {
+      return { ...detail, processTrail: await this.processTrailFor(detail.orderId) };
+    }
     return { ...detail, incoming: await this.incomingFor(workshop.id, detail.orderId) };
+  }
+
+  private async processTrailFor(orderId: string): Promise<ProcessTrail> {
+    const [deliveries, outputs] = await Promise.all([
+      this.repository.findProcessDeliveries(orderId),
+      new WorkshopOutputRepository().findProcessedForOrder(orderId),
+    ]);
+    const sent = [
+      ...deliveries.shipments.map((row) => toProcessSent(toListRow(row), row.workshop.name)),
+      ...deliveries.vouchers.map((row) => toProcessSent(toVoucherListRow(row), row.workshop?.name ?? "")),
+    ]
+      .filter((entry): entry is ProcessSent => entry !== null)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    return { sent, outputs: outputs.map(toProcessOutput) };
   }
 
   private async incomingFor(workshopId: string, orderId: string): Promise<IncomingOutput[]> {
@@ -652,6 +681,7 @@ function toVoucherDetail(row: WorkshopVoucherDetailRow): WorkshopDeliveryDetail 
     cuts: row.cuttingOrder ? toCuts(row.cuttingOrder, row.cuttingBatchId) : [],
     showCuts: row.cuttingOrder !== null,
     incoming: [],
+    processTrail: null,
   };
 }
 
@@ -688,6 +718,7 @@ function toDetail(row: WorkshopDeliveryDetailRow): WorkshopDeliveryDetail {
     cuts: toCuts(row.order, null),
     showCuts: true,
     incoming: [],
+    processTrail: null,
   };
 }
 

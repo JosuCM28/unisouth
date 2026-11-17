@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { DeliveryStateBadge } from "./delivery-state-badge";
 import { DispatchNote } from "./dispatch-status";
+import { ProcessTrailSection } from "./process-trail";
 import { ReceiveButton } from "./receive-button";
 
 export function CancelledDelivery({ code }: { code: string }) {
@@ -44,7 +45,11 @@ export function DeliveryDetail({
         onReceived={onReceived}
       />
       <DeliveryLines delivery={delivery} />
-      <IncomingOutputs delivery={delivery} />
+      {delivery.processTrail ? (
+        <ProcessTrailSection trail={delivery.processTrail} />
+      ) : (
+        <IncomingOutputs delivery={delivery} />
+      )}
       <OrderData delivery={delivery} />
       <Notes delivery={delivery} />
 

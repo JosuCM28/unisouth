@@ -226,6 +226,18 @@ export class WorkshopOutputRepository extends BaseRepository<
     });
   }
 
+  /**
+   * Las salidas vigentes que dieron los talleres de PROCESO de una orden, a
+   * donde hayan ido: quien confecciona ve así quién tiene cada parte.
+   */
+  async findProcessedForOrder(orderId: string): Promise<WorkshopOutputRow[]> {
+    return this.db.workshopOutput.findMany({
+      where: { orderId, type: "PROCESSED", cancelledAt: null },
+      select: OUTPUT_SELECT,
+      orderBy: { date: "asc" },
+    });
+  }
+
   /** A dónde puede mandar un taller: los demás talleres vivos del catálogo. */
   async findDestinations(workshopId: string): Promise<{ id: string; name: string }[]> {
     return this.db.workshop.findMany({

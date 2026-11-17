@@ -230,7 +230,7 @@ export class WorkshopDeliveryRepository extends BaseRepository<
   async findWorkshopByRole(role: string) {
     return this.db.workshop.findFirst({
       where: { accessRole: role, deletedAt: null },
-      select: { id: true, name: true, accessSince: true },
+      select: { id: true, name: true, accessSince: true, kind: true },
     });
   }
 
@@ -281,6 +281,36 @@ export class WorkshopDeliveryRepository extends BaseRepository<
       }),
     ]);
 
+    return { shipments, vouchers };
+  }
+
+  /**
+   * Lo que la planta mandó de una orden a los talleres de PROCESO (bordado,
+   * serigrafía). Es la única lectura que cruza de taller: la usa quien
+   * confecciona para saber dónde andan las piezas que le faltan, y por eso
+   * se limita a los de proceso y nunca enseña lo de otro de confección.
+   */
+  async findProcessDeliveries(orderId: string) {
+    const processWorkshop = { kind: "PROCESS" as const };
+    const [shipments, vouchers] = await Promise.all([
+      this.db.garmentShipment.findMany({
+        where: { orderId, workshop: processWorkshop },
+        orderBy: { sentAt: "asc" },
+        select: { ...LIST_SELECT, workshop: { select: { name: true } } },
+      }),
+      this.db.inventoryDocument.findMany({
+        // Mismo criterio que el tablero del taller: sólo vales ya aplicados.
+        where: {
+          type: "ISSUE",
+          cuttingOrderId: orderId,
+          cutLines: { some: {} },
+          appliedAt: { not: null },
+          workshop: processWorkshop,
+        },
+        orderBy: { date: "asc" },
+        select: { ...VOUCHER_LIST_SELECT, workshop: { select: { name: true } } },
+      }),
+    ]);
     return { shipments, vouchers };
   }
 
