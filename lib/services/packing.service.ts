@@ -36,15 +36,17 @@ export class PackingService extends BaseService {
   }
 
   /**
-   * Corrige nombre, fecha y nota. El cliente sólo cambia con las cajas
-   * vacías: con prenda adentro, cambiarlo dejaría en el pedido piezas de otro
-   * dueño.
+   * Corrige nombre, fecha y nota. Poner o cambiar el cliente pide las cajas
+   * vacías: con prenda adentro dejaría en el pedido piezas de otro dueño.
+   * QUITARLO sí se deja con prenda: sin cliente el pedido acepta cualquier
+   * empresa, así que nada de lo que ya lleva queda fuera de regla.
    */
   async update(id: string, input: PackingOrderInput): Promise<PackingOrder> {
     return this.transaction(async (tx) => {
       const before = await this.lockOpen(tx, id);
       const clientId = input.clientId ?? null;
-      if (clientId !== before.clientId && (await this.piecesIn(tx, id)) > 0) {
+      const narrows = clientId !== null && clientId !== before.clientId;
+      if (narrows && (await this.piecesIn(tx, id)) > 0) {
         throw new BusinessRuleError("Vacía las cajas antes de cambiar el cliente del pedido.", "clientId");
       }
 

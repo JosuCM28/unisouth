@@ -9,6 +9,7 @@ const BOX_LINE_SELECT = {
     select: {
       id: true,
       clientPo: true,
+      client: { select: { name: true } },
       product: {
         select: { id: true, name: true, code: true, garmentCategory: { select: { name: true, position: true } } },
       },

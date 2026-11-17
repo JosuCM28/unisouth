@@ -6,10 +6,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { FinishedAdjustDialog, type AdjustOptions } from "./finished-adjust-dialog";
 import { FinishedKardexDialog } from "./finished-kardex-dialog";
-import { FinishedStockList, NO_PO_LABEL } from "./finished-stock-list";
+import { FinishedStockTable, NO_PO_LABEL } from "./finished-stock-table";
 
 /**
- * La lista con sus acciones. Cliente porque cada renglón abre ventanas; los
+ * La tabla con sus acciones. Cliente porque cada renglón abre ventanas; los
  * datos ya llegaron filtrados del servidor.
  */
 export function FinishedGoodsView({
@@ -24,18 +24,6 @@ export function FinishedGoodsView({
   /** `null` = quien mira no puede ajustar. */
   adjustOptions: AdjustOptions | null;
 }) {
-  if (rows.length === 0) {
-    return (
-      <div className="flat-surface">
-        <EmptyState
-          icon={PackageCheck}
-          title={filtered ? "Nada con esos filtros" : "Aún no hay prenda terminada"}
-          description={filtered ? "Quita algún filtro." : "Llega cuando un taller de confección le da salida a Embarques."}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
       {truncated && (
@@ -43,31 +31,42 @@ export function FinishedGoodsView({
           Se muestran los primeros {rows.length} renglones. Afina los filtros para ver el resto.
         </p>
       )}
-      <FinishedStockList
+      <FinishedStockTable
         rows={rows}
-        renderActions={(row) => {
-          const label = `${row.product.name} · ${row.size.code} · ${row.clientPo ?? NO_PO_LABEL}`;
-          return (
-            <>
-              <FinishedKardexDialog stockId={row.id} title={label} />
-              {adjustOptions && (
-                <FinishedAdjustDialog
-                  options={adjustOptions}
-                  preset={{
-                    productId: row.product.id, sizeId: row.size.id,
-                    clientId: row.client?.id ?? null, clientPo: row.clientPo, label,
-                  }}
-                  trigger={
-                    <Button variant="ghost" size="icon" className="touch-target" aria-label={`Ajustar ${label}`}>
-                      <SlidersHorizontal className="size-4" aria-hidden />
-                    </Button>
-                  }
-                />
-              )}
-            </>
-          );
-        }}
+        emptyState={
+          <div className="flat-surface">
+            <EmptyState
+              icon={PackageCheck}
+              title={filtered ? "Nada con esos filtros" : "Aún no hay prenda terminada"}
+              description={filtered ? "Quita algún filtro." : "Llega cuando un taller de confección le da salida a Embarques."}
+            />
+          </div>
+        }
+        renderActions={(row) => <RowActions row={row} adjustOptions={adjustOptions} />}
       />
     </div>
+  );
+}
+
+function RowActions({ row, adjustOptions }: { row: FinishedStockRow; adjustOptions: AdjustOptions | null }) {
+  const label = `${row.product.name} · ${row.size.code} · ${row.clientPo ?? NO_PO_LABEL}`;
+  return (
+    <>
+      <FinishedKardexDialog stockId={row.id} title={label} />
+      {adjustOptions && (
+        <FinishedAdjustDialog
+          options={adjustOptions}
+          preset={{
+            productId: row.product.id, sizeId: row.size.id,
+            clientId: row.client?.id ?? null, clientPo: row.clientPo, label,
+          }}
+          trigger={
+            <Button variant="ghost" size="icon" className="touch-target" aria-label={`Ajustar ${label}`}>
+              <SlidersHorizontal className="size-4" aria-hidden />
+            </Button>
+          }
+        />
+      )}
+    </>
   );
 }

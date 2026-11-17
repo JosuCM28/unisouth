@@ -13,6 +13,8 @@ export interface PackingListLine {
   product: string;
   size: string;
   po: string;
+  /** El dueño de esa prenda: en un pedido sin cliente puede variar por renglón. */
+  client: string;
   pieces: number;
 }
 
@@ -32,6 +34,12 @@ export interface PackingList {
   code: string;
   name: string;
   client: string;
+  /**
+   * Más de un dueño en el pedido (Tenaris y Tenaris Shawcor en el mismo
+   * embarque): entonces la hoja lleva la columna Cliente. Con uno solo
+   * sobra, ya lo dice el encabezado.
+   */
+  showClient: boolean;
   date: Date;
   status: PackingOrderStatus;
   /** Abierto: todavía se mueve, y la hoja lo advierte. */
@@ -60,11 +68,13 @@ export function toPackingList(order: PackingOrderDetail): PackingList {
     });
 
   const summary = sortLines(mergeLines(order.boxes.flatMap((box) => box.lines.map(toLine))));
+  const owners = [...new Set(summary.map((line) => line.client))];
 
   return {
     code: order.code,
     name: order.name,
-    client: order.client?.name ?? NO_CLIENT_LABEL,
+    client: headerClient(order.client?.name ?? null, owners),
+    showClient: owners.length > 1,
     date: order.date,
     status: order.status,
     preliminary: order.status === "OPEN",
@@ -73,6 +83,17 @@ export function toPackingList(order: PackingOrderDetail): PackingList {
     totalBoxes: boxes.length,
     totalPieces: sum(summary),
   };
+}
+
+/**
+ * El cliente del encabezado: el del pedido; si no tiene, el único dueño de
+ * lo empacado, o todos los que lleva para que nadie lea "SIN CLIENTE" en un
+ * embarque que sí tiene dueños.
+ */
+function headerClient(orderClient: string | null, owners: string[]): string {
+  if (orderClient) return orderClient;
+  if (owners.length === 0) return NO_CLIENT_LABEL;
+  return owners.sort((a, b) => a.localeCompare(b)).join(" / ");
 }
 
 /** "packing-EMB-2026-0001-TAMSA-13-11-2026" sin nada que un sistema de archivos rechace. */
@@ -87,6 +108,7 @@ function toLine(line: PackingBoxLineRow): KeyedLine {
     product: line.stock.product.name,
     size: line.stock.size.code,
     po: line.stock.clientPo ?? NO_PO_LABEL,
+    client: line.stock.client?.name ?? NO_CLIENT_LABEL,
     pieces: line.quantity,
     categoryPosition: category?.position ?? Number.MAX_SAFE_INTEGER,
     sizeOrder: line.stock.size.order,
@@ -97,7 +119,7 @@ function toLine(line: PackingBoxLineRow): KeyedLine {
 function mergeLines(lines: KeyedLine[]): KeyedLine[] {
   const merged = new Map<string, KeyedLine>();
   for (const line of lines) {
-    const key = [line.category, line.product, line.size, line.po].join("|");
+    const key = [line.category, line.product, line.size, line.po, line.client].join("|");
     const known = merged.get(key);
     if (known) known.pieces += line.pieces;
     else merged.set(key, { ...line });
@@ -105,20 +127,24 @@ function mergeLines(lines: KeyedLine[]): KeyedLine[] {
   return [...merged.values()];
 }
 
-/** Tipo (como en el catálogo), producto, talla (CH antes que XG) y PO. */
+/** Tipo (como en el catálogo), producto, talla (CH antes que XG), PO y dueño. */
 function sortLines(lines: KeyedLine[]): KeyedLine[] {
   return [...lines].sort(
     (a, b) =>
       a.categoryPosition - b.categoryPosition ||
       a.product.localeCompare(b.product) ||
       a.sizeOrder - b.sizeOrder ||
-      a.po.localeCompare(b.po),
+      a.po.localeCompare(b.po) ||
+      a.client.localeCompare(b.client),
   );
 }
 
 /** Las llaves de orden no viajan al papel. */
 function stripKeys(line: KeyedLine): PackingListLine {
-  return { category: line.category, product: line.product, size: line.size, po: line.po, pieces: line.pieces };
+  return {
+    category: line.category, product: line.product, size: line.size, po: line.po,
+    client: line.client, pieces: line.pieces,
+  };
 }
 
 function sum(lines: { pieces: number }[]): number {

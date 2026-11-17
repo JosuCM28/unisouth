@@ -46,6 +46,8 @@ export function BoxContents({
               <p className="tabular text-xs text-muted-foreground">
                 {line.stock.size.code} · {line.stock.clientPo ?? "Sin PO"}
               </p>
+              {/* En un pedido sin cliente cada renglón puede ser de otra empresa. */}
+              <p className="truncate text-xs text-muted-foreground">{line.stock.client?.name ?? "Sin cliente"}</p>
             </div>
             <span className="tabular shrink-0 text-sm font-medium">{formatQuantity(line.quantity)}</span>
             {canEdit && (

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
+import { formatQuantity } from "@/lib/utils";
 import { FinishedGoodsRepository } from "@/lib/repositories/finished-goods.repository";
 import { GarmentCategoryRepository } from "@/lib/repositories/garment-category.repository";
 import { PackingRepository } from "@/lib/repositories/packing.repository";
@@ -15,9 +16,17 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Caja" };
 
+interface BoxFilters {
+  q?: string;
+  tipo?: string;
+  cliente?: string;
+  po?: string;
+  talla?: string;
+}
+
 interface PageProps {
   params: Promise<{ id: string; number: string }>;
-  searchParams: Promise<{ q?: string; tipo?: string; po?: string; talla?: string }>;
+  searchParams: Promise<BoxFilters>;
 }
 
 /** Una caja: lo que lleva arriba y, abajo, el inventario para llenarla. */
@@ -41,39 +50,53 @@ export default async function PackingBoxPage({ params, searchParams }: PageProps
         }
       />
       <BoxContents boxId={box.id} lines={box.lines} canEdit={canEdit} />
-      {canEdit && <BoxFiller boxId={box.id} clientId={box.order.clientId} filters={await searchParams} />}
+      {canEdit && <BoxFiller boxId={box.id} client={box.order.client} filters={await searchParams} />}
     </div>
   );
 }
 
 /**
- * El inventario para llenarla, ya acotado al dueño del pedido: lo de otro
- * cliente ni se ofrece.
+ * El inventario para llenarla. Con cliente en el pedido se acota a ese
+ * dueño (o sin dueño); sin cliente acepta cualquier empresa —Tenaris y
+ * Tenaris Shawcor en el mismo embarque— y entonces sí se ofrece el filtro.
  */
 async function BoxFiller({
   boxId,
-  clientId,
+  client,
   filters,
 }: {
   boxId: string;
-  clientId: string | null;
-  filters: { q?: string; tipo?: string; po?: string; talla?: string };
+  client: { id: string; name: string } | null;
+  filters: BoxFilters;
 }) {
   const repo = new FinishedGoodsRepository();
-  const [rows, options, categories] = await Promise.all([
+  const [rows, options, categories, hidden] = await Promise.all([
     repo.findStock({
       search: filters.q, categoryId: filters.tipo, clientPo: filters.po, sizeId: filters.talla,
-      forClientId: clientId ?? undefined,
+      ...(client ? { forClientId: client.id } : { clientId: filters.cliente }),
     }),
     repo.findFilterOptions(),
     new GarmentCategoryRepository().findOptions(),
+    client ? repo.countOtherOwners(client.id) : Promise.resolve(0),
   ]);
 
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agregar del inventario</h2>
-      <FinishedGoodsFilters options={{ ...options, clients: [], categories }} />
+      {client && hidden > 0 && <OtherOwnersNotice clientName={client.name} pieces={hidden} />}
+      <FinishedGoodsFilters options={{ ...options, clients: client ? [] : options.clients, categories }} />
       <BoxInventory boxId={boxId} rows={rows} />
     </section>
+  );
+}
+
+/** Para que un inventario acotado no se lea como un inventario vacío. */
+function OtherOwnersNotice({ clientName, pieces }: { clientName: string; pieces: number }) {
+  return (
+    <p className="border border-border bg-muted p-3 text-sm">
+      Este pedido es de <span className="font-medium">{clientName}</span>: sólo acepta su prenda o la que no
+      tiene cliente. Hay <span className="tabular font-medium">{formatQuantity(pieces)}</span> pzas de otras
+      empresas que no se ofrecen. Para mezclar empresas, quita el cliente del pedido.
+    </p>
   );
 }

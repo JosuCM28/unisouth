@@ -68,8 +68,26 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Anchos de la tabla, en porcentaje. Suman 100. */
-const COLUMNS = { category: "18%", product: "40%", size: "10%", po: "18%", pieces: "14%" } as const;
+/**
+ * Anchos de la tabla, en porcentaje; cada juego suma 100. Con la columna
+ * Cliente (pedido que mezcla dueños) se le quita espacio a Producto.
+ */
+interface ColumnWidths {
+  category: string;
+  product: string;
+  size: string;
+  po: string;
+  client: string | null;
+  pieces: string;
+  total: string;
+}
+
+const SINGLE_OWNER: ColumnWidths = {
+  category: "18%", product: "40%", size: "10%", po: "18%", client: null, pieces: "14%", total: "86%",
+};
+const MIXED_OWNERS: ColumnWidths = {
+  category: "14%", product: "30%", size: "8%", po: "14%", client: "22%", pieces: "12%", total: "88%",
+};
 
 function PackingListPdf({ list }: { list: PackingList }) {
   return (
@@ -83,11 +101,11 @@ function PackingListPdf({ list }: { list: PackingList }) {
               <Text>CAJA {box.number}</Text>
               <Text>{formatQuantity(box.pieces)} pzas</Text>
             </View>
-            <LinesTable lines={box.lines} />
+            <LinesTable lines={box.lines} widths={widthsFor(list)} />
           </View>
         ))}
         <Text style={styles.sectionTitle}>Resumen del pedido</Text>
-        <LinesTable lines={list.summary} />
+        <LinesTable lines={list.summary} widths={widthsFor(list)} />
         <Text style={styles.grandTotal}>
           {list.totalBoxes} {list.totalBoxes === 1 ? "caja" : "cajas"} · {formatQuantity(list.totalPieces)} pzas
         </Text>
@@ -128,28 +146,34 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LinesTable({ lines }: { lines: PackingListLine[] }) {
+function widthsFor(list: PackingList): ColumnWidths {
+  return list.showClient ? MIXED_OWNERS : SINGLE_OWNER;
+}
+
+function LinesTable({ lines, widths }: { lines: PackingListLine[]; widths: ColumnWidths }) {
   return (
     <View style={styles.table}>
       <View style={[styles.row, { backgroundColor: HEADER_FILL }]}>
-        <Text style={[styles.cell, styles.bold, { width: COLUMNS.category }]}>Tipo</Text>
-        <Text style={[styles.cell, styles.bold, { width: COLUMNS.product }]}>Producto</Text>
-        <Text style={[styles.cell, styles.bold, { width: COLUMNS.size }]}>Talla</Text>
-        <Text style={[styles.cell, styles.bold, { width: COLUMNS.po }]}>PO</Text>
-        <Text style={[styles.cell, styles.bold, styles.right, { width: COLUMNS.pieces }]}>Piezas</Text>
+        <Text style={[styles.cell, styles.bold, { width: widths.category }]}>Tipo</Text>
+        <Text style={[styles.cell, styles.bold, { width: widths.product }]}>Producto</Text>
+        <Text style={[styles.cell, styles.bold, { width: widths.size }]}>Talla</Text>
+        <Text style={[styles.cell, styles.bold, { width: widths.po }]}>PO</Text>
+        {widths.client && <Text style={[styles.cell, styles.bold, { width: widths.client }]}>Cliente</Text>}
+        <Text style={[styles.cell, styles.bold, styles.right, { width: widths.pieces }]}>Piezas</Text>
       </View>
       {lines.map((line, index) => (
         <View key={index} style={styles.row} wrap={false}>
-          <Text style={[styles.cell, { width: COLUMNS.category }]}>{line.category}</Text>
-          <Text style={[styles.cell, { width: COLUMNS.product }]}>{line.product}</Text>
-          <Text style={[styles.cell, { width: COLUMNS.size }]}>{line.size}</Text>
-          <Text style={[styles.cell, { width: COLUMNS.po }]}>{line.po}</Text>
-          <Text style={[styles.cell, styles.right, { width: COLUMNS.pieces }]}>{formatQuantity(line.pieces)}</Text>
+          <Text style={[styles.cell, { width: widths.category }]}>{line.category}</Text>
+          <Text style={[styles.cell, { width: widths.product }]}>{line.product}</Text>
+          <Text style={[styles.cell, { width: widths.size }]}>{line.size}</Text>
+          <Text style={[styles.cell, { width: widths.po }]}>{line.po}</Text>
+          {widths.client && <Text style={[styles.cell, { width: widths.client }]}>{line.client}</Text>}
+          <Text style={[styles.cell, styles.right, { width: widths.pieces }]}>{formatQuantity(line.pieces)}</Text>
         </View>
       ))}
       <View style={[styles.row, { backgroundColor: TOTAL_FILL }]}>
-        <Text style={[styles.cell, styles.bold, { width: "86%" }]}>Total</Text>
-        <Text style={[styles.cell, styles.bold, styles.right, { width: COLUMNS.pieces }]}>
+        <Text style={[styles.cell, styles.bold, { width: widths.total }]}>Total</Text>
+        <Text style={[styles.cell, styles.bold, styles.right, { width: widths.pieces }]}>
           {formatQuantity(lines.reduce((sum, line) => sum + line.pieces, 0))}
         </Text>
       </View>

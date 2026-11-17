@@ -87,7 +87,7 @@ export function PackingOrderFormDialog({
           <Input id="packing-name" placeholder="TAMSA 13/11/2026" value={name}
             onChange={(event) => setName(event.target.value)} className="touch-target uppercase" />
         </div>
-        <FormSelectField id="packing-client" label="Cliente" hint="Con cliente, sus cajas sólo aceptan prenda de ese dueño.">
+        <FormSelectField id="packing-client" label="Cliente" hint="Con cliente, sus cajas sólo aceptan prenda de ese dueño. Sin cliente aceptan cualquier empresa.">
           <SearchSelect id="packing-client" value={clientId} onChange={setClientId}
             options={clients.map((c) => ({ value: c.id, label: c.name }))}
             clearLabel="Sin cliente" placeholder="Sin cliente" searchPlaceholder="Buscar cliente…" />

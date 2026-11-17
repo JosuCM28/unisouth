@@ -8,7 +8,7 @@ import { packAction } from "@/app/actions/packing.actions";
 import { runAction } from "@/lib/offline/run-action";
 import type { FinishedStockRow } from "@/lib/repositories/finished-goods.repository";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FinishedStockList } from "@/components/finished-goods/finished-stock-list";
+import { FinishedStockTable, NO_PO_LABEL } from "@/components/finished-goods/finished-stock-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -17,18 +17,14 @@ import { Input } from "@/components/ui/input";
  * trae su cantidad lista con todo lo que hay; se baja si va menos.
  */
 export function BoxInventory({ boxId, rows }: { boxId: string; rows: FinishedStockRow[] }) {
-  const available = rows.filter((row) => row.quantity > 0);
-  if (available.length === 0) {
-    return (
-      <div className="flat-surface">
-        <EmptyState icon={PackageCheck} title="Nada disponible con esos filtros" />
-      </div>
-    );
-  }
-
   return (
-    <FinishedStockList
-      rows={available}
+    <FinishedStockTable
+      rows={rows.filter((row) => row.quantity > 0)}
+      emptyState={
+        <div className="flat-surface">
+          <EmptyState icon={PackageCheck} title="Nada disponible con esos filtros" />
+        </div>
+      }
       // La llave lleva la cantidad: al cambiar el saldo, el campo vuelve a
       // prellenarse con lo que hay ahora y no con lo de antes.
       renderActions={(row) => <PackControl key={`${row.id}-${row.quantity}`} boxId={boxId} row={row} />}
@@ -55,8 +51,9 @@ function PackControl({ boxId, row }: { boxId: string; row: FinishedStockRow }) {
 
   return (
     <>
-      <Input inputMode="numeric" aria-label={`Piezas de ${row.size.code} ${row.clientPo ?? ""}`} value={quantity}
-        onChange={(event) => setQuantity(event.target.value)} className="tabular touch-target w-16" />
+      <Input inputMode="numeric" aria-label={`Piezas de ${row.size.code} ${row.clientPo ?? NO_PO_LABEL}`}
+        value={quantity} onChange={(event) => setQuantity(event.target.value)}
+        className="tabular touch-target w-16" />
       <Button size="icon" className="touch-target" disabled={saving} aria-label="Agregar a la caja" onClick={handleClick}>
         <Plus className="size-4" aria-hidden />
       </Button>

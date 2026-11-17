@@ -11,6 +11,8 @@ interface SearchInputProps {
   /** Parámetro de la URL donde se escribe el término. */
   paramName?: string;
   className?: string;
+  /** Para ligarlo a un <Label> visible. */
+  id?: string;
 }
 
 const DEBOUNCE_MS = 350;
@@ -29,6 +31,7 @@ export function SearchInput({
   placeholder = "Buscar…",
   paramName = "q",
   className,
+  id,
 }: SearchInputProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -71,6 +74,7 @@ export function SearchInput({
         aria-hidden
       />
       <Input
+        id={id}
         type="search"
         inputMode="search"
         value={value}

@@ -94,6 +94,19 @@ export class FinishedGoodsRepository extends BaseRepository<
     };
   }
 
+  /**
+   * Piezas en existencia de OTROS dueños: las que un pedido con cliente no
+   * puede llevar. La caja lo dice para que nadie piense que el inventario
+   * está vacío cuando sólo está acotado.
+   */
+  async countOtherOwners(clientId: string): Promise<number> {
+    const result = await this.db.finishedStock.aggregate({
+      where: { quantity: { gt: 0 }, clientId: { not: null }, NOT: { clientId } },
+      _sum: { quantity: true },
+    });
+    return result._sum.quantity ?? 0;
+  }
+
   /** El kárdex de un renglón, lo más reciente arriba. */
   async findMovements(stockId: string): Promise<FinishedMovementRow[]> {
     return this.db.finishedMovement.findMany({

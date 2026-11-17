@@ -9,56 +9,74 @@ import { toXlsxDocument, type SheetRow } from "./xlsx";
  * Las piezas son números y no texto: lo primero que hace el cliente es
  * seleccionar la columna para ver el total.
  */
-const WIDTHS = [16, 40, 10, 18, 12];
-
-const HEADERS = ["Tipo", "Producto", "Talla", "PO", "Piezas"];
-
-function tableHeader(): SheetRow {
-  return HEADERS.map((value, index) => ({
-    value,
-    style: index === HEADERS.length - 1 ? "tableHeaderRight" : "tableHeader",
-  }));
+interface TextColumn {
+  header: string;
+  width: number;
+  value: (line: PackingListLine) => string;
 }
 
-function lineRow(line: PackingListLine): SheetRow {
+const BASE_COLUMNS: TextColumn[] = [
+  { header: "Tipo", width: 16, value: (line) => line.category },
+  { header: "Producto", width: 40, value: (line) => line.product },
+  { header: "Talla", width: 10, value: (line) => line.size },
+  { header: "PO", width: 18, value: (line) => line.po },
+];
+
+/** Sólo cuando el pedido mezcla dueños; con uno ya lo dice el encabezado. */
+const CLIENT_COLUMN: TextColumn = { header: "Cliente", width: 28, value: (line) => line.client };
+
+const PIECES_WIDTH = 12;
+
+function columnsFor(list: PackingList): TextColumn[] {
+  return list.showClient ? [...BASE_COLUMNS, CLIENT_COLUMN] : BASE_COLUMNS;
+}
+
+function tableHeader(columns: TextColumn[]): SheetRow {
   return [
-    { value: line.category, style: "cell" },
-    { value: line.product, style: "cell" },
-    { value: line.size, style: "cell" },
-    { value: line.po, style: "cell" },
+    ...columns.map((column) => ({ value: column.header, style: "tableHeader" as const })),
+    { value: "Piezas", style: "tableHeaderRight" },
+  ];
+}
+
+function lineRow(columns: TextColumn[], line: PackingListLine): SheetRow {
+  return [
+    ...columns.map((column) => ({ value: column.value(line), style: "cell" as const })),
     { value: line.pieces, kind: "number", style: "cellNumber" },
   ];
 }
 
-function totalRow(label: string, pieces: number): SheetRow {
+function totalRow(columns: TextColumn[], label: string, pieces: number): SheetRow {
   return [
-    { value: label, style: "gridTotal", mergeTo: 4 },
-    { at: 5, value: pieces, kind: "number", style: "gridTotalNumber" },
+    { value: label, style: "gridTotal", mergeTo: columns.length },
+    { at: columns.length + 1, value: pieces, kind: "number", style: "gridTotalNumber" },
   ];
 }
 
-function block(title: string, lines: PackingListLine[], pieces: number): SheetRow[] {
+function block(columns: TextColumn[], title: string, lines: PackingListLine[], pieces: number): SheetRow[] {
   return [
     [],
-    [{ value: title, style: "section", mergeTo: WIDTHS.length }],
-    tableHeader(),
-    ...lines.map(lineRow),
-    totalRow("Total", pieces),
+    [{ value: title, style: "section", mergeTo: columns.length + 1 }],
+    tableHeader(columns),
+    ...lines.map((line) => lineRow(columns, line)),
+    totalRow(columns, "Total", pieces),
   ];
 }
 
 export function buildPackingListWorkbook(list: PackingList): Buffer {
+  const columns = columnsFor(list);
+  const last = columns.length + 1;
   const rows: SheetRow[] = [
-    [{ value: "PACKING LIST", style: "title" }, { at: 5, value: list.code, style: "titleRight" }],
+    [{ value: "PACKING LIST", style: "title" }, { at: last, value: list.code, style: "titleRight" }],
     ...(list.preliminary ? [[{ value: "PRELIMINAR · el pedido sigue abierto", style: "label" as const }]] : []),
     [{ value: "Pedido", style: "label" }, { value: list.name }],
     [{ value: "Cliente", style: "label" }, { value: list.client }],
     [{ value: "Fecha", style: "label" }, { value: list.date, kind: "date" }],
     [{ value: "Cajas", style: "label" }, { value: list.totalBoxes, kind: "number" }],
     [{ value: "Piezas", style: "label" }, { value: list.totalPieces, kind: "number" }],
-    ...list.boxes.flatMap((box) => block(`CAJA ${box.number}`, box.lines, box.pieces)),
-    ...block("RESUMEN DEL PEDIDO", list.summary, list.totalPieces),
+    ...list.boxes.flatMap((box) => block(columns, `CAJA ${box.number}`, box.lines, box.pieces)),
+    ...block(columns, "RESUMEN DEL PEDIDO", list.summary, list.totalPieces),
   ];
 
-  return toXlsxDocument(rows, WIDTHS, "Packing list", { fitToWidth: true });
+  const widths = [...columns.map((column) => column.width), PIECES_WIDTH];
+  return toXlsxDocument(rows, widths, "Packing list", { fitToWidth: true });
 }
