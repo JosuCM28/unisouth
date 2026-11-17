@@ -217,6 +217,13 @@ renglón nace en cero y lo llena su primer movimiento. Los ajustes manuales
 llevan motivo y salen en la auditoría como `HIGH`. `verify-integrity.ts`
 revisa los dos inventarios.
 
+La **PO** es parte de la llave del renglón, así que cambiarla es pasar piezas
+de un renglón a otro (*Cambio de PO* sale y entra, en la misma transacción),
+nunca editar el texto. A lo que está **Sin PO** se la pone Embarques
+(`finished-goods:adjust`, `MEDIUM`); cambiar una PO que ya venía es sólo de
+ADMIN (`finished-goods:edit-po`), con motivo y como `HIGH`. Lo ya empacado
+conserva su PO.
+
 Las **cajas** de un pedido de empaque (`PackingBoxLine.quantity`) sólo las
 escribe `PackingService`, en la misma transacción que el movimiento *A caja*
 o *De caja* que mueve el inventario: lo empacado de cada renglón es siempre
@@ -340,7 +347,8 @@ Estas capacidades separan lo anterior:
 | `offline:manage` | La **copia de la base en el navegador** para trabajar sin internet: bajarla, ver lo pendiente de subir y borrarla. ADMIN y WAREHOUSE. Sólo dice "puede usar la copia": cada tabla se sigue cobrando con la llave de su pantalla (`OFFLINE_TABLE_PERMISSIONS`), así que nunca enseña más de lo que el rol ya ve en línea. Subir una salida offline pide `inventory:write`, igual que en línea |
 | `workshop-orders:access` | Las entregas de UN taller: verlas, reimprimir su vale y confirmar que llegaron. ADMIN no la lleva porque no es un taller; lo confirmado lo lee en la ficha de la orden |
 | `products:create` | **Alta rápida de producto** —nombre, tipo y cliente— desde la salida a Embarques o la entrada manual. ADMIN, Embarques, Acatlán y Allende. Aparte de `bom:write`, que abre fichas técnicas |
-| `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, y entradas y salidas manuales con motivo. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
+| `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, entradas y salidas manuales con motivo, y ponerle PO a lo que llegó sin ella. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
+| `finished-goods:edit-po` | **Cambiar** la PO de prenda que ya trae una. Sólo ADMIN: esa PO vino de la orden del cliente |
 | `packing:write` | **Pedidos de empaque**: crearlos, abrir cajas, meter y sacar prenda, cerrarlos y reabrirlos con motivo. Embarques y ADMIN. Verlos basta con `finished-goods:browse` |
 | `workshop-output:write` | La **salida** de UN taller: lo que saca de su saldo y cancelarla con motivo. Los cuatro talleres; ADMIN no, por la misma razón. ADMIN corrige desde la ficha de la orden con `cuts:unlock` |
 | `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN, Almacén y la otra planta (`MANAGEMENT`) llevan las cuatro: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access`. ADMIN y Almacén además ven **Enviar** en lo que sigue en planta, porque pide `inventory:write`, la misma llave que el botón de Órdenes |

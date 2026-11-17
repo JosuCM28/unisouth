@@ -30,6 +30,28 @@ export type AdjustFinishedGoodsInput = z.infer<typeof adjustFinishedGoodsSchema>
 
 export const finishedMovementsQuerySchema = z.object({ stockId: cuidSchema });
 
+/**
+ * Ponerle PO a piezas que llegaron "Sin PO". Se puede repartir: de 23
+ * piezas, 10 a una PO y luego 13 a otra. El motivo es opcional porque es el
+ * trabajo de todos los días de Embarques.
+ */
+export const assignFinishedPoSchema = z.object({
+  stockId: cuidSchema,
+  clientPo: requiredText("La PO", 60),
+  quantity: z.coerce
+    .number({ message: "Escribe cuántas piezas" })
+    .int("Las piezas se cuentan enteras")
+    .positive("Deben ser más de cero"),
+  reason: optionalText,
+});
+
+/** Cambiar una PO que ya venía: sólo ADMIN y siempre con motivo (`HIGH`). */
+export const changeFinishedPoSchema = assignFinishedPoSchema.extend({
+  reason: requiredText("El motivo", 500),
+});
+
+export type FinishedPoMoveInput = z.infer<typeof assignFinishedPoSchema>;
+
 /** Los filtros de la pantalla, tal como llegan en la URL. */
 export interface FinishedGoodsFilters {
   categoryId?: string;

@@ -55,6 +55,10 @@ export default async function FinishedGoodsPage({ searchParams }: PageProps) {
         truncated={rows.length >= FINISHED_STOCK_LIMIT}
         filtered={Object.values(filters).some(Boolean)}
         adjustOptions={adjustOptions}
+        poAccess={{
+          canAssign: canAdjust,
+          canChange: roleHasPermission(user.role, "finished-goods:edit-po"),
+        }}
       />
     </div>
   );

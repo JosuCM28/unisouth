@@ -69,6 +69,8 @@ export const FINISHED_MOVEMENT_TYPE_LABELS: Record<FinishedMovementType, string>
   PACKED: "A caja",
   UNPACKED: "De caja",
   WORKSHOP_IN_REVERSAL: "Salida de taller cancelada",
+  PO_CHANGE_OUT: "Cambio de PO (sale)",
+  PO_CHANGE_IN: "Cambio de PO (entra)",
 };
 
 /** Qué hace un taller: decide qué salida captura en su tablero. */

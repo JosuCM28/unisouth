@@ -1,8 +1,9 @@
 import type { FinishedMovementType } from "@prisma/client";
-import { InsufficientStockError, NotFoundError } from "@/lib/core/errors";
+import { BusinessRuleError, InsufficientStockError, NotFoundError } from "@/lib/core/errors";
 import type { PrismaExecutor } from "@/lib/prisma";
 import type {
   AdjustFinishedGoodsInput,
+  FinishedPoMoveInput,
   FinishedStockKeyInput,
 } from "@/lib/validations/finished-goods.schema";
 import { BaseService } from "./base.service";
@@ -56,6 +57,62 @@ export class FinishedGoodsService extends BaseService {
 
       return result;
     });
+  }
+
+  /** Ponerle PO a piezas que están "Sin PO". Embarques, todos los días. */
+  async assignPo(input: FinishedPoMoveInput): Promise<{ stockId: string; quantity: number }> {
+    return this.movePo(input, "ASSIGN");
+  }
+
+  /** Cambiar una PO que ya traían. Sólo ADMIN, con motivo. */
+  async changePo(input: FinishedPoMoveInput): Promise<{ stockId: string; quantity: number }> {
+    return this.movePo(input, "CHANGE");
+  }
+
+  /**
+   * La PO es parte de la llave del renglón, así que cambiarla es PASAR
+   * piezas: salen del renglón de la PO anterior y entran al de la nueva, en
+   * la misma transacción. Así el kárdex de los dos cuenta lo que pasó y el
+   * saldo de cada uno sigue siendo la suma de sus movimientos.
+   */
+  private async movePo(
+    input: FinishedPoMoveInput,
+    mode: "ASSIGN" | "CHANGE",
+  ): Promise<{ stockId: string; quantity: number }> {
+    return this.transaction(async (tx) => {
+      const source = await this.lockSource(tx, input.stockId);
+      assertPoMove(source.clientPo, input.clientPo, mode);
+
+      const from = source.clientPo ?? "SIN PO";
+      const reason = [`PO ${from} → ${input.clientPo}`, input.reason].filter(Boolean).join(" · ");
+      await this.applyToStockWith(tx, source.id, { type: "PO_CHANGE_OUT", quantity: -input.quantity, reason });
+      const target = await this.applyWith(tx, {
+        productId: source.productId, sizeId: source.sizeId,
+        clientId: source.clientId ?? undefined, clientPo: input.clientPo,
+        type: "PO_CHANGE_IN", quantity: input.quantity, reason,
+      });
+
+      await this.auditWith(tx).record({
+        entity: "FinishedStock", entityId: source.id, action: "UPDATE",
+        reference: source.key,
+        oldValue: { po: source.clientPo, cantidad: input.quantity },
+        newValue: { po: input.clientPo, cantidad: input.quantity },
+        // Poner la primera PO es rutina; mover una que vino de la orden no.
+        sensitivity: mode === "CHANGE" ? "HIGH" : "MEDIUM",
+        reason: input.reason,
+      });
+      return target;
+    });
+  }
+
+  private async lockSource(tx: PrismaExecutor, stockId: string) {
+    await tx.$queryRaw`SELECT id FROM finished_stock WHERE id = ${stockId} FOR UPDATE`;
+    const source = await tx.finishedStock.findUnique({
+      where: { id: stockId },
+      select: { id: true, key: true, productId: true, sizeId: true, clientId: true, clientPo: true },
+    });
+    if (!source) throw new NotFoundError("el renglón de inventario terminado", stockId);
+    return source;
   }
 
   /**
@@ -126,5 +183,23 @@ export class FinishedGoodsService extends BaseService {
       select: { id: true },
     });
     return stock.id;
+  }
+}
+
+/**
+ * Qué se deja según lo que ya trae el renglón. Se decide con la PO que
+ * tiene EN LA BASE y no con lo que pinta la pantalla: si otro le puso PO
+ * hace un minuto, Embarques ya no la puede mover aunque su pantalla siga
+ * diciendo "Sin PO".
+ */
+function assertPoMove(current: string | null, next: string, mode: "ASSIGN" | "CHANGE"): void {
+  if (mode === "ASSIGN" && current !== null) {
+    throw new BusinessRuleError("Estas piezas ya tienen PO. Cambiarla le toca al administrador.", "clientPo");
+  }
+  if (mode === "CHANGE" && current === null) {
+    throw new BusinessRuleError("Estas piezas no tienen PO: usa Asignar PO.", "clientPo");
+  }
+  if (current === next) {
+    throw new BusinessRuleError("Es la misma PO que ya tienen.", "clientPo");
   }
 }

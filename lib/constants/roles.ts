@@ -156,6 +156,11 @@ export const PERMISSIONS = [
      carga inicial de lo que ya estaba en la bodega y los reconteos. Aparte de
      ver porque mover un saldo sin papel detrás es lo que se vigila. */
   "finished-goods:adjust",
+  /* CAMBIAR la PO de prenda que ya trae una. Sólo ADMIN: esa PO vino de la
+     orden del cliente, y moverla es decir que esas piezas son de otro
+     pedido. Ponerle PO a lo que llegó "Sin PO" es trabajo diario de
+     Embarques y cuelga de `finished-goods:adjust`. */
+  "finished-goods:edit-po",
   /* Dar de alta un producto terminado RÁPIDO —nombre, tipo y cliente— desde
      donde hace falta: la salida a Embarques del taller que confecciona, o la
      entrada manual de Embarques. Aparte de `bom:write` porque eso abre la

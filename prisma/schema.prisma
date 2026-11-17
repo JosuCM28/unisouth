@@ -2987,6 +2987,12 @@ enum FinishedMovementType {
   UNPACKED
   /// Se canceló la salida del taller que la había metido: sale lo que entró.
   WORKSHOP_IN_REVERSAL
+  /// Sale de este renglón porque a esas piezas se les puso otra PO (o la
+  /// primera). La PO es parte de la llave del renglón, así que cambiarla es
+  /// mover piezas entre dos renglones, no editar un texto.
+  PO_CHANGE_OUT
+  /// Entra a este renglón desde el de la PO anterior.
+  PO_CHANGE_IN
 }
 
 /// El saldo de prenda terminada de UN producto, talla, cliente y PO.
