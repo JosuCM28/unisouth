@@ -228,6 +228,15 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
        copia en su celular. No le enseña nada nuevo: cada tabla se sigue
        cobrando con la llave de su pantalla en línea. */
     "offline:manage",
+    /* Los cuatro tableros de taller. Es quien sube el corte al camión, y
+       desde el tablero de cada taller ve de un golpe qué sigue en planta y
+       lo marca como enviado. Ahí no confirma nada: recibir sólo se le pinta
+       al taller dueño y pide `workshop-orders:access`, que no lleva. Enviar
+       pide `inventory:write`, la misma llave que en Órdenes. */
+    "workshop-board:acatlan",
+    "workshop-board:sitex",
+    "workshop-board:broderie",
+    "workshop-board:allende",
   ],
 
   /* Igual que Sólo lectura —mira las órdenes de corte completas y nada

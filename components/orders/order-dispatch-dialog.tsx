@@ -35,10 +35,17 @@ export function OrderDispatchDialog({
   orderId,
   orderCode,
   className,
+  preselectId,
 }: {
   orderId: string;
   orderCode: string;
   className?: string;
+  /**
+   * Abierta desde la tarjeta de un tablero de taller: esa entrega llega ya
+   * palomeada, que es la que se quería mandar. Las demás de la orden siguen
+   * ahí por si se suben al mismo camión.
+   */
+  preselectId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -61,6 +68,10 @@ export function OrderDispatchDialog({
     }
 
     setOptions(result.data);
+    const preselected = result.data.find((option) => option.id === preselectId);
+    if (preselected && canSelect(preselected)) {
+      setSelected(new Set([optionKey(preselected)]));
+    }
   }
 
   function handleOpenChange(next: boolean) {

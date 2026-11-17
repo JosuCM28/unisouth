@@ -114,6 +114,8 @@ export function DeliveryBoardView({
         basePath={basePath}
         // El detalle pide la llave del taller: a ADMIN lo mandaría a un error.
         isOwner={viewerRole === boardRole}
+        // La misma llave que el botón Enviar de Órdenes: ADMIN y Almacén.
+        canDispatch={roleHasPermission(viewerRole, "inventory:write")}
         report={{
           boardKey: BOARD_KEY_BY_ROLE[boardRole],
           months: listReportMonths(),

@@ -258,7 +258,7 @@ recupera en `lib/constants/roles.ts`, que es la fuente única de verdad.
 | Rol | Qué puede |
 |---|---|
 | `ADMIN` | Todo, incluido usuarios y configuración |
-| `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos, más **Datos sin conexión** (la copia de la base en su celular). Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar |
+| `WAREHOUSE` | **Mueve el material, y nada más.** Trece destinos: Tablero · Inventario · Escanear · Tareas · Materiales · Prendas · Ubicaciones · Clientes · Proveedores · Recepciones · Salidas · Órdenes · Documentos, más **Datos sin conexión** (la copia de la base en su celular) y los **cuatro tableros de taller**. Dentro de ellos puede todo: altas de rollo, cortes, conteos, ajustes y los catálogos que se eligen al capturar. En los tableros marca como **Enviado** lo que sigue en planta, pero no confirma entregas: eso le toca al taller |
 | `PRODUCTION` | Consultar inventario, ver el lado de producción y los reportes, editar fichas técnicas y correr cálculos |
 | `PURCHASING` | Consultar, crear y autorizar requisiciones |
 | `MANAGEMENT` | **La OTRA PLANTA. Seis pantallas: Órdenes · Órdenes de planta · los cuatro tableros de taller.** En Órdenes mira cómo van los pedidos de la casa igual que Sólo lectura, sin un botón de captura. En Órdenes de planta captura las suyas. Los tableros de taller los ve en sólo lectura, como ADMIN: no confirma entregas porque eso le toca al taller. No recorre el almacén, no corre cálculos y no ve auditoría |
@@ -336,7 +336,7 @@ Estas capacidades separan lo anterior:
 | `finished-goods:browse` / `finished-goods:adjust` | El **inventario de prenda terminada** de Embarques: verlo con su kárdex, y entradas y salidas manuales con motivo. Aparte de `inventory:browse` porque es otra bodega: rollos contra camisas por talla y PO |
 | `packing:write` | **Pedidos de empaque**: crearlos, abrir cajas, meter y sacar prenda, cerrarlos y reabrirlos con motivo. Embarques y ADMIN. Verlos basta con `finished-goods:browse` |
 | `workshop-output:write` | La **salida** de UN taller: lo que saca de su saldo y cancelarla con motivo. Los cuatro talleres; ADMIN no, por la misma razón. ADMIN corrige desde la ficha de la orden con `cuts:unlock` |
-| `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN y la otra planta (`MANAGEMENT`) llevan las cuatro en sólo lectura: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access` |
+| `workshop-board:acatlan` · `:sitex` · `:broderie` · `:allende` | El tablero de cada taller. Uno por llave: son pantallas distintas. ADMIN, Almacén y la otra planta (`MANAGEMENT`) llevan las cuatro: confirmar lo recibido sólo se le pinta al taller dueño y además pide `workshop-orders:access`. ADMIN y Almacén además ven **Enviar** en lo que sigue en planta, porque pide `inventory:write`, la misma llave que el botón de Órdenes |
 
 **Los talleres con cuenta.** El taller del catálogo se liga a su rol en
 **Talleres → Cuenta de acceso** (`Workshop.accessRole`, único). Qué taller ve
@@ -353,6 +353,8 @@ todavía se puede corregir o cambiar de taller. Un vale que nace de un envío no
 lleva ese campo: ya le llega por su envío, y con los dos lo vería duplicado.
 
 El tablero de cada taller separa sus entregas en **Por recibir** y **Recibidas**.
+En Por recibir, ADMIN y Almacén tienen **Enviar** en lo que sigue en planta: abre
+la misma ventana de Órdenes con esa entrega ya marcada.
 Al recibir puede dejar una nota opcional, que la casa lee junto al estado. ADMIN
 y la otra planta ven los tableros pero no confirman: eso le toca al taller.
 

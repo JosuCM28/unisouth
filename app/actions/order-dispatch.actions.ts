@@ -7,8 +7,17 @@ import {
   orderDispatchOptionsSchema,
 } from "@/lib/validations/order-dispatch.schema";
 
-/* `/workshop-orders` entra porque el taller lee ahí que ya salió. */
-const REVALIDATE = ["/orders", "/workshop-orders", "/issues"];
+/* `/workshop-orders` y los tableros entran porque el taller lee ahí que ya
+   salió, y desde los tableros también se marca. */
+const REVALIDATE = [
+  "/orders",
+  "/workshop-orders",
+  "/issues",
+  "/workshop-boards/acatlan",
+  "/workshop-boards/sitex",
+  "/workshop-boards/broderie",
+  "/workshop-boards/allende",
+];
 
 /** Se pide al abrir el diálogo: la tabla no carga esto para cada renglón. */
 export async function listOrderDispatchOptionsAction(input: unknown) {

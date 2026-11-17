@@ -45,6 +45,7 @@ const ESPERADO: Record<Role, string[]> = {
     "Tareas",
     "Materiales", "Prendas", "Ubicaciones", "Clientes", "Proveedores",
     "Recepciones", "Salidas", "Órdenes",
+    "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
     "Datos sin conexión",
   ],
 

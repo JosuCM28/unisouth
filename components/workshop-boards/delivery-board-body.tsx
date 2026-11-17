@@ -11,6 +11,7 @@ import { filterDeliveries } from "@/lib/workshop-delivery-search";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { FinishedOutputDialog } from "@/components/workshop-outputs/finished-output-dialog";
+import { OrderDispatchDialog } from "@/components/orders/order-dispatch-dialog";
 import { DeliveryFilter } from "@/components/workshop-orders/delivery-filter";
 import { DispatchNote } from "@/components/workshop-orders/dispatch-status";
 import { ReceiveButton } from "@/components/workshop-orders/receive-button";
@@ -33,6 +34,11 @@ interface Props {
   basePath: string;
   /** Sólo el dueño abre el detalle y confirma; ADMIN nada más mira. */
   isOwner: boolean;
+  /**
+   * Quien sube el corte al camión (ADMIN y Almacén): marca como enviado lo
+   * que sigue en planta, igual que desde Órdenes.
+   */
+  canDispatch: boolean;
   /** Lo que la ventana del reporte necesita; el filtro lo pone el buscador. */
   report: Omit<ComponentProps<typeof BoardReportDialog>, "search">;
 }
@@ -63,6 +69,7 @@ export function DeliveryBoardBody({
   tab: requestedTab,
   basePath,
   isOwner,
+  canDispatch,
   report,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -117,6 +124,7 @@ export function DeliveryBoardBody({
           tab={tab === "outputs" ? "pending" : tab}
           query={query}
           isOwner={isOwner}
+          canDispatch={canDispatch}
           onOpen={(row) => delivery.open({ id: row.id, code: row.code })}
           canShip={(row) => row.state === "RECEIVED" && !!row.orderId && shippable.has(row.orderId)}
           onShip={(row) => setShipOrderId(row.orderId)}
@@ -157,6 +165,7 @@ function BoardList({
   tab,
   query,
   isOwner,
+  canDispatch,
   onOpen,
   canShip,
   onShip,
@@ -165,6 +174,7 @@ function BoardList({
   tab: DeliveryTab;
   query: string;
   isOwner: boolean;
+  canDispatch: boolean;
   onOpen: (row: WorkshopDeliveryRow) => void;
   canShip: (row: WorkshopDeliveryRow) => boolean;
   onShip: (row: WorkshopDeliveryRow) => void;
@@ -177,6 +187,7 @@ function BoardList({
             key={row.id}
             row={row}
             isOwner={isOwner}
+            canDispatch={canDispatch}
             onOpen={onOpen}
             onShip={canShip(row) ? () => onShip(row) : undefined}
           />
@@ -227,11 +238,13 @@ function groupRows(
 function BoardRow({
   row,
   isOwner,
+  canDispatch,
   onOpen,
   onShip,
 }: {
   row: WorkshopDeliveryRow;
   isOwner: boolean;
+  canDispatch: boolean;
   onOpen: (row: WorkshopDeliveryRow) => void;
   /** Sólo llega cuando a esta orden se le puede dar salida a Embarques. */
   onShip?: () => void;
@@ -274,6 +287,19 @@ function BoardRow({
               code={row.code}
               pieces={row.pieces}
               bundles={row.bundles}
+            />
+          </div>
+        )}
+
+        {/* Sigue en planta: quien lo sube al camión lo marca desde aquí. Sin
+            orden no hay ventana que abrir (el envío se marca por orden). */}
+        {canDispatch && row.state === "PENDING" && !row.dispatchedAt && row.orderId && (
+          <div className="relative z-20">
+            <OrderDispatchDialog
+              orderId={row.orderId}
+              orderCode={row.orderReference}
+              preselectId={row.id}
+              className="w-full sm:w-auto"
             />
           </div>
         )}
