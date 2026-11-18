@@ -31,4 +31,16 @@ export class SizeRepository extends BaseRepository<
       orderBy: { order: "asc" },
     });
   }
+
+  /**
+   * La posición de cada código en la escala, incluidas las desactivadas: un
+   * reporte viejo puede traer una talla que hoy ya no se ofrece.
+   */
+  async findScaleOrder(): Promise<Map<string, number>> {
+    const sizes = await this.db.size.findMany({
+      select: { code: true, order: true },
+      orderBy: [{ order: "asc" }, { code: "asc" }],
+    });
+    return new Map(sizes.map((size, index) => [size.code, index]));
+  }
 }

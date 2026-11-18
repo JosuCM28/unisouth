@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/shared/search-select";
 import { ExportButton } from "@/components/shared/export-button";
 import { PrintLinkButton } from "@/components/shared/print-link-button";
+import { DailyCutDialog } from "./daily-cut-dialog";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const;
 
@@ -158,6 +159,7 @@ export function OrderFilters({
         <ExportButton href={exportHref} exact />
         <ExportButton href={cutReportHref} label="Reporte de corte" exact />
         <PrintLinkButton href="/print/orders" />
+        <DailyCutDialog />
 
         {/* Los pedidos archivados se piden a propósito: son los entregados, y
             si salieran siempre la lista crecería sin parar con trabajo que ya
