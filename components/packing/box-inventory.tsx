@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 
 /**
  * El inventario disponible para llenar la caja, ya filtrado. Cada renglón
- * trae su cantidad lista con todo lo que hay; se baja si va menos.
+ * trae su campo vacío para escribir cuántas piezas van.
  */
 export function BoxInventory({ boxId, rows }: { boxId: string; rows: FinishedStockRow[] }) {
   return (
@@ -25,8 +25,8 @@ export function BoxInventory({ boxId, rows }: { boxId: string; rows: FinishedSto
           <EmptyState icon={PackageCheck} title="Nada disponible con esos filtros" />
         </div>
       }
-      // La llave lleva la cantidad: al cambiar el saldo, el campo vuelve a
-      // prellenarse con lo que hay ahora y no con lo de antes.
+      // La llave lleva la cantidad: al cambiar el saldo, el campo se limpia
+      // y no se queda con lo que se acaba de meter.
       renderActions={(row) => <PackControl key={`${row.id}-${row.quantity}`} boxId={boxId} row={row} />}
     />
   );
@@ -34,8 +34,11 @@ export function BoxInventory({ boxId, rows }: { boxId: string; rows: FinishedSto
 
 function PackControl({ boxId, row }: { boxId: string; row: FinishedStockRow }) {
   const router = useRouter();
-  const [quantity, setQuantity] = useState(String(row.quantity));
+  // Arranca vacío (el 0 es sólo guía): casi nunca va todo el saldo a una
+  // caja, y prellenarlo obligaba a borrar antes de escribir.
+  const [quantity, setQuantity] = useState("");
   const [saving, setSaving] = useState(false);
+  const hasQuantity = Number(quantity) > 0;
 
   async function handleClick() {
     setSaving(true);
@@ -52,9 +55,9 @@ function PackControl({ boxId, row }: { boxId: string; row: FinishedStockRow }) {
   return (
     <>
       <Input inputMode="numeric" aria-label={`Piezas de ${row.size.code} ${row.clientPo ?? NO_PO_LABEL}`}
-        value={quantity} onChange={(event) => setQuantity(event.target.value)}
+        placeholder="0" value={quantity} onChange={(event) => setQuantity(event.target.value)}
         className="tabular touch-target w-16" />
-      <Button size="icon" className="touch-target" disabled={saving} aria-label="Agregar a la caja" onClick={handleClick}>
+      <Button size="icon" className="touch-target" disabled={saving || !hasQuantity} aria-label="Agregar a la caja" onClick={handleClick}>
         <Plus className="size-4" aria-hidden />
       </Button>
     </>
