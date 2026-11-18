@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/core/session";
 import { roleHasPermission } from "@/lib/constants/roles";
 import { formatQuantity } from "@/lib/utils";
@@ -12,7 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { FinishedGoodsFilters } from "@/components/finished-goods/finished-goods-filters";
 import { BoxContents } from "@/components/packing/box-contents";
 import { BoxInventory } from "@/components/packing/box-inventory";
-import { Button } from "@/components/ui/button";
+import { PackingBreadcrumb } from "@/components/packing/packing-breadcrumb";
 
 export const metadata: Metadata = { title: "Caja" };
 
@@ -40,15 +38,12 @@ export default async function PackingBoxPage({ params, searchParams }: PageProps
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={`Caja ${box.number}`}
-        description={`${box.order.name} · ${box.order.code}`}
-        action={
-          <Button asChild variant="outline" className="touch-target">
-            <Link href={`/packing/${id}`}><ArrowLeft className="size-4" aria-hidden />Pedido</Link>
-          </Button>
-        }
-      />
+      <PackingBreadcrumb items={[
+        { label: "Pedidos", href: "/packing" },
+        { label: box.order.code, href: `/packing/${id}` },
+        { label: `Caja ${box.number}` },
+      ]} />
+      <PageHeader title={`Caja ${box.number}`} description={box.order.name} />
       <BoxContents boxId={box.id} lines={box.lines} canEdit={canEdit} />
       {canEdit && <BoxFiller boxId={box.id} client={box.order.client} filters={await searchParams} />}
     </div>
@@ -93,7 +88,7 @@ async function BoxFiller({
 /** Para que un inventario acotado no se lea como un inventario vacío. */
 function OtherOwnersNotice({ clientName, pieces }: { clientName: string; pieces: number }) {
   return (
-    <p className="border border-border bg-muted p-3 text-sm">
+    <p className="border-l-2 border-state-reserved bg-muted p-3 text-sm">
       Este pedido es de <span className="font-medium">{clientName}</span>: sólo acepta su prenda o la que no
       tiene cliente. Hay <span className="tabular font-medium">{formatQuantity(pieces)}</span> pzas de otras
       empresas que no se ofrecen. Para mezclar empresas, quita el cliente del pedido.

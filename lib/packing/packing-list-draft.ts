@@ -118,6 +118,44 @@ export function draftPieces(rows: DraftRow[]): number {
   return rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
 }
 
+/** Llave caja + talla con la que el papel se compara contra las cajas. */
+export function boxSizeKey(boxNumber: number, size: string): string {
+  return `${boxNumber}|${size.trim().toUpperCase()}`;
+}
+
+/**
+ * Los renglones que no cuadran con lo que de verdad lleva su caja en su
+ * talla, con lo que la caja SÍ lleva.
+ *
+ * El packing list es papel: escribir 4 donde la caja tiene 1 no mete tres
+ * camisas. Sin este aviso, quien edita cree que ya las agregó y el embarque
+ * sale con una hoja que miente.
+ *
+ * Se compara la SUMA de los renglones de la misma caja y talla, no renglón
+ * por renglón: dos productos distintos de talla M en la misma caja son dos
+ * renglones contra dos saldos, y lo que importa al cliente es que el total
+ * de la caja cuadre. Los renglones sin caja o sin talla no se pueden
+ * comparar con nada y se dejan en paz.
+ */
+export function findMismatches(rows: DraftRow[], inBoxes: Record<string, number>): Map<string, number> {
+  const written = new Map<string, number>();
+  const keyOf = new Map<string, string>();
+  for (const row of rows) {
+    const box = Number.parseInt(row.boxNumber, 10);
+    if (!Number.isInteger(box) || !row.size.trim()) continue;
+    const key = boxSizeKey(box, row.size);
+    keyOf.set(row.key, key);
+    written.set(key, (written.get(key) ?? 0) + (Number(row.quantity) || 0));
+  }
+
+  const result = new Map<string, number>();
+  for (const [rowKey, key] of keyOf) {
+    const actual = inBoxes[key] ?? 0;
+    if (written.get(key) !== actual) result.set(rowKey, actual);
+  }
+  return result;
+}
+
 /** Lo que se manda al servidor; el esquema hace el resto. */
 export function toSheetInput(orderId: string, draft: PackingListDraft) {
   const { rows, boxes, ...header } = draft;

@@ -1,6 +1,7 @@
 import type { PackingOrderDetail } from "@/lib/repositories/packing.repository";
 import type { PackingListSheetRow } from "@/lib/repositories/packing-list-sheet.repository";
 import type { PackingListSheetInput } from "@/lib/validations/packing-list-sheet.schema";
+import { boxSizeKey } from "./packing-list-draft";
 
 /**
  * Lo que dice un packing list, venga de donde venga: lo que alguien guardó
@@ -93,6 +94,21 @@ function defaultClient(order: PackingOrderDetail): string {
     order.boxes.flatMap((box) => box.lines.flatMap((line) => (line.stock.client ? [line.stock.client.name] : []))),
   );
   return [...owners].sort((a, b) => a.localeCompare(b)).join(" / ") || "SIN CLIENTE";
+}
+
+/**
+ * Piezas por caja y talla, para señalar el renglón exacto que ya no cuadra.
+ * Un objeto plano y no un Map porque cruza del Server Component al cliente.
+ */
+export function piecesByBoxAndSize(order: PackingOrderDetail): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const box of order.boxes) {
+    for (const line of box.lines) {
+      const key = boxSizeKey(box.number, line.stock.size.code);
+      totals[key] = (totals[key] ?? 0) + line.quantity;
+    }
+  }
+  return totals;
 }
 
 /** Las piezas que de verdad hay en las cajas, para avisar si la hoja ya no cuadra. */

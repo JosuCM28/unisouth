@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Undo2 } from "lucide-react";
+import { PackageOpen, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { unpackAction } from "@/app/actions/packing.actions";
 import { runAction } from "@/lib/offline/run-action";
@@ -26,7 +26,14 @@ export function BoxContents({
   canEdit: boolean;
 }) {
   if (lines.length === 0) {
-    return <p className="flat-surface p-3 text-sm text-muted-foreground">La caja está vacía. Agrega prenda de abajo.</p>;
+    return (
+      <div className="flat-surface flex items-center gap-3 p-4">
+        <PackageOpen className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <p className="text-sm text-muted-foreground">
+          {canEdit ? "La caja está vacía. Agrega prenda del inventario de abajo." : "La caja está vacía."}
+        </p>
+      </div>
+    );
   }
 
   const sorted = [...lines].sort(
@@ -35,21 +42,24 @@ export function BoxContents({
 
   return (
     <section className="flat-surface flex flex-col">
-      <h2 className="tabular border-b border-border p-3 text-sm font-semibold">
-        En la caja · {formatQuantity(sumPieces(lines))} pzas
-      </h2>
+      <div className="flex items-center justify-between border-b border-border bg-muted px-3 py-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">En la caja</h2>
+        <span className="tabular text-sm font-semibold">{formatQuantity(sumPieces(lines))} pzas</span>
+      </div>
       <ul>
         {sorted.map((line) => (
           <li key={line.id} className="flex items-center justify-between gap-3 border-b border-border p-3 last:border-0">
-            <div className="min-w-0">
-              <p className="truncate text-sm">{line.stock.product.name}</p>
-              <p className="tabular text-xs text-muted-foreground">
-                {line.stock.size.code} · {line.stock.clientPo ?? "Sin PO"}
-              </p>
+            <span className="tabular flex size-11 shrink-0 items-center justify-center border border-border text-sm font-semibold">
+              {line.stock.size.code}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{line.stock.product.name}</p>
               {/* En un pedido sin cliente cada renglón puede ser de otra empresa. */}
-              <p className="truncate text-xs text-muted-foreground">{line.stock.client?.name ?? "Sin cliente"}</p>
+              <p className="tabular truncate text-xs text-muted-foreground">
+                {line.stock.clientPo ?? "Sin PO"} · {line.stock.client?.name ?? "Sin cliente"}
+              </p>
             </div>
-            <span className="tabular shrink-0 text-sm font-medium">{formatQuantity(line.quantity)}</span>
+            <span className="tabular shrink-0 text-base font-semibold">{formatQuantity(line.quantity)}</span>
             {canEdit && (
               <UnpackControl key={`${line.id}-${line.quantity}`} boxId={boxId} stockId={line.stock.id} max={line.quantity} />
             )}

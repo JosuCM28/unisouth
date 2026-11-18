@@ -23,16 +23,20 @@ export function PackingListEditorBoxes({
   }
 
   return (
-    <section className="flat-surface flex flex-col gap-2 p-4">
-      <h2 className="text-sm font-semibold">Peso y medidas por caja</h2>
-      <div className="grid grid-cols-[3.5rem_1fr_1fr] gap-2 text-xs text-muted-foreground">
+    <section className="flat-surface flex flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold">Peso y medidas por caja</h2>
+        <p className="text-xs text-muted-foreground">Opcional. Sale en el subtotal de cada caja para la paquetería.</p>
+      </div>
+      <div className="grid grid-cols-[4rem_1fr_1fr] gap-2 border-b border-border bg-muted px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <span>Caja</span>
         <span>Peso (kg)</span>
         <span>Medidas</span>
       </div>
       {boxes.map((box) => (
-        <div key={box.boxNumber} className="grid grid-cols-[3.5rem_1fr_1fr] items-center gap-2">
-          <span className="tabular text-sm font-medium">{box.boxNumber}</span>
+        <div key={box.boxNumber}
+          className="grid grid-cols-[4rem_1fr_1fr] items-center gap-2 border-b border-border px-4 py-2 last:border-0">
+          <span className="tabular text-sm font-semibold">{box.boxNumber}</span>
           <Input inputMode="decimal" aria-label={`Peso de la caja ${box.boxNumber}`} placeholder="0.00"
             value={box.weightKg} readOnly={readOnly}
             onChange={(event) => update(box.boxNumber, { weightKg: event.target.value })}
@@ -40,7 +44,7 @@ export function PackingListEditorBoxes({
           <Input aria-label={`Medidas de la caja ${box.boxNumber}`} placeholder="60X40X40"
             value={box.dimensions} readOnly={readOnly}
             onChange={(event) => update(box.boxNumber, { dimensions: event.target.value })}
-            className="touch-target uppercase" />
+            className="tabular touch-target uppercase" />
         </div>
       ))}
     </section>

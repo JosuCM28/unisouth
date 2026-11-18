@@ -11,6 +11,7 @@ import {
   reopenPackingOrderAction,
 } from "@/app/actions/packing.actions";
 import { runAction } from "@/lib/offline/run-action";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -32,15 +33,17 @@ export function PackingOrderActions({
 }) {
   const router = useRouter();
 
+  /** `false` deja abierto el diálogo: el servidor dijo que no y se lee por qué. */
   async function run(action: () => ReturnType<typeof closePackingOrderAction>, after?: () => void) {
     const result = await runAction(action);
     if (!result.success) {
       toast.error(result.error);
-      return;
+      return false;
     }
     toast.success(result.message ?? "Listo");
     if (after) after();
     else router.refresh();
+    return true;
   }
 
   if (status === "CLOSED") return <ReopenButton id={order.id} />;
@@ -49,24 +52,27 @@ export function PackingOrderActions({
     <div className="flex flex-wrap gap-2">
       <PackingOrderFormDialog order={order} clients={clients}
         trigger={<Button variant="outline" className="touch-target"><Pencil className="size-4" aria-hidden />Editar</Button>} />
-      <Button variant="outline" className="touch-target"
-        onClick={() => {
-          if (window.confirm("¿Cerrar el pedido? Sus cajas ya no se podrán mover.")) {
-            void run(() => closePackingOrderAction({ id: order.id }));
-          }
-        }}>
-        <Lock className="size-4" aria-hidden />
-        Cerrar
-      </Button>
-      <Button variant="outline" className="touch-target"
-        onClick={() => {
-          if (window.confirm("¿Borrar el pedido? Sólo se puede si sus cajas están vacías.")) {
-            void run(() => removePackingOrderAction({ id: order.id }), () => router.push("/packing"));
-          }
-        }}>
-        <Trash2 className="size-4" aria-hidden />
-        Borrar
-      </Button>
+      <ConfirmDialog
+        title="¿Cerrar el pedido?"
+        description="Sus cajas quedan selladas: ya no se puede meter ni sacar prenda. El packing list se sigue pudiendo corregir. Para volver a moverlo habrá que reabrirlo con motivo."
+        confirmLabel="Cerrar pedido"
+        pendingLabel="Cerrando…"
+        onConfirm={() => run(() => closePackingOrderAction({ id: order.id }))}
+        trigger={<Button variant="outline" className="touch-target"><Lock className="size-4" aria-hidden />Cerrar</Button>}
+      />
+      <ConfirmDialog
+        title={`¿Borrar ${order.name}?`}
+        description="Sólo se puede si todas sus cajas están vacías. El pedido desaparece de la lista y no se puede recuperar."
+        confirmLabel="Borrar pedido"
+        pendingLabel="Borrando…"
+        tone="destructive"
+        onConfirm={() => run(() => removePackingOrderAction({ id: order.id }), () => router.push("/packing"))}
+        trigger={
+          <Button variant="outline" className="touch-target text-destructive hover:text-destructive">
+            <Trash2 className="size-4" aria-hidden />Borrar
+          </Button>
+        }
+      />
     </div>
   );
 }
