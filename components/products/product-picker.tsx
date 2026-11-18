@@ -90,7 +90,14 @@ export function ProductPicker({
       {creating && (
         <div className="flex flex-col gap-2 border border-border bg-muted p-2">
           <Input aria-label="Nombre del producto nuevo" placeholder="Camisa manga larga" value={name}
-            onChange={(event) => setName(event.target.value)} className="touch-target uppercase" />
+            onChange={(event) => setName(event.target.value)} className="touch-target uppercase"
+            // El selector vive dentro del formulario de quien lo usa: Enter aquí
+            // da de alta el producto y no manda el formulario de afuera.
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              void handleCreate();
+            }} />
           <SearchSelect
             value={categoryId}
             onChange={setCategoryId}

@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Tag } from "lucide-react";
 import { toast } from "sonner";
+import type { z } from "zod";
 import { assignFinishedPoAction, changeFinishedPoAction } from "@/app/actions/finished-goods.actions";
 import { runAction } from "@/lib/offline/run-action";
 import type { FinishedStockRow } from "@/lib/repositories/finished-goods.repository";
 import { formatQuantity } from "@/lib/utils";
 import { assignFinishedPoSchema, changeFinishedPoSchema } from "@/lib/validations/finished-goods.schema";
+import { FormField } from "@/components/shared/form-field";
 import { ResponsiveFormDialog } from "@/components/shared/responsive-form-dialog";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -36,6 +39,12 @@ const MODES = {
   },
 } as const;
 
+/* Los dos esquemas tienen los mismos campos; sólo cambia que el motivo sea
+   obligatorio. El formulario se tipa con el más laxo y valida con el del modo,
+   que es el mismo que vuelve a revisar el servidor. */
+type FormInput = z.input<typeof assignFinishedPoSchema>;
+type FormOutput = z.output<typeof assignFinishedPoSchema>;
+
 /**
  * Pasa piezas de un renglón a otra PO. Arranca con todas: lo normal es que
  * la PO sea de todo el renglón; se baja la cantidad para repartir.
@@ -44,33 +53,22 @@ export function FinishedPoDialog({ row }: { row: FinishedStockRow }) {
   const mode = MODES[row.clientPo === null ? "assign" : "change"];
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [clientPo, setClientPo] = useState("");
-  const [quantity, setQuantity] = useState(String(row.quantity));
-  const [reason, setReason] = useState("");
-  const [saving, setSaving] = useState(false);
 
-  function reset() {
-    setClientPo("");
-    setQuantity(String(row.quantity));
-    setReason("");
-  }
+  const form = useForm<FormInput, unknown, FormOutput>({
+    resolver: zodResolver(mode.schema),
+    defaultValues: toDefaults(row),
+  });
+  const { errors, isSubmitting } = form.formState;
 
-  async function handleSave() {
-    const parsed = mode.schema.safeParse({ stockId: row.id, clientPo, quantity, reason });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Revisa los datos.");
-      return;
-    }
-    setSaving(true);
-    const result = await runAction(() => mode.action(parsed.data));
-    setSaving(false);
+  async function onSubmit(values: FormOutput) {
+    const result = await runAction(() => mode.action(values));
     if (!result.success) {
       toast.error(result.error);
       return;
     }
     toast.success(mode.success);
     setOpen(false);
-    reset();
+    form.reset(toDefaults(row));
     router.refresh();
   }
 
@@ -81,7 +79,7 @@ export function FinishedPoDialog({ row }: { row: FinishedStockRow }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) reset();
+        if (!next) form.reset(toDefaults(row));
       }}
       title={mode.title}
       description={mode.description}
@@ -91,31 +89,31 @@ export function FinishedPoDialog({ row }: { row: FinishedStockRow }) {
         </Button>
       }
     >
-      <div className="flex flex-col gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <p className="tabular text-sm">
           {label} · PO actual: <span className="font-medium">{row.clientPo ?? "Sin PO"}</span> ·{" "}
           {formatQuantity(row.quantity)} pzas
         </p>
         <div className="grid grid-cols-[1fr_6rem] gap-3">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="po-new">PO nueva</Label>
-            <Input id="po-new" value={clientPo} onChange={(event) => setClientPo(event.target.value)}
-              className="tabular touch-target uppercase" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="po-qty">Piezas</Label>
-            <Input id="po-qty" inputMode="numeric" value={quantity}
-              onChange={(event) => setQuantity(event.target.value)} className="tabular touch-target" />
-          </div>
+          <FormField id="po-new" label="PO nueva" className="tabular touch-target uppercase"
+            error={errors.clientPo?.message} {...form.register("clientPo")} />
+          <FormField id="po-qty" label="Piezas" inputMode="numeric" className="tabular touch-target"
+            error={errors.quantity?.message} {...form.register("quantity")} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="po-reason">{mode.reasonLabel}</Label>
-          <Textarea id="po-reason" rows={2} value={reason} onChange={(event) => setReason(event.target.value)} />
+          <Textarea id="po-reason" rows={2} aria-invalid={Boolean(errors.reason)} {...form.register("reason")} />
+          {errors.reason && <p className="text-sm text-destructive">{errors.reason.message}</p>}
         </div>
-        <SubmitButton isSubmitting={saving} onClick={handleSave} className="h-12 w-full">
+        <SubmitButton isSubmitting={isSubmitting} className="h-12 w-full">
           {mode.title}
         </SubmitButton>
-      </div>
+      </form>
     </ResponsiveFormDialog>
   );
+}
+
+/** Arranca con todo el renglón: lo normal es pasar todas sus piezas. */
+function toDefaults(row: FinishedStockRow): FormInput {
+  return { stockId: row.id, clientPo: "", quantity: String(row.quantity), reason: "" };
 }
