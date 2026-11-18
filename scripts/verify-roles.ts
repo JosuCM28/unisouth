@@ -71,6 +71,8 @@ const ESPERADO: Record<Role, string[]> = {
   MANAGEMENT: [
     "Órdenes", "Órdenes de planta",
     "Tablero Acatlán", "Tablero Sitex", "Tablero Broderie", "Tablero Allende",
+    // Más todo Embarques.
+    "Inventario terminado", "Pedidos",
   ],
 
   /* Un solo destino: entra a mirar cómo va un pedido y de ahí no se mueve.

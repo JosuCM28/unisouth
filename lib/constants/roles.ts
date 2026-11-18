@@ -293,7 +293,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
      cada taller y si ya lo confirmó, como ADMIN. No puede confirmar nada por
      dos candados: el botón sólo se pinta al taller dueño del tablero
      (`isOwner`), y la acción de recibir pide `workshop-orders:access`, que
-     este rol no lleva. */
+     este rol no lleva.
+
+     Además, TODO lo de Embarques: inventario terminado, ajustes con motivo,
+     alta rápida de producto y pedidos de empaque. Se le dio porque también
+     arma y despacha prenda terminada; son las mismas cuatro llaves de
+     SHIPPING, ni una más (cambiar una PO que ya venía sigue siendo de ADMIN). */
   MANAGEMENT: [
     "orders:browse",
     "plant-orders:browse",
@@ -302,6 +307,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "workshop-board:sitex",
     "workshop-board:broderie",
     "workshop-board:allende",
+    "finished-goods:browse",
+    "finished-goods:adjust",
+    "products:create",
+    "packing:write",
   ],
 
   /* Una sola pantalla: las órdenes de corte, y de ahí no se mueve.
