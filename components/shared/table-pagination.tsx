@@ -19,6 +19,12 @@ import {
 /** Tamaños de página que se ofrecen. */
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 
+/**
+ * "Todos": la lista completa en una sola página. Viaja como 0 por
+ * `onPageSizeChange` para no inventar otro callback.
+ */
+export const ALL_ROWS = 0;
+
 interface Props {
   page: number;
   totalPages: number;
@@ -28,6 +34,12 @@ interface Props {
   onPageChange: (page: number) => void;
   /** Sin esto no se ofrece cambiar el tamaño de página. */
   onPageSizeChange?: (size: number) => void;
+  /**
+   * Ofrece "Todos" (`ALL_ROWS`). Sólo en listas que ya llegaron completas al
+   * navegador: en las que pagina la base, "todos" sería pedirle la tabla
+   * entera de un jalón.
+   */
+  allowAll?: boolean;
   className?: string;
 }
 
@@ -49,10 +61,13 @@ export function TablePagination({
   itemLabel,
   onPageChange,
   onPageSizeChange,
+  allowAll = false,
   className,
 }: Props) {
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
+  // Con "Todos" la única página es la lista entera.
+  const effectiveSize = pageSize === ALL_ROWS ? Math.max(total, 1) : pageSize;
+  const from = total === 0 ? 0 : (page - 1) * effectiveSize + 1;
+  const to = Math.min(page * effectiveSize, total);
 
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
@@ -148,6 +163,7 @@ export function TablePagination({
                   {size} filas
                 </SelectItem>
               ))}
+              {allowAll && <SelectItem value={String(ALL_ROWS)}>Todos</SelectItem>}
             </SelectContent>
           </Select>
         )}

@@ -1,6 +1,7 @@
 import type { FinishedStock, Prisma } from "@prisma/client";
 import { BaseRepository, type PrismaDelegate } from "@/lib/core/base-repository";
 import type { FinishedGoodsFilters } from "@/lib/validations/finished-goods.schema";
+import { EXPORT_ROW_LIMIT } from "@/lib/export/limits";
 
 /**
  * Tope de renglones en pantalla. Sobra para una bodega de prenda terminada;
@@ -63,13 +64,18 @@ export class FinishedGoodsRepository extends BaseRepository<
   }
 
   /** Lo que HAY: un renglón en cero ya no estorba en la lista. */
-  async findStock(filters: FinishedGoodsFilters): Promise<FinishedStockRow[]> {
+  async findStock(filters: FinishedGoodsFilters, take = FINISHED_STOCK_LIMIT): Promise<FinishedStockRow[]> {
     return this.db.finishedStock.findMany({
       where: toWhere(filters),
       select: STOCK_SELECT,
       orderBy: [{ product: { name: "asc" } }, { size: { order: "asc" } }, { clientPo: "asc" }],
-      take: FINISHED_STOCK_LIMIT,
+      take,
     });
+  }
+
+  /** Lo mismo que la lista, con el tope del Excel y no el de la pantalla. */
+  async findAllForExport(filters: FinishedGoodsFilters): Promise<FinishedStockRow[]> {
+    return this.findStock(filters, EXPORT_ROW_LIMIT);
   }
 
   /**

@@ -10,7 +10,12 @@ import {
 import { GarmentCategoryRepository } from "@/lib/repositories/garment-category.repository";
 import { SizeRepository } from "@/lib/repositories/size.repository";
 import type { FinishedGoodsFilters as Filters } from "@/lib/validations/finished-goods.schema";
+import {
+  parseFinishedGoodsFilters,
+  type FinishedGoodsSearchParams,
+} from "@/lib/export/finished-goods-filters";
 import { PageHeader } from "@/components/layout/page-header";
+import { ExportButton } from "@/components/shared/export-button";
 import { FinishedAdjustDialog, type AdjustOptions } from "@/components/finished-goods/finished-adjust-dialog";
 import { FinishedGoodsFilters } from "@/components/finished-goods/finished-goods-filters";
 import { FinishedGoodsView } from "@/components/finished-goods/finished-goods-view";
@@ -19,16 +24,14 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = { title: "Inventario terminado" };
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; tipo?: string; cliente?: string; po?: string; talla?: string }>;
+  searchParams: Promise<FinishedGoodsSearchParams>;
 }
 
 /** La prenda terminada que tiene Embarques, por producto, talla y PO. */
 export default async function FinishedGoodsPage({ searchParams }: PageProps) {
   const user = await requirePermission("finished-goods:browse");
-  const params = await searchParams;
-  const filters: Filters = {
-    search: params.q, categoryId: params.tipo, clientId: params.cliente, clientPo: params.po, sizeId: params.talla,
-  };
+  // El mismo lector que el Excel: lo que se baja es lo que se está viendo.
+  const filters: Filters = parseFinishedGoodsFilters(await searchParams);
   const canAdjust = roleHasPermission(user.role, "finished-goods:adjust");
 
   const repo = new FinishedGoodsRepository();
@@ -44,10 +47,16 @@ export default async function FinishedGoodsPage({ searchParams }: PageProps) {
       <PageHeader
         title="Inventario terminado"
         description="Prenda confeccionada lista para empacar"
-        action={adjustOptions && (
-          <FinishedAdjustDialog options={adjustOptions}
-            trigger={<Button className="touch-target"><Plus className="size-4" aria-hidden />Entrada manual</Button>} />
-        )}
+        action={
+          <div className="flex flex-wrap gap-2">
+            {/* Lleva los filtros de la URL: sin ninguno baja todo el inventario. */}
+            <ExportButton href="/api/export/finished-goods" label="Excel" />
+            {adjustOptions && (
+              <FinishedAdjustDialog options={adjustOptions}
+                trigger={<Button className="touch-target"><Plus className="size-4" aria-hidden />Entrada manual</Button>} />
+            )}
+          </div>
+        }
       />
       <FinishedGoodsFilters options={{ ...options, categories }} />
       <FinishedGoodsView

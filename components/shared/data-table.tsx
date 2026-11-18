@@ -27,7 +27,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TablePagination } from "@/components/shared/table-pagination";
+import { ALL_ROWS, TablePagination } from "@/components/shared/table-pagination";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -152,6 +152,9 @@ export function DataTable<TData>({
      salían de una fila por página. Se veía como si la lista estuviera casi
      vacía y el resto se alcanzaba picando "Siguiente" una vez por registro. */
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
+  /* "Todos" se lleva aparte y no como un pageSize gigante: la lista puede
+     crecer al refrescar, y un número fijo volvería a partirla sin avisar. */
+  const [showAll, setShowAll] = useState(false);
 
   /**
    * ¿Reparte esta tabla las filas en el navegador?
@@ -203,7 +206,7 @@ export function DataTable<TData>({
     ...(getRowId ? { getRowId } : {}),
   });
 
-  const rows = paginatesInMemory
+  const rows = paginatesInMemory && !showAll
     ? table.getPaginatedRowModel().rows
     : table.getSortedRowModel().rows;
 
@@ -331,13 +334,17 @@ export function DataTable<TData>({
           deja volver a partir la lista si alguien eligió 100. */}
       {paginatesInMemory && selectablePageSize && (
         <TablePagination
-          page={pagination.pageIndex + 1}
-          totalPages={Math.max(1, table.getPageCount())}
+          page={showAll ? 1 : pagination.pageIndex + 1}
+          totalPages={showAll ? 1 : Math.max(1, table.getPageCount())}
           total={data.length}
-          pageSize={pagination.pageSize}
+          pageSize={showAll ? ALL_ROWS : pagination.pageSize}
           itemLabel={itemLabel}
+          allowAll
           onPageChange={(page) => table.setPageIndex(page - 1)}
-          onPageSizeChange={(size) => setPagination({ pageIndex: 0, pageSize: size })}
+          onPageSizeChange={(size) => {
+            setShowAll(size === ALL_ROWS);
+            if (size !== ALL_ROWS) setPagination({ pageIndex: 0, pageSize: size });
+          }}
         />
       )}
 

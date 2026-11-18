@@ -7,9 +7,9 @@ import { ColumnPicker } from "@/components/shared/column-picker";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { useColumnVisibility, type ColumnVisibility } from "@/components/shared/use-column-visibility";
 
-export const NO_PO_LABEL = "Sin PO";
-export const NO_CATEGORY_LABEL = "Sin tipo";
-export const NO_CLIENT_LABEL = "Sin cliente";
+import { NO_CATEGORY_LABEL, NO_CLIENT_LABEL, NO_PO_LABEL } from "./finished-stock-labels";
+
+export { NO_CATEGORY_LABEL, NO_CLIENT_LABEL, NO_PO_LABEL };
 
 /** Renglones por página: la lista llega completa y se reparte aquí. */
 const PAGE_SIZE = 50;
