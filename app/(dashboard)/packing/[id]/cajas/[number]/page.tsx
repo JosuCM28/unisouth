@@ -11,6 +11,7 @@ import { FinishedGoodsFilters } from "@/components/finished-goods/finished-goods
 import { BoxContents } from "@/components/packing/box-contents";
 import { BoxInventory } from "@/components/packing/box-inventory";
 import { PackingBreadcrumb } from "@/components/packing/packing-breadcrumb";
+import { NewBoxButton } from "@/components/packing/packing-box-buttons";
 
 export const metadata: Metadata = { title: "Caja" };
 
@@ -43,7 +44,9 @@ export default async function PackingBoxPage({ params, searchParams }: PageProps
         { label: box.order.code, href: `/packing/${id}` },
         { label: `Caja ${box.number}` },
       ]} />
-      <PageHeader title={`Caja ${box.number}`} description={box.order.name} />
+      {/* Nueva caja aquí también: al llenar una tras otra no hay que regresar al pedido. */}
+      <PageHeader title={`Caja ${box.number}`} description={box.order.name}
+        action={canEdit && <NewBoxButton orderId={id} />} />
       <BoxContents boxId={box.id} lines={box.lines} canEdit={canEdit} />
       {canEdit && <BoxFiller boxId={box.id} client={box.order.client} filters={await searchParams} />}
     </div>
