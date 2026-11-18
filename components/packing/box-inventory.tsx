@@ -20,6 +20,7 @@ export function BoxInventory({ boxId, rows }: { boxId: string; rows: FinishedSto
   return (
     <FinishedStockTable
       rows={rows.filter((row) => row.quantity > 0)}
+      columnsKey="packing-box-inventory"
       emptyState={
         <div className="flat-surface">
           <EmptyState icon={PackageCheck} title="Nada disponible con esos filtros" />

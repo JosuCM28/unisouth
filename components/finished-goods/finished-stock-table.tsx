@@ -3,7 +3,9 @@
 import type { ReactNode } from "react";
 import type { FinishedStockRow } from "@/lib/repositories/finished-goods.repository";
 import { formatQuantity } from "@/lib/utils";
+import { ColumnPicker } from "@/components/shared/column-picker";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { useColumnVisibility, type ColumnVisibility } from "@/components/shared/use-column-visibility";
 
 export const NO_PO_LABEL = "Sin PO";
 export const NO_CATEGORY_LABEL = "Sin tipo";
@@ -26,12 +28,58 @@ export function FinishedStockTable({
   rows,
   renderActions,
   emptyState,
+  columnsKey,
 }: {
   rows: FinishedStockRow[];
   renderActions: (row: FinishedStockRow) => ReactNode;
   emptyState: ReactNode;
+  /** Dónde se recuerdan las columnas elegidas. Cada pantalla la suya: en la
+      caja se quiere ver otra cosa que en el inventario. */
+  columnsKey: string;
 }) {
-  const columns: DataTableColumn<FinishedStockRow>[] = [
+  const { visibility, setVisible } = useColumnVisibility(columnsKey, DEFAULT_VISIBILITY);
+  const columns = buildColumns(renderActions).filter((column) => visibility[column.id ?? ""] !== false);
+
+  /* El selector sólo existe desde `md:`: en celular son tarjetas y no hay
+     columnas que elegir. */
+  return (
+    <div className="flex flex-col gap-2">
+      {rows.length > 0 && (
+        <div className="hidden justify-end md:flex">
+          <ColumnPicker columns={PICKABLE_COLUMNS} visibility={visibility} onChange={setVisible} />
+        </div>
+      )}
+      <DataTable
+        columns={columns}
+        data={rows}
+        pageSize={PAGE_SIZE}
+        selectablePageSize
+        getRowId={(row) => row.id}
+        itemLabel={{ one: "renglón", many: "renglones" }}
+        emptyState={emptyState}
+        renderMobileRow={(row) => <MobileRow row={row} actions={renderActions(row)} />}
+      />
+    </div>
+  );
+}
+
+/** Todas a la vista de entrada; cada quien esconde lo que no use. */
+const DEFAULT_VISIBILITY: ColumnVisibility = {};
+
+/* Producto y acciones no se ofrecen: sin el nombre el renglón no dice qué es,
+   y sin acciones no se puede trabajar. */
+const PICKABLE_COLUMNS = [
+  { id: "category", label: "Tipo" },
+  { id: "size", label: "Talla" },
+  { id: "po", label: "PO" },
+  { id: "client", label: "Cliente" },
+  { id: "quantity", label: "Piezas" },
+];
+
+function buildColumns(
+  renderActions: (row: FinishedStockRow) => ReactNode,
+): DataTableColumn<FinishedStockRow>[] {
+  return [
     {
       id: "product",
       header: "Producto",
@@ -87,18 +135,6 @@ export function FinishedStockTable({
       cell: ({ row }) => <div className="flex justify-end gap-1">{renderActions(row.original)}</div>,
     },
   ];
-
-  return (
-    <DataTable
-      columns={columns}
-      data={rows}
-      pageSize={PAGE_SIZE}
-      getRowId={(row) => row.id}
-      itemLabel={{ one: "renglón", many: "renglones" }}
-      emptyState={emptyState}
-      renderMobileRow={(row) => <MobileRow row={row} actions={renderActions(row)} />}
-    />
-  );
 }
 
 /** En celular, tarjeta con las mismas etiquetas que las columnas. */

@@ -36,6 +36,7 @@ export function FinishedGoodsView({
       )}
       <FinishedStockTable
         rows={rows}
+        columnsKey="finished-stock"
         emptyState={
           <div className="flat-surface">
             <EmptyState

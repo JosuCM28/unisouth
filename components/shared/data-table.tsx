@@ -112,6 +112,12 @@ interface DataTableProps<TData> {
   pageSize?: number;
   /** Presente = la página la sirve Postgres, no el navegador. */
   server?: ServerPagination;
+  /**
+   * Paginador completo —números de página y filas por página— también para
+   * las listas que se reparten en el navegador. Sin esto queda el sencillo
+   * de anterior/siguiente.
+   */
+  selectablePageSize?: boolean;
   /** Sustantivo para los contadores ("rollo"/"rollos"). */
   itemLabel?: { one: string; many: string };
   getRowId?: (row: TData) => string;
@@ -134,6 +140,7 @@ export function DataTable<TData>({
   emptyState,
   pageSize = 25,
   server,
+  selectablePageSize = false,
   itemLabel = { one: "registro", many: "registros" },
   getRowId,
 }: DataTableProps<TData>) {
@@ -320,7 +327,21 @@ export function DataTable<TData>({
         </div>
       )}
 
-      {paginatesInMemory && table.getPageCount() > 1 && (
+      {/* Se pinta aunque quepa en una página: el selector de filas es el que
+          deja volver a partir la lista si alguien eligió 100. */}
+      {paginatesInMemory && selectablePageSize && (
+        <TablePagination
+          page={pagination.pageIndex + 1}
+          totalPages={Math.max(1, table.getPageCount())}
+          total={data.length}
+          pageSize={pagination.pageSize}
+          itemLabel={itemLabel}
+          onPageChange={(page) => table.setPageIndex(page - 1)}
+          onPageSizeChange={(size) => setPagination({ pageIndex: 0, pageSize: size })}
+        />
+      )}
+
+      {paginatesInMemory && !selectablePageSize && table.getPageCount() > 1 && (
         <Pagination
           page={pagination.pageIndex + 1}
           pageCount={table.getPageCount()}
