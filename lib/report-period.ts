@@ -285,3 +285,24 @@ export function monthShortLabel(month: string): string {
 
   return `${name} ${month.slice(2, 4)}`;
 }
+
+/** "jueves": el renglón de cada día en el reporte de corte y tendido. */
+export function weekdayLong(key: string): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(keyToDate(key));
+}
+
+/** "jueves 20 de noviembre de 2026" */
+export function formatLongDayKey(key: string): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+    .format(keyToDate(key))
+    .replace(",", "");
+}

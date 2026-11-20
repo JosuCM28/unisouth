@@ -4,7 +4,7 @@ import { buildDailyCutWorkbook } from "@/lib/export/daily-cut-sheet";
 import { xlsxResponse } from "@/lib/export/xlsx";
 import { DailyCutService } from "@/lib/services/daily-cut.service";
 
-/** El Excel de "Lo cortado": lo capturado en la mesa en el día o rango. */
+/** El Excel de "Lo cortado": el reporte diario de corte y tendido. */
 export async function GET(request: Request) {
   // Recorre los cortes de todo el rango: sin tope es un vector de denegación.
   await enforceRateLimit("export:daily-cut", EXPORT_LIMIT);
@@ -20,5 +20,5 @@ export async function GET(request: Request) {
   const range = report.fromKey === report.toKey
     ? report.fromKey
     : `${report.fromKey}-a-${report.toKey}`;
-  return xlsxResponse(buildDailyCutWorkbook(report), `lo-cortado-${range}`);
+  return xlsxResponse(buildDailyCutWorkbook(report), `reporte-corte-tendido-${range}`);
 }
