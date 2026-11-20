@@ -338,6 +338,7 @@ function packageWorkbook(
   sheetXml: string,
   tabName: string,
   repeatRows?: string,
+  stylesXml: string = STYLES_XML,
 ): Buffer {
   /* Los títulos que se repiten en cada página son un NOMBRE DEFINIDO del
      libro, no una propiedad de la hoja: así lo guarda Excel. Sin esto, una
@@ -382,9 +383,20 @@ ${printTitles}<calcPr calcId="0" fullCalcOnLoad="1"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`,
     },
-    { name: "xl/styles.xml", content: STYLES_XML },
+    { name: "xl/styles.xml", content: stylesXml },
     { name: "xl/worksheets/sheet1.xml", content: sheetXml },
   ]);
+}
+
+/**
+ * Una hoja con estilos PROPIOS: la escribe quien llama, celda por celda.
+ *
+ * Para las hojas que tienen que verse igual que un formato que ya circula
+ * —colores por columna, alto de renglón, filtro—: con los estilos fijos de
+ * arriba saldrían "parecidas", y quien las recibe nota la diferencia.
+ */
+export function toXlsxCustom(sheetXml: string, stylesXml: string, tabName: string): Buffer {
+  return packageWorkbook(sheetXml, tabName, undefined, stylesXml);
 }
 
 /** Estilos con nombre para una hoja con forma de documento. */
